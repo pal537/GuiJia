@@ -40,6 +40,14 @@ func TestUIIDs(t *testing.T) {
 		"data-px-certedit",       // 证书行编辑按钮
 		`data-tab="cert"`,        // 导航证书项
 		`id="tab-cert"`,          // 证书页
+		`data-tab="home"`,        // 导航首页项(仅有其他服务器时显示)
+		`id="tab-home"`,          // 首页
+		"navHome",                // 首页导航按钮
+		"homeGrid",               // 首页服务器卡片网格
+		"homeAlert",              // 首页新设备提醒条
+		"btnHomeAck",             // 提醒条“知道了”按钮
+		"viewBar",                // 正在查看节点提示条
+		"btnHomeBack",            // 返回首页按钮
 		"cmBackHost",             // 反代规则上游 IP 框
 		"cmBackPort",             // 反代规则上游端口框
 		"pxCertViewModal",        // 证书查看弹窗构建函数

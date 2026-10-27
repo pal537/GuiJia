@@ -79,6 +79,103 @@ func saveServersLocked() {
 	os.WriteFile(serversFile, b, 0600)
 }
 
+// ---------- 首页新设备提醒(服务端持久化, home-seen.json, 0600) ----------
+// homeSeen: 已由管理员在首页点“知道了”的服务器指纹集合。判断只认登记,
+// 待添加不算; 指纹一律小写比对。文件缺失 = 空集合, 不报错。
+
+var homeSeen = map[string]bool{}
+
+func loadHomeSeen() {
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	homeSeen = map[string]bool{}
+	if b, err := os.ReadFile(homeSeenFile); err == nil {
+		var wrap struct {
+			Seen []string `json:"seen"`
+		}
+		if json.Unmarshal(b, &wrap) == nil {
+			for _, fp := range wrap.Seen {
+				if validFingerprint(fp) {
+					homeSeen[strings.ToLower(fp)] = true
+				}
+			}
+		}
+	}
+}
+
+// saveHomeSeenLocked 调用方须持有 hubMu, 文件 0600。
+func saveHomeSeenLocked() {
+	seen := []string{}
+	for fp := range homeSeen {
+		seen = append(seen, fp)
+	}
+	b, _ := json.MarshalIndent(map[string]any{"seen": seen}, "", "  ")
+	os.WriteFile(homeSeenFile, b, 0600)
+}
+
+// handleNodeHomeAlerts: 未确认的新接入服务器(已登记且指纹不在 homeSeen 里)。
+func handleNodeHomeAlerts(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		errJSON(w, 405, "method")
+		return
+	}
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	news := []map[string]any{}
+	for _, s := range hubServers {
+		if s == nil || homeSeen[strings.ToLower(s.Fingerprint)] {
+			continue
+		}
+		news = append(news, map[string]any{
+			"fingerprint": s.Fingerprint, "name": s.Name, "status": s.Status,
+			"createdAt": s.CreatedAt, "lastSeen": s.LastSeen,
+		})
+	}
+	writeJSON(w, 200, map[string]any{"new": news})
+}
+
+// handleNodeHomeAck: 把一批指纹记为已确认, 落盘后不再提醒。
+func handleNodeHomeAck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var in struct {
+		Fingerprints []string `json:"fingerprints"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	n := 0
+	for _, fp := range in.Fingerprints {
+		if !validFingerprint(fp) {
+			continue
+		}
+		fp = strings.ToLower(fp)
+		// 只确认当前已登记的服务器: 未登记的指纹不进集合, 以后它真接入时仍会提醒。
+		registered := false
+		for _, s := range hubServers {
+			if s != nil && strings.ToLower(s.Fingerprint) == fp {
+				registered = true
+				break
+			}
+		}
+		if !registered {
+			continue
+		}
+		if !homeSeen[fp] {
+			homeSeen[fp] = true
+			n++
+		}
+	}
+	saveHomeSeenLocked()
+	writeJSON(w, 200, map[string]any{"acked": n})
+}
+
 func findHubServer(fp string) *hubServer {
 	for _, s := range hubServers {
 		if s != nil && s.Fingerprint == fp {

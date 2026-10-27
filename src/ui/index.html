@@ -34,6 +34,28 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 .stat .chip{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px}
 .stat .num{font-size:26px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums}
 .stat .lab{color:var(--mut);font-size:12.5px;margin-top:4px}
+/* ---------- 多服务器首页 ---------- */
+.home-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(272px,1fr));gap:14px;margin-bottom:16px}
+.srv-card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:18px;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease, opacity .3s ease}
+.srv-card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(16,24,40,.13)}
+.srv-card.offline{opacity:.55;filter:saturate(.4);cursor:default}
+.srv-card.offline:hover{transform:none;box-shadow:var(--shadow)}
+.srv-card.srv-in{animation:srvIn .45s ease both}
+@keyframes srvIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.srv-card .srv-top{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.srv-card .srv-name{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srv-card .srv-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.15)}
+.srv-card.offline .srv-dot{background:#9aa5b1;box-shadow:0 0 0 3px rgba(154,165,177,.15)}
+.srv-card .srv-tag{font-size:12px;color:var(--mut);margin-left:auto;flex:0 0 auto}
+.srv-card .srv-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.srv-card .srv-num{font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;min-height:24px}
+.srv-card .srv-lab{color:var(--mut);font-size:12px;margin-top:3px}
+.srv-card .srv-foot{color:var(--mut);font-size:12px;margin-top:12px;min-height:16px}
+.home-alert{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13.5px}
+.home-alert .btn{flex:0 0 auto}
+#viewBar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 16px;margin-bottom:16px;font-size:13.5px;box-shadow:var(--shadow)}
+#viewBar .btn{flex:0 0 auto}
+@media (prefers-reduced-motion: reduce){.srv-card,.srv-card.srv-in{animation:none;transition:none}.srv-card:hover{transform:none}}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
 .ph{display:flex;align-items:center;padding:14px 18px 10px;gap:8px;flex-wrap:wrap}
 .ph h2{font-size:15px;font-weight:700}
@@ -210,7 +232,7 @@ body.auth #loginView{margin:auto}
       <span class="pill" id="pillGeo">归属地库 …</span>
       <span class="pill" id="pillDry" style="display:none">干跑模式</span>
     </div>
-    <span class="sp"></span><select id="serverSel" style="display:none"></select><button class="btn sm" id="btnLogout" style="display:none">退出登录</button>
+    <span class="sp"></span><button class="btn sm" id="btnLogout" style="display:none">退出登录</button>
   </div>
 
   <div class="panel" id="loginView" style="display:none">
@@ -265,8 +287,16 @@ body.auth #loginView{margin:auto}
   </div>
 
   <div class="nav" id="nav">
-    <button data-tab="ov" class="on">总览</button><button data-tab="ports">端口</button><button data-tab="events">事件</button><button data-tab="bans">黑白名单</button><button data-tab="prot">防护</button><button data-tab="proxy">反代</button><button data-tab="cert">证书</button><button data-tab="set">设置</button>
+    <button data-tab="home" id="navHome" style="display:none">首页</button><button data-tab="ov" class="on">总览</button><button data-tab="ports">端口</button><button data-tab="events">事件</button><button data-tab="bans">黑白名单</button><button data-tab="prot">防护</button><button data-tab="proxy">反代</button><button data-tab="cert">证书</button><button data-tab="set">设置</button>
   </div>
+
+  <div id="viewBar" style="display:none"><span>正在查看：<b id="viewBarName"></b></span><span class="sp"></span><button class="btn sm" id="btnHomeBack">返回首页</button></div>
+
+  <section id="tab-home" style="display:none">
+    <div class="home-alert" id="homeAlert" style="display:none"><span id="homeAlertTx"></span><span class="sp"></span><button class="btn sm" id="btnHomeAck">知道了</button></div>
+    <div class="home-grid" id="homeGrid"></div>
+    <div style="color:var(--mut);font-size:12.5px;padding:2px 4px 6px">点卡片切换到那台服务器的面板；离线卡片不可点。<span id="homeTime"></span></div>
+  </section>
 
   <div class="panel" id="rescueBanner" style="display:none;border-color:rgba(212,58,47,.5)">
     <div class="ph"><h2 style="color:var(--red)">🆘 防护已暂停（急救模式）</h2><span class="hint" id="rescueBannerTx"></span><span class="sp"></span><button class="btn primary" id="btnRescueRestoreTop">恢复防护</button></div>
@@ -599,24 +629,117 @@ async function api(method,path,body){
   }
   return apiLocal(method,path,body);
 }
-let serverSelSig='';
-async function loadServerSel(){
-  let d;try{d=await apiLocal('GET','api/nodes/servers')}catch(e){return}
-  const opts=[{fp:'',name:'本机',online:true}].concat((d.servers||[]).map(s=>({fp:s.fingerprint,name:s.name,online:s.status==='online',last:s.lastSeen,tg:s.tgMode})));
-  const sig=JSON.stringify(opts.map(o=>[o.fp,o.name,o.online,o.tg]));
-  if(sig===serverSelSig)return;
-  serverSelSig=sig;
-  const sel=$('#serverSel');
-  const cur=sel.value;
-  sel.innerHTML=opts.map(o=>{
-    if(!o.fp)return '<option value="">本机</option>';
-    const last=o.last?('，最后在线 '+new Date(o.last*1000).toLocaleString()):'';
-    const tg=o.tg==='independent'?'（TG独立）':'';
-    return '<option value="'+o.fp+'"'+(o.online?'':' disabled')+'>'+esc(o.name)+tg+(o.online?'':'（离线'+last+'）')+'</option>';
-  }).join('');
-  if(opts.some(o=>o.fp===cur))sel.value=cur; else {sel.value='';curServer='';}
+/* ---------- 多服务器首页 ---------- */
+// 首页只在有其他已登记服务器时出现; 切换只走首页卡片, 右上角下拉已删。
+// 卡片数据: 本机走本地接口, 节点走现有代理通道并行取, 单台失败只影响自己那张卡。
+let homeServers=[]; // [{fp,name,online,last,created,ver}]
+let homeMounted=[]; // 已挂载的卡片指纹('' = 本机), 用于判断是否重建网格
+let homeTimer=null;
+let homeAlertFps=[];
+
+async function refreshHomeNav(){
+  let list=null;
+  try{const d=await apiLocal('GET','api/nodes/servers');list=d.servers||[];}catch(e){return homeServers;}
+  homeServers=list.map(s=>({fp:s.fingerprint,name:s.name,online:s.status==='online',last:s.lastSeen,created:s.createdAt,ver:s.version||''}));
+  $('#navHome').style.display=homeServers.length?'':'none';
+  if(curServer&&!homeServers.some(s=>s.fp===curServer)){curServer='';gotoTab('ov');}
+  else if(curTab==='home'&&!homeServers.length)gotoTab('ov');
+  renderViewBar();
+  return homeServers;
 }
-$('#serverSel').onchange=()=>{curServer=$('#serverSel').value;gotoTab(curTab);};
+
+function renderViewBar(){
+  const bar=$('#viewBar');
+  if(!curServer){bar.style.display='none';return;}
+  const s=homeServers.find(x=>x.fp===curServer);
+  $('#viewBarName').textContent=s?s.name:curServer.slice(0,8);
+  bar.style.display='';
+}
+$('#btnHomeBack').onclick=()=>{curServer='';gotoTab(homeServers.length?'home':'ov');};
+
+function homeCardEl(fp){
+  return $('#homeGrid').querySelector('[data-fp="'+fp+'"]');
+}
+function homeSetNums(fp,conns,bans,ports,foot){
+  const c=homeCardEl(fp);if(!c)return;
+  c.querySelector('[data-k="conns"]').textContent=conns;
+  c.querySelector('[data-k="bans"]').textContent=bans;
+  c.querySelector('[data-k="ports"]').textContent=ports;
+  if(foot!==undefined)c.querySelector('.srv-foot').textContent=foot;
+}
+function homeCardHTML(fp,name,online,tag,foot,animate,delay){
+  return '<div class="srv-card'+(online?'':' offline')+(animate?' srv-in':'')+'" data-fp="'+fp+'"'+(animate?' style="animation-delay:'+delay+'ms"':'')+'><div class="srv-top"><span class="srv-dot"></span><span class="srv-name">'+esc(name)+'</span><span class="srv-tag">'+tag+'</span></div><div class="srv-nums"><div><div class="srv-num" data-k="conns">…</div><div class="srv-lab">当前连接</div></div><div><div class="srv-num" data-k="bans">…</div><div class="srv-lab">今日拉黑</div></div><div><div class="srv-num" data-k="ports">…</div><div class="srv-lab">监控端口</div></div></div><div class="srv-foot">'+esc(foot)+'</div></div>';
+}
+$('#homeGrid').onclick=e=>{
+  const card=e.target.closest('.srv-card');if(!card||card.classList.contains('offline'))return;
+  const fp=card.dataset.fp;
+  curServer=fp; // '' = 本机
+  gotoTab('ov');
+};
+$('#btnHomeAck').onclick=async()=>{
+  const fps=homeAlertFps;if(!fps.length)return;
+  try{await apiLocal('POST','api/nodes/home-ack',{fingerprints:fps});}catch(e){}
+  $('#homeAlert').style.display='none';homeAlertFps=[];
+};
+
+async function loadHome(){
+  await refreshHomeNav();
+  if(curTab!=='home')return;
+  // 提醒条(服务端持久化, 点“知道了”后不再出现, 直到又有新设备)
+  let news=[];
+  try{const a=await apiLocal('GET','api/nodes/home-alerts');news=a.new||[];}catch(e){}
+  if(curTab!=='home')return;
+  homeAlertFps=news.map(n=>n.fingerprint);
+  const al=$('#homeAlert');
+  if(news.length){
+    $('#homeAlertTx').textContent='新设备已接入：'+news.map(n=>n.name+'（'+n.fingerprint.slice(0,8)+'，'+fmtTs(n.createdAt*1000)+'）').join('、');
+    al.style.display='';
+  }else al.style.display='none';
+  // 网格: 指纹集合变化才重建(新卡播进场动画), 否则只就地更新数字与状态, 不闪不跳
+  const want=[''].concat(homeServers.map(s=>s.fp));
+  const prevSet=new Set(homeMounted);
+  if(JSON.stringify(want)!==JSON.stringify(homeMounted)){
+    $('#homeGrid').innerHTML=want.map((fp,i)=>{
+      if(!fp)return homeCardHTML('','本机',true,'本机','本机面板',!prevSet.has(''),i*60);
+      const s=homeServers.find(x=>x.fp===fp);
+      const foot=s.online?(s.ver?'版本 '+s.ver:''):(s.last?('最后在线 '+fmtTs(s.last*1000)):'未上线过');
+      return homeCardHTML(fp,s.name,s.online,s.online?'在线':'离线',foot,!prevSet.has(fp),i*60);
+    }).join('');
+    homeMounted=want;
+  }else{
+    homeServers.forEach(s=>{
+      const c=homeCardEl(s.fp);if(!c)return;
+      c.classList.toggle('offline',!s.online);
+      c.querySelector('.srv-tag').textContent=s.online?'在线':'离线';
+      if(!s.online)c.querySelector('.srv-foot').textContent=s.last?('最后在线 '+fmtTs(s.last*1000)):'未上线过';
+      else if(s.ver)c.querySelector('.srv-foot').textContent='版本 '+s.ver;
+    });
+  }
+  // 本机数
+  let local=null,localName='本机';
+  try{local=await apiLocal('GET','api/overview');}catch(e){}
+  try{const st=await apiLocal('GET','api/settings');if(st.serverName)localName=st.serverName;}catch(e){}
+  if(curTab!=='home')return;
+  const lc=homeCardEl('');if(lc)lc.querySelector('.srv-name').textContent=localName;
+  if(local)homeSetNums('',local.connsNow,local.today.bans,local.watchedPorts);
+  else homeSetNums('','—','—','—');
+  // 节点数: 并行取, 各卡独立; 离线不取, 超时 15 秒按失败计
+  const jobs=homeServers.map(s=>{
+    if(!s.online)return Promise.resolve({fp:s.fp,off:true});
+    return Promise.race([
+      apiLocal('POST','api/nodes/proxy',{fingerprint:s.fp,method:'GET',path:'api/overview'}).then(o=>({fp:s.fp,o})).catch(e=>({fp:s.fp,err:1})),
+      new Promise(r=>setTimeout(()=>r({fp:s.fp,err:1}),15000))
+    ]);
+  });
+  const results=await Promise.all(jobs);
+  if(curTab!=='home')return;
+  results.forEach(r=>{
+    if(r.off)return;
+    if(r.o)homeSetNums(r.fp,r.o.connsNow,r.o.today.bans,r.o.watchedPorts);
+    else homeSetNums(r.fp,'—','—','—','数据获取失败');
+  });
+  $('#homeTime').textContent=' · 更新于 '+new Date().toTimeString().slice(0,8);
+}
 /* ---------- 服务类型(预设色) ---------- */
 const KINDS={
   ssh:{label:'SSH',color:'#2f4356'}, ui:{label:'面板',color:'#2563eb'},
@@ -686,9 +809,12 @@ function confirmPop(anchor,title,text,okLabel,fn){
 let curTab='ov';
 function gotoTab(name,arg){
   curTab=name;
+  renderViewBar();
   $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
-  ['ov','ports','events','bans','prot','proxy','cert','set'].forEach(t=>{$('#tab-'+t).style.display=t===name?'':'none'});
+  ['home','ov','ports','events','bans','prot','proxy','cert','set'].forEach(t=>{$('#tab-'+t).style.display=t===name?'':'none'});
   closePop();
+  if(homeTimer){clearInterval(homeTimer);homeTimer=null;}
+  if(name==='home'){loadHome();homeTimer=setInterval(()=>{if(document.visibilityState==='visible')loadHome();},10000);}
   if(name==='ports')loadPorts();
   if(name==='events')loadEvents(arg&&arg.type);
   if(name==='bans'){loadBans();loadSettings();}
@@ -1252,7 +1378,6 @@ async function loadOverview(){
   $('#sessBody').innerHTML=sess.map(s=>sessRow(s,now)).join('');
   $('#sessEmpty').style.display=sess.length?'none':'';
   bindConnOps($('#tab-ov'));
-  loadServerSel();
 }
 /* 防护页: 急救状态 + 蜜罐 + 端口防护 */
 async function loadProtection(){
@@ -1799,10 +1924,18 @@ async function loadSettings(){
 }
 /* 版本与升级: 当前视图的服务器(本机或节点)走 api() 代理; 推送全部节点只在本机视图用 apiLocal。
    检查按钮状态机: 检查更新 → 正在检查…(禁用) → 升级到 X / 当前版本已是最新；
-   升级到 X → 正在更新…(禁用) → 更新完成(禁用, 提示重登录)；失败回检查更新。全部反馈只在卡片内。 */
+   升级到 X → 正在更新…(禁用) → 更新完成(禁用, 提示重登录) → 1.5 秒后自动刷新；
+   重启中轮询失败不停，继续等面板回来；失败回检查更新。全部反馈只在卡片内。
+   防循环：自动刷新只在本流程内触发一次；页面加载时状态已是 done 只显示“已升级到 X”，绝不刷新。 */
 let upTarget='';
 let upPoll=null;
 let upBusy=false;
+let upAutoReloaded=false;
+function upScheduleReload(){
+  if(upAutoReloaded)return;
+  upAutoReloaded=true;
+  setTimeout(()=>{location.reload();},1500);
+}
 function upSetBtn(text,disabled,primary){const b=$('#btnUpCheck');b.textContent=text;b.disabled=!!disabled;b.classList.toggle('primary',!!primary);}
 function upSetMsg(t){$('#upMsg').textContent=t||'';}
 function upSetPushMsg(t){$('#upPushMsg').textContent=t||'';}
@@ -1810,10 +1943,17 @@ function stopUpPoll(){if(upPoll){clearInterval(upPoll);upPoll=null;}}
 function upStartPoll(){
   stopUpPoll();
   upPoll=setInterval(async()=>{
+    // 登录框已弹出时跳过本次：避免 401 反复触发 showLogin（会把 2FA 表单打回密码框）；
+    // 登录成功后 showApp() 去掉 auth 类，下一 tick 恢复轮询。
+    if(document.body.classList.contains('auth'))return;
     try{const s=await api('GET','api/upgrade/status');
-      if(s.state==='done'){stopUpPoll();upBusy=false;upSetBtn('更新完成',true,false);upSetMsg('更新完成，面板重启后请重新登录。');}
+      if(s.state==='done'){stopUpPoll();upBusy=false;upSetBtn('更新完成',true,false);upSetMsg('更新完成，面板重启后请重新登录。');upScheduleReload();}
       else if(s.state==='failed'){stopUpPoll();upBusy=false;$('#btnUpCheck').dataset.mode='';upSetBtn('检查更新',false,false);upSetMsg('升级失败：'+(s.error||''));}
-    }catch(e){stopUpPoll();upBusy=false;upSetBtn('更新完成',true,false);upSetMsg('面板正在重启，重启后请重新登录。');}
+    }catch(e){
+      // 面板重启中（连接被拒）或会话刚清：不停轮询，等面板回来、状态 done 后自动刷新；
+      // 绝不在这里 reload，那会撞上重启中的 refused 页面。
+      upSetMsg('面板正在重启，恢复后自动刷新…');
+    }
   },3000);
 }
 async function upRefreshPushHint(){
@@ -2011,10 +2151,11 @@ function showLogin(setup){
   document.body.classList.remove('app');
   const ic=document.querySelector('link[rel=icon]');if(ic)$('#authLogo').src=ic.href;
   $('#loginView').style.display='';
-  ['ov','ports','events','bans','prot','proxy','set'].forEach(t=>{$('#tab-'+t).style.display='none'});
+  ['home','ov','ports','events','bans','prot','proxy','set'].forEach(t=>{$('#tab-'+t).style.display='none'});
+  $('#viewBar').style.display='none';
+  if(homeTimer){clearInterval(homeTimer);homeTimer=null;}
   $('#nav').style.display='none';
   $('#btnLogout').style.display='none';
-  $('#serverSel').style.display='none';
   curServer='';
   $('#loginSetup').style.display=setup?'':'none';
   $('#loginForm').style.display=setup?'none':'';
@@ -2028,10 +2169,11 @@ function showChoice(){
   document.body.classList.remove('app');
   const ic=document.querySelector('link[rel=icon]');if(ic)$('#authLogo').src=ic.href;
   $('#loginView').style.display='';
-  ['ov','ports','events','bans','prot','proxy','set'].forEach(t=>{$('#tab-'+t).style.display='none'});
+  ['home','ov','ports','events','bans','prot','proxy','set'].forEach(t=>{$('#tab-'+t).style.display='none'});
+  $('#viewBar').style.display='none';
+  if(homeTimer){clearInterval(homeTimer);homeTimer=null;}
   $('#nav').style.display='none';
   $('#btnLogout').style.display='none';
-  $('#serverSel').style.display='none';
   curServer='';
   $('#modeChoice').style.display='';
   $('#joinForm').style.display='none';
@@ -2040,15 +2182,14 @@ function showChoice(){
   $('#login2fa').style.display='none';
   $('#modeErr').textContent='';
 }
-function showApp(){
+async function showApp(){
   document.body.classList.remove('auth');
   document.body.classList.add('app');
   $('#loginView').style.display='none';
   $('#nav').style.display='';
   $('#btnLogout').style.display='';
-  $('#serverSel').style.display='';
-  loadServerSel();
-  gotoTab(curTab);
+  await refreshHomeNav();
+  if(curTab==='ov'&&homeServers.length&&!curServer)gotoTab('home'); else gotoTab(curTab);
 }
 async function checkAuth(){
   try{

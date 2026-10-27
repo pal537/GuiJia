@@ -63,6 +63,7 @@ var (
 	authFile     string
 	nodeFile     string
 	serversFile  string
+	homeSeenFile string
 	startedAt    = time.Now()
 )
 
@@ -241,6 +242,7 @@ func loadAll() {
 	loadPortGuard()
 	loadNodeIdentity() // 节点身份(密钥对), 缺失即生成并落盘 0600
 	loadServers()      // 主服务器侧节点登记(servers.json)
+	loadHomeSeen()     // 首页新设备提醒已确认集合(home-seen.json)
 }
 
 // newServerID 生成 8 位 hex 服务器指纹(4 字节随机数); 失败时回落时间戳 hex, 绝不返回空。
@@ -390,6 +392,7 @@ func initPaths() {
 	authFile = filepath.Join(dataDir, "auth.json")
 	nodeFile = filepath.Join(dataDir, "node.json")
 	serversFile = filepath.Join(dataDir, "servers.json")
+	homeSeenFile = filepath.Join(dataDir, "home-seen.json")
 	tgHubQueueFile = filepath.Join(dataDir, "tg-hub-queue.json")
 	os.MkdirAll(eventsDir, 0755)
 	os.MkdirAll(eventsSrcDir, 0755)
@@ -525,6 +528,8 @@ func main() {
 	mux.HandleFunc("/api/node/status", handleNodeStatus)
 	mux.HandleFunc("/api/nodes/pairing-code", handlePairingCode)
 	mux.HandleFunc("/api/nodes/servers", handleNodeServers)
+	mux.HandleFunc("/api/nodes/home-alerts", handleNodeHomeAlerts)
+	mux.HandleFunc("/api/nodes/home-ack", handleNodeHomeAck)
 	mux.HandleFunc("/api/nodes/approve", handleNodeApprove)
 	mux.HandleFunc("/api/nodes/reject", handleNodeReject)
 	mux.HandleFunc("/api/nodes/remove", handleNodeRemove)
