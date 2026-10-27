@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -77,14 +78,77 @@ func TestSetupModeManaged(t *testing.T) {
 			t.Fatalf("非法加入应 400: %s 得到 %d", b, rec.Code)
 		}
 	}
-	req := httptest.NewRequest("POST", "/api/setup/mode", strings.NewReader(`{"mode":"managed","hubUrl":"https://hub.example.com/","code":"abc123"}`))
-	rec := httptest.NewRecorder()
-	handleSetupMode(rec, req)
-	if rec.Code != 200 || settings.RunMode != "managed" || settings.HubURL != "https://hub.example.com" {
-		t.Fatalf("加入失败: code=%d body=%s mode=%q hub=%q", rec.Code, rec.Body.String(), settings.RunMode, settings.HubURL)
+	// 模拟主服务器 hello: 好码 -> pending, 其余 -> 403；无码 hello（拨号器跟进）也回 pending。
+	hubSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Code string `json:"code"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+		if req.Code != "" && req.Code != "good-code" {
+			w.WriteHeader(403)
+			json.NewEncoder(w).Encode(map[string]string{"error": "配对码无效或已过期"})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]string{"status": "pending"})
+	}))
+	defer hubSrv.Close()
+	post := func(body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("POST", "/api/setup/mode", strings.NewReader(body))
+		rec := httptest.NewRecorder()
+		handleSetupMode(rec, req)
+		return rec
 	}
-	if st, _, _ := linkSnapshot(); st != "joining" {
-		t.Fatalf("加入后链路应为 joining, 得到 %q", st)
+	get := func() map[string]any {
+		req := httptest.NewRequest("GET", "/api/setup/mode", nil)
+		rec := httptest.NewRecorder()
+		handleSetupMode(rec, req)
+		var v map[string]any
+		json.Unmarshal(rec.Body.Bytes(), &v)
+		return v
+	}
+	// 错码: 400 + 模式仍未定 + 码不落盘, 加入页可重输
+	if rec := post(`{"mode":"managed","hubUrl":"` + hubSrv.URL + `","code":"bad-code"}`); rec.Code != 400 {
+		t.Fatalf("错码应 400, 得到 %d: %s", rec.Code, rec.Body.String())
+	} else if !strings.Contains(rec.Body.String(), "配对码无效") {
+		t.Fatalf("错码应回配对码无效, 得到 %s", rec.Body.String())
+	}
+	if v := get(); v["decided"] != false || v["runMode"] != "" {
+		t.Fatalf("错码后模式应仍未定, 得到 %+v", v)
+	}
+	if nodePairingCode() != "" {
+		t.Fatalf("错码不应落盘, 得到 %q", nodePairingCode())
+	}
+	// 连不上主服务器: 400 + 模式仍未定
+	closed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	closed.Close()
+	if rec := post(`{"mode":"managed","hubUrl":"` + closed.URL + `","code":"good-code"}`); rec.Code != 400 {
+		t.Fatalf("连不上应 400, 得到 %d", rec.Code)
+	} else if !strings.Contains(rec.Body.String(), "无法连接主服务器") {
+		t.Fatalf("连不上应回无法连接主服务器, 得到 %s", rec.Body.String())
+	}
+	if v := get(); v["decided"] != false {
+		t.Fatalf("连不上后模式应仍未定, 得到 %+v", v)
+	}
+	// 好码: 200 + 模式 managed + 码不落盘（已被主服务器消耗）+ 链路 joining + 未配对 + 清掉上次回退标记
+	settings.JoinError = "rejected"
+	if rec := post(`{"mode":"managed","hubUrl":"` + hubSrv.URL + `","code":"good-code"}`); rec.Code != 200 {
+		t.Fatalf("好码应 200, 得到 %d: %s", rec.Code, rec.Body.String())
+	}
+	if settings.RunMode != "managed" || settings.HubURL != hubSrv.URL {
+		t.Fatalf("加入失败: mode=%q hub=%q", settings.RunMode, settings.HubURL)
+	}
+	if v := get(); v["linkState"] != "joining" && v["linkState"] != "pending" || v["paired"] != false {
+		t.Fatalf("好码后应 joining/pending 且未配对, 得到 %+v", v)
+	}
+	if nodePairingCode() != "" {
+		t.Fatalf("好码校验通过后码不应再留盘, 得到 %q", nodePairingCode())
+	}
+	if settings.JoinError != "" {
+		t.Fatalf("好码提交应清掉上次回退标记, 得到 %q", settings.JoinError)
+	}
+	// 二次选择应 403
+	if rec := post(`{"mode":"standalone"}`); rec.Code != 403 {
+		t.Fatalf("二次选择应 403, 得到 %d", rec.Code)
 	}
 }
 

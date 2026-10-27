@@ -82,49 +82,50 @@ type Settings struct {
 	TGEnabled         bool     `json:"tgEnabled"`
 	TGBotToken        string   `json:"tgBotToken"`
 	TGChatID          string   `json:"tgChatId"`
-	AlertSSHLogin     bool     `json:"alertSshLogin"`     // 默认开
-	AlertSSHBrute     bool     `json:"alertSshBrute"`     // 默认开
-	AlertSSHConn      bool     `json:"alertSshConn"`      // SSH 端口新连接推送, 默认开(与重点端口新连接叠加, 只影响 SSH 端口)
-	AlertPortGuardBan bool     `json:"alertPortGuardBan"` // 端口防护封禁推送, 默认开(此前无开关恒推送)
-	AlertUILogin      bool     `json:"alertUiLogin"`      // 默认开
-	AlertNewConnStar  bool     `json:"alertNewConnStar"`  // 默认关
-	AlertNewListener  bool     `json:"alertNewListener"`  // 默认关
-	AlertMuteInternal bool     `json:"alertMuteInternal"` // 内网访问不通知(只记录不推送), 默认关=内网照常通知
-	AutoBanEnabled    bool     `json:"autoBanEnabled"`    // 默认关(手动开启)
-	BruteWindowMin    int      `json:"bruteWindowMin"`    // 默认10
-	BruteThreshold    int      `json:"bruteThreshold"`    // 默认5
-	BruteBanHours     int      `json:"bruteBanHours"`     // 默认24
-	AlertPortFlood    bool     `json:"alertPortFlood"`    // 默认开
-	ScanEnabled       bool     `json:"scanEnabled"`       // 扫描识别, 默认关
-	AlertScan         bool     `json:"alertScan"`         // 扫描报警, 默认开
-	ScanAutoBan       bool     `json:"scanAutoBan"`       // 扫描自动拉黑, 默认关
-	ScanWindowMin     int      `json:"scanWindowMin"`     // 默认 5
-	ScanDistinctPorts int      `json:"scanDistinctPorts"` // 默认 5
-	FloodEnabled      bool     `json:"floodEnabled"`      // 重点端口洪峰防护(分布式爆破), 默认关
-	FloodWindowMin    int      `json:"floodWindowMin"`    // 默认1
-	FloodDistinctIPs  int      `json:"floodDistinctIps"`  // 默认30
-	FloodCloseMin     int      `json:"floodCloseMin"`     // 默认60
-	ReportEnabled     bool     `json:"reportEnabled"`     // 默认开
-	ReportTime        string   `json:"reportTime"`        // 默认 09:00
-	LogKeepDays       int      `json:"logKeepDays"`       // 默认30
-	NewSrcKeepDays    int      `json:"newSrcKeepDays"`    // 新来源事件保留天数, 默认7; 0=只计数不记录
-	TrafficAcct       bool     `json:"trafficAcct"`       // 每连接流量统计: 应用自动打开内核字节计数, 默认开
-	LedgerKeepDays    int      `json:"ledgerKeepDays"`    // 流量每日明细保留天数, 默认7; 0=永久保留(永久累计不受此设置影响)
-	TrustedIPs        []string `json:"trustedIps"`        // 信任名单: 不报警、不可拉黑
-	RescuePassHash    string   `json:"rescuePassHash"`    // 急救超级密码哈希(GET 时剥离, 永不外泄; 只能由专用接口改)
-	AuthLogPath       string   `json:"authLogPath"`       // SSH 日志路径: 为空 = 自动识别 auth.log/secure
-	PanelBanThreshold int      `json:"panelBanThreshold"` // 面板防爆破阈值: 连续错几次封 IP, 默认 5(可调, 时长固定 7 天)
-	PanelSSLMode      string   `json:"panelSslMode"`      // 面板 SSL: off | port | domain(阶段 4 实现)
-	PanelSSLCert      string   `json:"panelSslCert"`      // 面板 SSL 证书 ID(阶段 4 实现)
-	PanelSSLPort      int      `json:"panelSslPort"`      // 面板 SSL 端口模式端口, 默认 59188(阶段 4 实现)
-	PanelDomain       string   `json:"panelDomain"`       // 面板域名直访域名(阶段 4 实现)
-	ServerName        string   `json:"serverName"`        // 服务器名称: TG 通知标题用, 留空则用系统 hostname
-	ServerID          string   `json:"serverId"`          // 服务器指纹: 首次启动生成 8 位 hex, 改名不变, 随设置备份走, TG 回调靠它防串台
-	RunMode           string   `json:"runMode"`           // 运行模式: ""=未定(首次), standalone=独立用, managed=被主服务器群控
-	HubURL            string   `json:"hubUrl"`            // 被群控时主服务器地址
-	HubName           string   `json:"hubName"`           // 被群控时主服务器名(批准后回填)
-	HubID             string   `json:"hubId"`             // 被群控时主服务器 serverId(批准后回填)
-	NodeTGMode        string   `json:"nodeTgMode"`        // 被群控时 TG 通知模式: ""=走主服务器(默认), independent=独立通知
+	AlertSSHLogin     bool     `json:"alertSshLogin"`       // 默认开
+	AlertSSHBrute     bool     `json:"alertSshBrute"`       // 默认开
+	AlertSSHConn      bool     `json:"alertSshConn"`        // SSH 端口新连接推送, 默认开(与重点端口新连接叠加, 只影响 SSH 端口)
+	AlertPortGuardBan bool     `json:"alertPortGuardBan"`   // 端口防护封禁推送, 默认开(此前无开关恒推送)
+	AlertUILogin      bool     `json:"alertUiLogin"`        // 默认开
+	AlertNewConnStar  bool     `json:"alertNewConnStar"`    // 默认关
+	AlertNewListener  bool     `json:"alertNewListener"`    // 默认关
+	AlertMuteInternal bool     `json:"alertMuteInternal"`   // 内网访问不通知(只记录不推送), 默认关=内网照常通知
+	AutoBanEnabled    bool     `json:"autoBanEnabled"`      // 默认关(手动开启)
+	BruteWindowMin    int      `json:"bruteWindowMin"`      // 默认10
+	BruteThreshold    int      `json:"bruteThreshold"`      // 默认5
+	BruteBanHours     int      `json:"bruteBanHours"`       // 默认24
+	AlertPortFlood    bool     `json:"alertPortFlood"`      // 默认开
+	ScanEnabled       bool     `json:"scanEnabled"`         // 扫描识别, 默认关
+	AlertScan         bool     `json:"alertScan"`           // 扫描报警, 默认开
+	ScanAutoBan       bool     `json:"scanAutoBan"`         // 扫描自动拉黑, 默认关
+	ScanWindowMin     int      `json:"scanWindowMin"`       // 默认 5
+	ScanDistinctPorts int      `json:"scanDistinctPorts"`   // 默认 5
+	FloodEnabled      bool     `json:"floodEnabled"`        // 重点端口洪峰防护(分布式爆破), 默认关
+	FloodWindowMin    int      `json:"floodWindowMin"`      // 默认1
+	FloodDistinctIPs  int      `json:"floodDistinctIps"`    // 默认30
+	FloodCloseMin     int      `json:"floodCloseMin"`       // 默认60
+	ReportEnabled     bool     `json:"reportEnabled"`       // 默认开
+	ReportTime        string   `json:"reportTime"`          // 默认 09:00
+	LogKeepDays       int      `json:"logKeepDays"`         // 默认30
+	NewSrcKeepDays    int      `json:"newSrcKeepDays"`      // 新来源事件保留天数, 默认7; 0=只计数不记录
+	TrafficAcct       bool     `json:"trafficAcct"`         // 每连接流量统计: 应用自动打开内核字节计数, 默认开
+	LedgerKeepDays    int      `json:"ledgerKeepDays"`      // 流量每日明细保留天数, 默认7; 0=永久保留(永久累计不受此设置影响)
+	TrustedIPs        []string `json:"trustedIps"`          // 信任名单: 不报警、不可拉黑
+	RescuePassHash    string   `json:"rescuePassHash"`      // 急救超级密码哈希(GET 时剥离, 永不外泄; 只能由专用接口改)
+	AuthLogPath       string   `json:"authLogPath"`         // SSH 日志路径: 为空 = 自动识别 auth.log/secure
+	PanelBanThreshold int      `json:"panelBanThreshold"`   // 面板防爆破阈值: 连续错几次封 IP, 默认 5(可调, 时长固定 7 天)
+	PanelSSLMode      string   `json:"panelSslMode"`        // 面板 SSL: off | port | domain(阶段 4 实现)
+	PanelSSLCert      string   `json:"panelSslCert"`        // 面板 SSL 证书 ID(阶段 4 实现)
+	PanelSSLPort      int      `json:"panelSslPort"`        // 面板 SSL 端口模式端口, 默认 59188(阶段 4 实现)
+	PanelDomain       string   `json:"panelDomain"`         // 面板域名直访域名(阶段 4 实现)
+	ServerName        string   `json:"serverName"`          // 服务器名称: TG 通知标题用, 留空则用系统 hostname
+	ServerID          string   `json:"serverId"`            // 服务器指纹: 首次启动生成 8 位 hex, 改名不变, 随设置备份走, TG 回调靠它防串台
+	RunMode           string   `json:"runMode"`             // 运行模式: ""=未定(首次), standalone=独立用, managed=被主服务器群控
+	HubURL            string   `json:"hubUrl"`              // 被群控时主服务器地址
+	HubName           string   `json:"hubName"`             // 被群控时主服务器名(批准后回填)
+	HubID             string   `json:"hubId"`               // 被群控时主服务器 serverId(批准后回填)
+	JoinError         string   `json:"joinError,omitempty"` // 加入失败回退原因: rejected=主服务器拒绝, revoked=曾配对后被移除；加入页据此提示，下次提交时清掉
+	NodeTGMode        string   `json:"nodeTgMode"`          // 被群控时 TG 通知模式: ""=走主服务器(默认), independent=独立通知
 }
 
 func defaultSettings() Settings {
@@ -476,8 +477,8 @@ func main() {
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		if effectiveRunMode() == "managed" {
-			w.Write(managedHTML) // 被群控节点: 只读状态页, 不给管理界面
+		if useManagedPage() {
+			w.Write(managedHTML) // 已配对成功: 只读状态页, 只有一行大字
 			return
 		}
 		w.Write(indexHTML)

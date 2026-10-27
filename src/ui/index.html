@@ -240,7 +240,7 @@ body.auth #loginView{margin:auto}
     <div id="modeChoice" style="display:none">
       <div class="authstate">选择运行模式</div>
       <div class="authhint">同一安装包，首次使用二选一。选了之后不可在面板里改，改模式需走服务器本地命令。</div>
-      <div style="display:flex;flex-direction:column;gap:12px">
+      <div id="modeBtns" style="display:flex;flex-direction:column;gap:12px">
         <button class="btn primary" id="btnModeStandalone">独立使用（设置管理员密码）</button>
         <button class="btn" id="btnModeManaged">连接到主服务器（群控）</button>
       </div>
@@ -249,6 +249,10 @@ body.auth #loginView{margin:auto}
         <input type="text" id="joinCode" placeholder="配对码（主服务器面板生成）">
         <button class="btn primary" id="btnJoin">发送加入请求</button>
         <button class="btn" id="btnJoinBack">返回</button>
+      </div>
+      <div id="joinPending" style="display:none;flex-direction:column;gap:12px;margin-top:12px">
+        <div class="authstate">已发送加入请求，等待主服务器确认</div>
+        <div class="authhint">主服务器确认后自动进入群控状态页；如被拒绝，会回到加入页用新配对码重输。</div>
       </div>
       <div class="authnote" id="modeErr" style="color:#cf222e"></div>
     </div>
@@ -2216,6 +2220,29 @@ $('#btnUpData').onclick=()=>$('#upData').click();
 $('#upSettings').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)restoreUpload('settings',f,false).catch(err=>toast(err.message))};
 $('#upData').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)restoreUpload('data',f,false).catch(err=>toast(err.message))};
 /* ---------- 登录鉴权 ---------- */
+// 加入等待态：码已消耗、等主服务器确认期间留在加入页，不进状态页。
+let joinPoll=null;
+function stopJoinPoll(){if(joinPoll){clearInterval(joinPoll);joinPoll=null;}}
+function joinErrorText(e){
+  if(e==='rejected')return '加入请求被拒绝，请用新配对码重输';
+  if(e==='revoked')return '已被主服务器移除，请用新配对码重新配对';
+  return '';
+}
+async function joinPollTick(){
+  try{
+    const m=await api('GET','api/setup/mode');
+    if(!m.decided){stopJoinPoll();showChoice(m.joinError);if(m.hubUrl)$('#joinHub').value=m.hubUrl;return;}
+    if(m.paired){stopJoinPoll();location.reload();return;}
+  }catch(e){/* 临时失败继续等，不退出等待态 */}
+}
+function showJoinPending(){
+  showChoice();
+  $('#modeBtns').style.display='none';
+  $('#joinPending').style.display='flex';
+  stopJoinPoll();
+  joinPollTick();
+  joinPoll=setInterval(joinPollTick,3000);
+}
 function showLogin(setup){
   document.body.classList.add('auth');
   document.body.classList.remove('app');
@@ -2232,9 +2259,11 @@ function showLogin(setup){
   $('#login2fa').style.display='none';
   $('#modeChoice').style.display='none';
   $('#joinForm').style.display='none';
+  $('#joinPending').style.display='none';
+  stopJoinPoll();
   $('#loginErr').textContent='';
 }
-function showChoice(){
+function showChoice(joinError){
   document.body.classList.add('auth');
   document.body.classList.remove('app');
   const ic=document.querySelector('link[rel=icon]');if(ic)$('#authLogo').src=ic.href;
@@ -2246,11 +2275,14 @@ function showChoice(){
   $('#btnLogout').style.display='none';
   curServer='';
   $('#modeChoice').style.display='';
+  $('#modeBtns').style.display='';
   $('#joinForm').style.display='none';
+  $('#joinPending').style.display='none';
   $('#loginSetup').style.display='none';
   $('#loginForm').style.display='none';
   $('#login2fa').style.display='none';
-  $('#modeErr').textContent='';
+  $('#modeErr').textContent=joinErrorText(joinError);
+  stopJoinPoll();
 }
 async function showApp(){
   document.body.classList.remove('auth');
@@ -2264,7 +2296,9 @@ async function showApp(){
 async function checkAuth(){
   try{
     const m=await api('GET','api/setup/mode');
-    if(!m.decided){showChoice();return;}
+    if(!m.decided){showChoice(m.joinError);if(m.hubUrl)$('#joinHub').value=m.hubUrl;return;}
+    if(m.runMode==='managed'&&!m.paired){showJoinPending();return;}
+    if(m.runMode==='managed'&&m.paired){location.reload();return;}
     const st=await api('GET','api/auth/status');
     if(st.loggedIn){showApp();loadOverview();}
     else showLogin(st.setupRequired);
@@ -2287,10 +2321,13 @@ $('#btnJoinBack').onclick=()=>{
 $('#btnJoin').onclick=async()=>{
   const hubUrl=$('#joinHub').value.trim(),code=$('#joinCode').value.trim();
   if(!hubUrl||!code){$('#modeErr').textContent='主服务器地址与配对码不能为空';return;}
+  const b=$('#btnJoin'),old=b.textContent;
+  b.disabled=true;b.textContent='正在校验配对码…';
   try{
     await api('POST','api/setup/mode',{mode:'managed',hubUrl:hubUrl,code:code});
-    location.reload();
+    showJoinPending();
   }catch(e){$('#modeErr').textContent=e.message;}
+  finally{b.disabled=false;b.textContent=old;}
 };
 let pending2fa='';
 $('#btnLogin').onclick=async()=>{

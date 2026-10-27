@@ -39,6 +39,17 @@ func startLinkLoop() {
 	go linkLoop()
 }
 
+// rejectReason 加入被拒时的回退原因：
+// 明确拒绝时节点若还持有 token，说明此前配对成功过，如今 hello 403 只能是
+// 主服务器删了记录（移除常发生在断网退避期，下一轮从 hello 开始，
+// 到不了 ping 401 的吊销路径），按“被移除”提示；否则按“被拒绝”。
+func rejectReason() string {
+	if nodeToken() != "" {
+		return "revoked"
+	}
+	return "rejected"
+}
+
 func linkLoop() {
 	defer func() {
 		linkRunMu.Lock()
@@ -52,7 +63,15 @@ func linkLoop() {
 			return
 		}
 		if err := linkSession(); err != nil {
-			setLinkState("disconnected", err.Error())
+			// 明确拒绝/吊销：回退到加入页重输，不在死页面上重试；
+			// 网络等临时失败才继续退避重连。
+			if errors.Is(err, errLinkRejected) {
+				rollbackJoin(rejectReason())
+			} else if errors.Is(err, errLinkRevoked) {
+				rollbackJoin("revoked")
+			} else {
+				setLinkState("disconnected", err.Error())
+			}
 		}
 		if effectiveRunMode() != "managed" {
 			return
@@ -73,6 +92,10 @@ func touchLink() {
 }
 
 var errLinkRevoked = errors.New("节点已被主服务器移除，需重新配对（本机命令行 hub-code）")
+
+// errLinkRejected 主服务器明确拒绝加入（码无效/过期、待添加被拒绝、指纹未登记）：
+// 拨号器不再重试，由 linkLoop 回退到加入页重输（JoinError=rejected）。
+var errLinkRejected = errors.New("link-rejected")
 
 // linkPost 节点侧 POST 助手: 自动带指纹头, token 为空则不带。
 func linkPost(client *http.Client, url, token string, payload any) (int, []byte, error) {
@@ -133,10 +156,8 @@ func linkSession() error {
 			return "", err
 		}
 		if st == 403 {
-			if nodeToken() == "" && nodePairingCode() == "" {
-				return "", errors.New("未配对（无配对码），请用本机命令行 hub-code 填入新配对码并重启")
-			}
-			return "", errors.New("配对码无效或加入请求被拒绝，请用本机命令行 hub-code 填入新配对码并重启")
+			// 主服务器明确拒绝：不再重试，由 linkLoop 回退到加入页重输。
+			return "", errLinkRejected
 		}
 		if st != 200 {
 			return "", fmt.Errorf("hello 失败(HTTP %d): %s", st, linkErrBody(body))
@@ -179,7 +200,8 @@ func linkSession() error {
 		return err
 	}
 	if st == 403 {
-		return errors.New("节点未获批准")
+		// 批准后又被移除：同样是明确拒绝，回退到加入页重输。
+		return errLinkRejected
 	}
 	if st != 200 {
 		return fmt.Errorf("challenge 失败(HTTP %d): %s", st, linkErrBody(body))

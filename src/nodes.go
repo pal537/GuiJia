@@ -16,6 +16,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -46,6 +48,12 @@ func migrateRunMode() {
 		settings.RunMode = "standalone"
 		saveSettings()
 	}
+}
+
+// useManagedPage 群控状态页只给已配对成功（持有 token）的节点；
+// managed 但无 token（正在等确认、或已被回退途中）一律走加入页，绝不进状态页。
+func useManagedPage() bool {
+	return effectiveRunMode() == "managed" && nodeToken() != ""
 }
 
 // ---------- 节点身份 ----------
@@ -264,12 +272,67 @@ func nodeDisplayName() string {
 
 // ---------- 接口 ----------
 
+// validatePairingCode 向主服务器同步校验一次配对码（hello 一次），供加入提交在落盘翻转模式前调用。
+// 返回 hub 状态 pending/approved；码无效/过期、连不上、返回异常都以 error 回给加入页 inline 显示。
+// 注意：校验成功即消耗了码（hub 侧 pending 已建），调用方不要再把码留盘；拨号器凭指纹 hello 即回 pending。
+func validatePairingCode(hubURL, code string) (string, error) {
+	fp := nodeFingerprint()
+	if fp == "" {
+		loadNodeIdentity()
+		fp = nodeFingerprint()
+	}
+	if fp == "" {
+		return "", errors.New("节点身份缺失")
+	}
+	c := &http.Client{Timeout: 15 * time.Second}
+	st, body, err := linkPost(c, hubURL+"/api/nodes/hello", "", map[string]any{
+		"fingerprint": fp, "pubKey": nodePubKeyB64(), "name": nodeDisplayName(), "version": appVersion,
+		"code": code,
+	})
+	if err != nil {
+		return "", errors.New("无法连接主服务器，请检查地址与网络")
+	}
+	if st == 403 {
+		if msg := linkErrBody(body); msg != "" {
+			return "", errors.New(msg)
+		}
+		return "", errors.New("配对码无效")
+	}
+	if st != 200 {
+		return "", fmt.Errorf("主服务器校验失败(HTTP %d)", st)
+	}
+	var v struct {
+		Status string `json:"status"`
+	}
+	if json.Unmarshal(body, &v) != nil || (v.Status != "pending" && v.Status != "approved") {
+		return "", errors.New("主服务器返回异常")
+	}
+	return v.Status, nil
+}
+
+// rollbackJoin 加入失败回退：清掉 managed 模式与凭据，回到加入页重输。
+// reason: "rejected"（主服务器拒绝）或 "revoked"（曾配对成功后被移除）；
+// HubURL 保留，供加入页回填。仅网络不通等临时失败不走这里（拨号器继续重试）。
+func rollbackJoin(reason string) {
+	mu.Lock()
+	if settings.RunMode == "managed" {
+		settings.RunMode = ""
+		settings.HubName = ""
+		settings.HubID = ""
+		settings.JoinError = reason
+		saveSettings()
+	}
+	mu.Unlock()
+	clearNodeToken()
+	clearNodePairingCode()
+}
+
 // handleSetupMode 首次运行模式二选一(公开接口, 未登录时就要能选)。
 // GET: 当前模式与选择状态; POST: 只能选一次, 选定后 403。
 func handleSetupMode(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		mu.Lock()
-		hubURL, hubName := settings.HubURL, settings.HubName
+		hubURL, hubName, joinErr := settings.HubURL, settings.HubName, settings.JoinError
 		mu.Unlock()
 		st, last, _ := linkSnapshot()
 		writeJSON(w, 200, map[string]any{
@@ -280,6 +343,8 @@ func handleSetupMode(w http.ResponseWriter, r *http.Request) {
 			"hubName":       hubName,
 			"linkState":     st,
 			"lastContact":   last,
+			"paired":        nodeToken() != "",
+			"joinError":     joinErr,
 		})
 		return
 	}
@@ -324,6 +389,17 @@ func handleSetupMode(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		hubURL = strings.TrimRight(hubURL, "/")
+		// 本次重输为准：先清掉上次回退残留的失败标记。
+		mu.Lock()
+		settings.JoinError = ""
+		saveSettings()
+		mu.Unlock()
+		// 落盘翻转模式前先向主服务器同步校验一次码：错码直接回错误，
+		// 不写 managed 模式、不进状态页，加入页 inline 显示错误、可无限重输。
+		if _, err := validatePairingCode(hubURL, code); err != nil {
+			errJSON(w, 400, err.Error())
+			return
+		}
 		mu.Lock()
 		settings.RunMode = "managed"
 		settings.HubURL = hubURL
@@ -331,7 +407,8 @@ func handleSetupMode(w http.ResponseWriter, r *http.Request) {
 		settings.HubID = ""
 		saveSettings()
 		mu.Unlock()
-		setNodePairingCode(code) // 配对码落 node.json(0600), 供拨号器使用
+		// 码已被主服务器接受并消耗（pending 已建），本地不再留盘；
+		// 拨号器凭指纹 hello 即回 pending，等确认。
 		setLinkState("joining", "")
 		startLinkLoop() // 本进程内立即起拨号器, 不等重启
 		writeJSON(w, 200, map[string]any{"ok": true, "linkState": "joining"})
