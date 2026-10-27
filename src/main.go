@@ -126,6 +126,7 @@ type Settings struct {
 	HubID             string   `json:"hubId"`               // 被群控时主服务器 serverId(批准后回填)
 	JoinError         string   `json:"joinError,omitempty"` // 加入失败回退原因: rejected=主服务器拒绝, revoked=曾配对后被移除；加入页据此提示，下次提交时清掉
 	NodeTGMode        string   `json:"nodeTgMode"`          // 被群控时 TG 通知模式: ""=走主服务器(默认), independent=独立通知
+	ManualLocation    string   `json:"manualLocation"`      // 首页本机卡片手动归属地, 为空则按本机主 IP 自动解析
 }
 
 func defaultSettings() Settings {
@@ -534,6 +535,8 @@ func main() {
 	mux.HandleFunc("/api/nodes/approve", handleNodeApprove)
 	mux.HandleFunc("/api/nodes/reject", handleNodeReject)
 	mux.HandleFunc("/api/nodes/remove", handleNodeRemove)
+	mux.HandleFunc("/api/nodes/location", handleNodeLocation)
+	mux.HandleFunc("/api/local-info", handleLocalInfo)
 	mux.HandleFunc("/api/nodes/hello", linkLimit(handleNodeHello))
 	mux.HandleFunc("/api/nodes/challenge", linkLimit(handleNodeChallenge))
 	mux.HandleFunc("/api/nodes/auth", linkLimit(handleNodeAuth))

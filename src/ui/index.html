@@ -51,10 +51,17 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 .srv-card .srv-num{font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;min-height:24px}
 .srv-card .srv-lab{color:var(--mut);font-size:12px;margin-top:3px}
 .srv-card .srv-foot{color:var(--mut);font-size:12px;margin-top:12px;min-height:16px}
+.srv-card .srv-meta{color:var(--mut);font-size:12.5px;margin-top:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srv-card .srv-meta b{color:var(--txt);font-weight:600}
+.srv-card .srv-btns{display:flex;gap:8px;margin-top:12px}
+.srv-card .srv-btns .btn{flex:1;text-align:center}
+/* 模式二选一两按钮同宽、同内边距、同对齐, 视觉齐平 */
+#modeBtns .btn{width:100%;box-sizing:border-box;padding:11px 14px;text-align:center}
+/* 顶部正在管理标识: 放拦截链 pill 左边, 显眼可点, 点回首页 */
+#managingTag{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:7px 14px;border-radius:999px;background:var(--blue);color:#fff;cursor:pointer;white-space:nowrap}
+#managingTag .dot{width:8px;height:8px;border-radius:50%;background:#fff;flex:0 0 auto}
 .home-alert{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13.5px}
 .home-alert .btn{flex:0 0 auto}
-#viewBar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 16px;margin-bottom:16px;font-size:13.5px;box-shadow:var(--shadow)}
-#viewBar .btn{flex:0 0 auto}
 @media (prefers-reduced-motion: reduce){.srv-card,.srv-card.srv-in{animation:none;transition:none}.srv-card:hover{transform:none}}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
 .ph{display:flex;align-items:center;padding:14px 18px 10px;gap:8px;flex-wrap:wrap}
@@ -227,6 +234,7 @@ body.auth #loginView{margin:auto}
     <span class="logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFQAAABUCAYAAAAcaxDBAAAZ3klEQVR4nOWdS4xkSZaWv2Nm9/ojPB4ZEfmorgczU9U91ZUFghnUCIToHUuEECXBlgWa3WgEYoVY9ixGmtnMBnYsQAgkliyR2MxmxGhqprOrmuquyqqsrMzIR0T4I/x1r9lhYXbdr3u4R7jnq3kcyTM83e+1a3busXN++8+x68JG8gnwXwA4OvpNps5hEVUBVONL5PJpIvG7+v9h8bOrjt/kvOXvVl1TFVVFRNZfoxqDgKjgUcnLkufPf35JB1fJCi2sls6duxhFURAjCAJo6tsaBf1fJ5Luj6AoGhQEgiCDx/c2asGs/+oTADp3PmD/9l21KmqMRUx1xz2qyptQpq6z6Fd/JTSNDVXECMZYrIru376rnTsfpOM+WdvCGguN5r17+y4GUTEGDZ6ovI2N+v8RiWMWY9EQCKj0T+6xzgWs1c7erY8wxqqioOGqQ/8/EQUxCEIIXnpPfrbyqKUp/2MA9m/dxdhMK9P/lSpTJDqVKqD86joyc3XGZrp/6276/MfLR1H74n9Ey7SZaij4lSiyHrVDQEKFIuJ3KgLGXI8YXqsoYjKCL5KlRt3BksZ2j/8q1hEt800qs6Yc8R6CotairSa+3SJkDhFBpgXmYogZjxEfwAhqDYiZnf/mRBGx+BLpP/vL+VCqN7vf+xDjrUac9gZ8ZqVEHxBfggghy/F7HfzRAeXhIX63g2b53DGFgBQFtn+BPT3DnZ7jegMoCkQ1Kte8OeWKCKpKsF76330OgKuilXijMZKVvDZlVkoMAYoCAN3Zobz5NsXt2xgjTG4eoBpicA0BfAk+wTMBdZby6IDy+AYThPzkGdLtYvoDsvMeMh4jyhtRrmpAjEN8FWg+iZrbPf4hxlp9bZiyUmRZxuncblLeukXxvTuUR4fo/j7u9AxQSgngfe28uIBYkBDiX2NAlez0nGK3hYwLXHdAdnqGPethxmMwAtZWGng940MI3kv/2Wc4ALEmYc1XaJ11aywjhtXjY6bvvE155yZ+ZwdFkeAxp6eY8YRitw3jCRg76+hcoVW/qgBl4sfWolmOO+/j2y2Kw32KoxuYyYTs9Jzs6XPseT+ufSqrfaWKVcRYJMEhuXnzIyaCihheiYXOrNEj3qM7bcqDfYp330H3dwnWIWUZFa0KzmKGI3S3Q2GBYlpT6LoxJAuVGO3NtCD79hF+pz2zXjUGrEF8wAxHuG4f9/wMMy1SMJNXOCEF1UBDEblx+2NU0Jde3lWKLApQJRwcMP3B+9BqU7Za+MN9mEyWjq+sTshPn1O2GoQUoK6Uel+dI394Es9tNaNCKwKkIjysBV/S6I+g3yf75lvspIiXt+YV2ZEgirggQQULvGBkT4OXogQN+ONjJj94n+Ldt8E5sq8f4HeaMBpGf0Y1WOYDN46y2cJOJ4RGFn3tdUoVwFjM4CLGr1Zjfl7lYyG27z1YQ2kFvneb6W6L7LRH/uwMN7iIXbJVANteBfEkQxCvjiAJlryYMiUFmvL4iOmH349T21pAyR4+IuzuzHsZNCp1wYIMhEDYaWKejzA+EJaVWacHZ5AuTlnXH1He2AMf1t8EEQiKb+Rk/RGaZUyP9imO9snOemQnz3AXo5ew2CpeCE4FXui2JKDtjw6ZfPh9inffRrMs+kAfMKMpEgJFZye6gfrKps5JSgoyKvjODu68G29C8LWLVRZd+8ha7HkfbeYEKxFaVddYx3laS8gMtigIRB8+PdynOOhgzwc0Tp7jLi7mqGALURQVcFINcluZFkw+/iHjv/ZRnC7TAqbJR1qHPT/HH+zFlU+1Hq+uVSeD45sIp5pNcEPseIxv5Om4SpM1VCdAWWKnBcXhPgyHm2HOEPDNBmY0xlghqEZXJVAe7uEPdmk8ekrj0dNoqduIavRC250VByM+MPlbv83oR38jjrH08a66DBpNzOACcS4qJYTL9l8RHQtTVMB7yr1dzGiaInh6GRMjf3WOc7j+EL1xgNaD2EaGofh2GzueRshlEj9QelQD43ffYvzr74Jf0e8NxG11tAgUBcVbb1Ee3sB9/e3cihKEQQTX7VP82rtQTGNnl9u45Os0Tn1VtJGhzQbZoxO02YiWK/MpL0nxJkBxnMPZYA6z6u2uS8sEJbQa2C648x5kDk03PZL1Y8p2g+Jgj+y8u/X0306h3qPtNuMf/TbBWaTdSn3XNB5BnUVKjznv4Q86yLRYVGplRdVfU58kBik9MhpTHt1IqKCa6XNgL8bA+QAzGuOt285lGYNMCyhK/O4OFYas2ojuXBi/9xZuOIpBdwvacPMpL4KUnvK9d/B7O2ANmmUxEOX5/L0Yyjs3Mb0epoyRt444gUUFzBQsyfd20dyhjQZqTEQM1qRXpO7UGHynhe1fIHke0cMmohFluG4fbTUSUxXHFt1KbBsg5I7pjX0kXIEeVsh2PtQYitu3IkSpgkviK2fBLYQ44IN9smenqHMLd3+tcgWkmGJGY8rOTiRFUnso8+tpJEy0kREE7GQKboNhqEbrHE0RFJ87xIf1+SqFcrcdZ9cWM2BzhYaA5hmhs5OAc6SuLsFXEaQo8Yc3oCgw4/Hsrs8APSuUai2u2yPstmsDWEoC1s6PAWwHuRjF9PDyoFf5biAbjfGdNur9paAjS7BL83xrH7qVhWoKKDOwcxWQVqU4PsI9PY2dCgENMQ+tM2vTueUMR4gqZSOPGHS2Xl9xjUrPzhGajQjKrV1vSekadjhCWi18Zf1XDjbiym3TLlvDpnmAuaZD3hN2O3EgvX7EmJkDF1+a/sbPLK43wO91FhcBy7LwuUJZ4vd2kGkZ8W7m5v7WmPl750AD1itFK4fxeCkYrpEKP28x5beK8lXlxczv1C600lq9p3jrNtkv78d1tgYu3UMbrZNOBy/JZ1Y5o9maP12rzuYpEWqhlAd7uMdPCJ3INkm9jwDGYIZjwlt30EE3ooTY6TQMXfi7OOhtNLSlQnX2z4bHRgYGms10I2IaVusK0ogtpSigkS2unmZKDbVG519Xb6QsEWMSwaFode7skJh7MqXHb2Ft24y3ku1waETW8d2aablgvUZwz55T3tibU2tVLytDVQh7HfLHT3HNnHLbVLGC6/aZHt+IEKvONNUktJrkvR5mt40fj+eo9goFvwBdtKVCawB44eNVnXIW2xugKKGZw3Q672Saxjqbwkqxv0ve7VMe7q/3o9X0r75yOe70nNBuRiSR1uUrz7NCmVnccEJoNmBaLBq8pv5cHhzbqHa7oKQa8+SAVsz4kjJFJFpvUGy3hz/Yg7JcxJ+VlStxFEHRZo43FjcczyO2Lllb5T8RMDamlYuCcqcdOc8VEK6qqCMoodlAiwKDiVVv9aGt0lll7VuY6nYrpRDmjDirLVMTsHfdPtpsEKyZ3YTZMXX3VvnS4Cn3OxHaXCpCk8tvjcH2BoS9DlqWsz4uXkgXZ5SCbzexwwmywZJVEsWwjWy99LTdboQidcao/rIW8R4zHOJ3d+K6uTbQqMwYmHRmqWnFlTl8q4Xr9rG5wxrBGk0vsFaw1mAzixuNsdbiMzfPktZpwZUuQwl5hhqDmUS2ae04TDKg5VlyjbhZIep1orGaw4zGMe0wS+pVQD+5AmtxZ13CXoeQpnpdpB46a5BWAC1Lyt02djDEnxbglsD6DB0oXIzh9gE6uFgszblKBNBAud/BPX6aSGGZT4aZSyHOgEkx99sbittImZVo9Nz2+RlqbS3BW6k0RnbT7VPsvQPT8cr+qMwg5KXxYhyHrcC/uv0/odmIuDJ5vApytXXKf3h0hz/xRxhfEuyK2LpyOqclpYvwzF6MUWeX8FEclSoYrzPGa97uigHVZPMoL4L4EhmPKH7w61AmErjeugLOELKM7Pkp0+MDmExXtqXCgm9VkZic7Bf87jv3+Zd/Z8L5uMBVTixZsUfZyeDj+9/x9//8HYq8sZjUm5V21/tV4wasxV5cAFAcHSAaFg8h+V2XER49jeR5VvO319jf1rBJnYutlh5kRRQea1xyDi6wkymlMSnI1Nu5bD1GlBByflO/5p991OObXkYIiqjUBhFJmacjy2/dKfgne7/k3/c+xEqBnwPka8aguIsRRacZl6u1ri9g6BSA615gE9kONolghsN4iVWOHEmVGYHi8AB31kVWkBYro6c16GDMv/7wAbstg3rFmcjMOUnLchv/3zCBIY7f+/AJN8pz1Gbrb1r9c2sikdLMCdd5OgGZrsG1a0RVt1eojEdLGckV4j2h2SC4DHsxrPmpFZ0QwVgIU8ffa33DP3x/yOnYzMuRZmgg+m8lLl9HU+GDm8rv3LpPGJvLXMclSi/SijYo07yGDNaNE7B++9Kkrek7GY5nmcyrOoQvKQ4PML3BAgpY0SpqHNLr8m8+fogXWQMPa0sDiVCqWzr++d0uvxZO8JphKv+3An9iBDsYEXZa6GSCyOWh1wO0lh6ZTOfIYgMRkS0UWnGKkwkyna5UaI3WQIKiWUZot7FnPciyBYxXFctaawhj+Kd3HvDj9wrOLmSBgBc0BY76oKLPKErlaM/wL37jIXIxXo8rnUUmU6TRxAsxT7RkeXH3xxzHmtJjivJykvEa2T7rOZ1GKqzZvLJkJqZmC/zRDfIvvkRGoziIGZZM5xkw/Sm/94+fMJymO1yDJrpwm5i/15hi6pWGf/TRlD/89Fu+Gt4gl6iEBaMyBjOaoN9/n/D0USS0rwo1Ketw7UxcIVsrVIoSO7igPD689LXW/6pClmG6ffzuDn5/d7b+n+HXiGIoW8J/+uIZP/nbzwlY6kmHSFpI7f9z5OsV9nPlv/3C8dAdY3YyCp/SzrM7krCxs7izMyRvoEvVIdXiZpZJEMGMJ3H15mS9t1oh2xc6oJjz7qVPL91HEfAe1x9EZVYIoOItrUWdxWOQ3Yw/vv8e904cu00ItdZmi4ClKylgjTC6CPz+T28xbbWI/lio1wjEaCWEdoNwcYG1GbJUFXKJkAbsaDy7edvIC1SOCPa8e4l3XOhOlXQ77+HbrZSkWwoSqkgqMDChYNI55Cef3qTtPMur52UmSAW8Cvu55z9+3uEv/W2MLQgrKaP5NX0zxw5GSKO5ljet0IEdpernLcuUzIIzvk6q9Xw/FhmsrP+pCJKiwBYFZad9GaKERIYkJXsF01T+6/l7/Pevcvabq1Pts0WTQu7g8Vngj755B2kA1yC5mMXM8L7ATMtUIVh9VecLBDMtseMVVS8bSCxkTCa/kWKNQcbjaKXGJkZmCa5Yhzvr4Ts7iaesday+3JxNEIHgCZ1dfvL5O2jhUSTuWdC5/j3xVXhh35X8uy9u8i2HGD9eXQK5LCFQtpvY4RjD3Pqk9kIkTvdiu4qRmXoq7DUjhjcQCYp7dgpZtpS9dNBoxL1E1uBbzVgUUZ23zHMu6FkwmedPxm/znz9r8e5+YKcJew3Yrb06Oby1D589hn/79H2Mma6e6mvoO6yhzBxmEBccKsyXYSlTavuDSNu9gEK3zCmlflmLPXmKO3macuiLA7DDMf7tO+gk+iHRih/XdNjsf1WLkIrAZLfJH3z5Lt/Lv8Bntmb58aZ7hT1T8Mdfv0cv62B6j1DJYNNQ7D1+t0U+HOLOB6hNicMa2+T6VXnkdv4TXkShquBirt32B5SH+2hRzLOZxmCNJIyaAP6MMBJE5h0HIES1qoGgBoznft/xD/70LmSxEvpSXicEJATc7SklpnYM16/gAAKoGDS3ICa58xCtczjBjieJk9haOy9moSBI8MhggP+N92AyZgbajWGa5+Rn5/ijG2mjwiIor5y9aEDrENtZ7FkXawLheC9tx1mhIGswvQGmdwGN5uaFC+lc17tAGxm+lUcKUYgPG8gc+Vk39ku2rOqDGNC2OyNJivbZt98hF6MFuouiiDVQxuBG40hEy+LkrvUgGk1F4paebDikONhDJwXqFfXh8mta4tstmIxxxl4mgWv9XGb8pSixEJVZpt3WaZbItCA77b7UXqYXUyiAtZjeAPfkGdhsHr01cqXlXgfpD5gVM0q6msiMalOReXWbtWTnXXy7uVQPukYUimYD2xukUpsV9F2ddIZIkIymlM3mIvrQuCnM9S8ww1px27ayNX23LAKNrx/Mlnfxs7SSyS2h1cRdXMSdxRVfmupopJ78MgaZTLAhULZbaapf33lt5oQQcNNyhc9buiEicetiu01IFdEVVFQFgpI/O2deOPBi8uIKVQXnsE+e4Z6fzq1ENLbqA+VeB0aTOLVSIk0wqLHRCqqcubMRt+7touUVxWLLEgLl3g52MIzt2BqbVX+fLM6WStFqoJPJ7BpCuv7FENvrp5qAF9bK6qC0cSZUIiBv/PI+5c2jFd9DONgl63YpdzszTBqbTpZsBNO7wLRaFLmD/mjzCKtEPqDZwPUu8DutuNCYBTqdcaFmPMUeHTMd9aN1L62O8qdnMUAlYPGislKhG2dCE6PkvjvBPT2lPL4BdQsLgdBoYkdPMVUxwhJmJS1lw1t3CFUOf9MBCWkTQgv3/AydTjG6fLqiYrCTKXr7dtxbX9udrMaQ9S/Iznspbb3htdfIpbz8xtY5G5RACDQ+/wXl3/1RbRwKLsM+eU55sEdot1YTEiLIfof82Tnm1iFhoptN+YpXNQZ71qU86BCcq1XXpXEk+i/klvzJM2S/Qzg7Q1KyUUTIHz+Niw+zHVW3LCtzSlspM7aCZg53ckL+4CHk+azG04wmmJRfoijm0Mr7OP19gLJEjVA2Mlz/ArJqw9dyx5ZeSkwJD8eIFYKNvIKozipR1IeIPkofiZHhEFfqfCuNs2Sn3Vg29JK+s9LdTKFbsU4rxoqxNO/9HDOcJPJW4kqq0768Lq6CkaT3pY+VyMNRJJdN7ftZB1lisIlbIKclZTNPvnPFOGY3QClbGZx3MXkTAFOWNL578kr30L9QlF+pfGeRwYDmvc8hb2IuRoizhMxev+0lQaqi08ae966ul5/13GCH47gb5IpUxTzXHvvoQxkr/Jo5zW9PsJPJ5qusDWTWUjXV64paZ7Grjo18Y467/w35l/exQfHtZqrZ3IBa856w00ZDwI4m6+GLxl5LWWCNxVtZKFi4fPC8z6LMalWbT8/Jnp2lFPersU5YstBl/3mVP11F90VM52j+2aeI9/irptIyh5qCmz88iHvY40XWvAx2XBA6bXR4kZJyV7usGYi3lkCg8dWDlw5Cq+RSsdjWQWlZRBAP+Z//BeXf/OuEqkx7k3ZDiAUSxpA/PCE0c0Q1FuAkCo+089ns7FKojzMgy9bcuNo1E2ElZUnzm0czhPCqZQGHbg2ZVogQwbY9Paf1F59x8Vsfr1bmpcoOInc6mSJlSXG0t+RSase1G7hxgfEN/KZTVkCMofXlg1TN4rZMv20g69imbaL9qmOl8qePn9D66c8XH/OzquaoRpC4bg9f7cOs46T6lDcG7+K2RNNag2+XxTlaDx6TnXVfjzLTmFb60G2sdOWxqTZI84z8m4e0fvZFXIWki66UtF/JhIBvNaAM648P8YaFyRgTuH7qWkPrm+/InjyHLLtSmS8DHyFlPV+XCKCNjMb9B7R++r/meZtl60wOLhuMKHZacePsVZKAe5lnmEmBrPWhJGU+Ij95dimir5xda3Jrmyg60QZxGlV7MDdR8Jz20ms/F42W2vj6Ae1PP4udreNM1dnTbaTRIBhJj2abjXD54vO/mSMYcJNiMaWdUIMgtL96SP7k+cppvu1MvHpvVoRlZva0BJ2fuOqEBSWtOWbdhTWEWNX88BHtP/00Powqz1KWMboCNykpOq2Yzlg30HreSCRShM0cmRYxZ19Rgs5hSk/7ywfkp13IXpPPpN4dAVFk9/hj4oNsF0mJhXqfSw3IwjHXSb2qTYqCsLPD+MP38Tvt+OSvwRC9eUypBVRFZZcbmfe+LtZEau75WdyHZAQ7mdJ8+CQ++24Vm/8apHoQlmlKIMxw4mUrrFtc9b5ujVuJxhJHGY1o/9lPyR4+jrhzpxXr919k4BL3emojJzQbZKdd2r/8FjOdvvJV0BWdiJmDVELO3s27Knb+MMGXBvdLsspdqGp8iMBbtxn/8PuxFjPP8KMBK7e1Lc2gNA5QyAcjSgvNb09wz88jW4+81mle6xhiHCF4eif3xMW+BhEVXVXVe9203mTar3Id8YEvjuy7x9izLtP33kZvHuObrdXTvn6NKoeVZbjeANsfkH93gk1W+aZUmToWqUAfqjxEfCDr3u2P1Bi38MjLTab2y6yutLI6H2IufG+P0Qd/haLTjH3w8zRv6kgKOhH0u9NzWl89jE93FFIh7cvLJmOqdGOsI4SS3snPZPZAVpg/MrhuTZsqtC7bKHcerOI/kp4DUh7doLh9TLm7g+ZZdXA8tChx/QHZ42e40/N4PWNmRb6vwl1tqtDqEaH1RwYvnFU96VY1bNyxV7H+n7WV/pUy8puh0Yhbt7MspheKEhmNY6kMGrHlYix9g1I91LqU/rPPZp/WNPFj4mPXP0RMruhmW0q2VehGx0t8OJUs1ZFW1N3aSpFX3NcrWtrssevVF/u37iLWafDFjLd42Y6sDEqbwK9NyOk3LGIc6kvpPrlHXZlwhQnu3foIMSa6puBZhQC2lWUFvjCe/ZWI8gI/XVHJJ/Se/AxRFQ3xjswafQlZXpauTKVcIW/uV2suX1OMQxW8hqTM1b9Yc4VpRDjVufMB1jcUEcQadM1zR162w3C9pb7KAHi1JHofQCykjWdeJjJ4/Auu+rGqjXu3/ANV1Upko99UWrXKWfj6/5SpP59BCz9QVSCD05f+gaq6fMLg8T16J/ck86UEVRGNDzC9Spl1UuTSZ/VhXEGNXSfbuoFVfap9O5uBQVUyX0rv5F5S5vofparL/wZOeisXMkxqYwAAAABJRU5ErkJggg==" alt="龟甲"></span>
     <div><div class="ttl">龟甲安全防护</div><div class="subt">连接监控 · 入侵防护 · 蜜罐诱捕</div></div>
     <div class="pills">
+      <span id="managingTag" style="display:none"><span class="dot"></span><span id="managingTagTx"></span></span>
       <span class="pill" id="pillFw"><span class="dot"></span><span id="pillFwTx">拦截链 …</span></span>
       <span class="pill bad" id="pillClosed" style="display:none"></span>
       <span class="pill" id="pillGeo">归属地库 …</span>
@@ -294,8 +302,6 @@ body.auth #loginView{margin:auto}
     <button data-tab="home" id="navHome" style="display:none">首页</button><button data-tab="ov" class="on">总览</button><button data-tab="ports">端口</button><button data-tab="events">事件</button><button data-tab="bans">黑白名单</button><button data-tab="prot">防护</button><button data-tab="proxy">反代</button><button data-tab="cert">证书</button><button data-tab="set">设置</button>
   </div>
 
-  <div id="viewBar" style="display:none"><span>正在查看：<b id="viewBarName"></b></span><span class="sp"></span><button class="btn sm" id="btnHomeBack">返回首页</button></div>
-
   <section id="tab-home" style="display:none">
     <div class="home-alert" id="homeAlert" style="display:none"><span id="homeAlertTx"></span><span class="sp"></span><button class="btn sm" id="btnHomeAck">知道了</button></div>
     <div class="home-grid" id="homeGrid"></div>
@@ -308,7 +314,7 @@ body.auth #loginView{margin:auto}
 
   <section id="tab-ov">
     <div class="stats" id="cards"></div>
-    <div class="panel">
+    <div class="panel" id="sessCard">
       <div class="ph"><h2>当前登录会话</h2><span class="pcount" id="sessCount"></span><span class="hint">登录 IP · 登录时间 · 最后活跃</span><span class="sp"></span></div>
       <div class="tblwrap"><table class="fixed" style="min-width:940px"><colgroup><col style="width:198px"><col><col style="width:190px"><col style="width:150px"><col style="width:110px"><col style="width:110px"></colgroup><thead><tr><th>登录 IP</th><th>归属地</th><th>登录时间</th><th>最后活跃</th><th>记住登录</th><th>会话</th></tr></thead><tbody id="sessBody"></tbody></table></div>
       <div class="empty" id="sessEmpty" style="display:none">当前没有登录会话</div>
@@ -500,7 +506,7 @@ body.auth #loginView{margin:auto}
   </section>
 
   <section id="tab-set" style="display:none">
-    <div class="panel" style="margin-bottom:14px">
+    <div class="panel" style="margin-bottom:14px" id="totpCard">
       <div class="ph"><h2>二次验证（2FA）</h2><span class="hint" id="totpState">…</span><span class="sp"></span><button class="btn" id="btnTotpSetup">开通 2FA</button></div>
       <div id="totpDisableBox" style="display:none">
         <div class="frow"><div class="fl">当前密码</div><div class="fv"><input type="password" id="totpDisablePw" placeholder="确认身份用的当前密码"></div></div>
@@ -530,7 +536,7 @@ body.auth #loginView{margin:auto}
       <div class="hint" id="pairPendingMsg" style="margin:0 18px 10px"></div>
     </div>
     <div class="setgrid">
-      <div class="scard">
+      <div class="scard" id="tgCard">
         <h3>通知方式 <span class="cbadge">Telegram</span></h3>
         <div class="frow"><div class="fl">启用 TG 报警<div class="d">报警消息带一键拉黑按钮</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sTgOn"><i></i></label></div></div>
         <div class="frow"><div class="fl">Bot Token</div><div class="fv"><input id="sTgToken" type="password" placeholder="123456:ABC-..."></div></div>
@@ -542,10 +548,9 @@ body.auth #loginView{margin:auto}
       <div class="scard" id="nodeTgCard" style="display:none">
         <h3>节点 TG 通知 <span class="cbadge">群控</span></h3>
         <div class="frow"><div class="fl">通知模式<div class="d">默认走主服务器 bot 统一发；切独立后本节点用自己的 bot 发，主服务器不再替发</div></div><div class="fv"><label><input type="radio" name="nodeTgMode" value="hub"> 走主服务器</label><label style="margin-left:14px"><input type="radio" name="nodeTgMode" value="independent"> 独立通知</label></div></div>
-        <div class="frow"><div class="fl">独立 Bot Token<div class="d">仅独立模式用；只存本机 0600 文件，面板不回显明文</div></div><div class="fv"><input id="ntToken" type="password" placeholder="123456:ABC-..."></div></div>
-        <div class="frow"><div class="fl">独立 Chat ID<div class="d">只认这个会话的拉黑回调</div></div><div class="fv"><input id="ntChat" placeholder="例如 123456789"></div></div>
-        <div class="frow"><div class="fl">启用独立通知</div><div class="fv"><label class="sw"><input type="checkbox" id="ntOn"><i></i></label></div></div>
-        <div class="frow"><div class="fl">连通性测试<div class="d">用当前填写的值发送，无需先保存</div></div><div class="fv"><button class="btn" id="btnNtTest">发送测试消息</button></div></div>
+        <div class="frow" id="ntTokenRow"><div class="fl">独立 Bot Token<div class="d">仅独立模式用；只存本机 0600 文件，面板不回显明文</div></div><div class="fv"><input id="ntToken" type="password" placeholder="123456:ABC-..."></div></div>
+        <div class="frow" id="ntChatRow"><div class="fl">独立 Chat ID<div class="d">只认这个会话的拉黑回调</div></div><div class="fv"><input id="ntChat" placeholder="例如 123456789"></div></div>
+        <div class="frow" id="ntTestRow"><div class="fl">连通性测试<div class="d">用当前填写的值发送，无需先保存</div></div><div class="fv"><button class="btn" id="btnNtTest">发送测试消息</button></div></div>
         <div class="hint" id="ntMsg" style="margin-top:8px"></div>
         <div class="savebar"><button class="btn primary" id="btnNtSave">保存节点 TG 设置</button></div>
       </div>
@@ -658,7 +663,7 @@ let homeAlertFps=[];
 async function refreshHomeNav(){
   let list=null;
   try{const d=await apiLocal('GET','api/nodes/servers');list=d.servers||[];}catch(e){return homeServers;}
-  homeServers=list.map(s=>({fp:s.fingerprint,name:s.name,online:s.status==='online',last:s.lastSeen,created:s.createdAt,ver:s.version||''}));
+  homeServers=list.map(s=>({fp:s.fingerprint,name:s.name,online:s.status==='online',last:s.lastSeen,created:s.createdAt,ver:s.version||'',ip:s.ip||'',os:s.os||'',arch:s.arch||'',location:s.location||'未知',country:s.country||'',flag:s.flag||'',manualLocation:s.manualLocation||''}));
   $('#navHome').style.display=homeServers.length?'':'none';
   if(curServer&&!homeServers.some(s=>s.fp===curServer)){curServer='';gotoTab('ov');}
   else if(curTab==='home'&&!homeServers.length)gotoTab('ov');
@@ -667,13 +672,15 @@ async function refreshHomeNav(){
 }
 
 function renderViewBar(){
-  const bar=$('#viewBar');
-  if(!curServer){bar.style.display='none';return;}
+  // 顶部管理标识: 查看节点时放在拦截链 pill 左边, 显眼可点, 点回首页;
+  // 本机视图或未登录时隐藏。旧横幅已删。
+  const tag=$('#managingTag');
+  if(!curServer){tag.style.display='none';return;}
   const s=homeServers.find(x=>x.fp===curServer);
-  $('#viewBarName').textContent=s?s.name:curServer.slice(0,8);
-  bar.style.display='';
+  $('#managingTagTx').textContent='正在管理：'+(s?s.name:curServer.slice(0,8));
+  tag.style.display='';
 }
-$('#btnHomeBack').onclick=()=>{curServer='';gotoTab(homeServers.length?'home':'ov');};
+$('#managingTag').onclick=()=>{curServer='';gotoTab(homeServers.length?'home':'ov');};
 
 function homeCardEl(fp){
   return $('#homeGrid').querySelector('[data-fp="'+fp+'"]');
@@ -685,15 +692,62 @@ function homeSetNums(fp,conns,bans,ports,foot){
   c.querySelector('[data-k="ports"]').textContent=ports;
   if(foot!==undefined)c.querySelector('.srv-foot').textContent=foot;
 }
-function homeCardHTML(fp,name,online,tag,foot,animate,delay){
-  return '<div class="srv-card'+(online?'':' offline')+(animate?' srv-in':'')+'" data-fp="'+fp+'"'+(animate?' style="animation-delay:'+delay+'ms"':'')+'><div class="srv-top"><span class="srv-dot"></span><span class="srv-name">'+esc(name)+'</span><span class="srv-tag">'+tag+'</span></div><div class="srv-nums"><div><div class="srv-num" data-k="conns">…</div><div class="srv-lab">当前连接</div></div><div><div class="srv-num" data-k="bans">…</div><div class="srv-lab">今日拉黑</div></div><div><div class="srv-num" data-k="ports">…</div><div class="srv-lab">监控端口</div></div></div><div class="srv-foot">'+esc(foot)+'</div></div>';
+function homeCardHTML(fp,name,online,tag,foot,animate,delay,meta){
+  const m=meta||{};
+  const loc=(m.flag?esc(m.flag)+' ':'')+esc(m.location||'未知');
+  const ip=esc(m.ip||'未知');
+  const sys=(m.os||m.arch)?esc([m.os,m.arch].filter(Boolean).join(' · ')):'未知';
+  const btns=fp
+    ?'<div class="srv-btns"><button class="btn sm" data-act="loc" data-fp="'+fp+'">设置归属地</button><button class="btn sm danger" data-act="rm" data-fp="'+fp+'">移除管理</button></div>'
+    :'<div class="srv-btns"><button class="btn sm" data-act="loc" data-fp="">设置归属地</button></div>';
+  return '<div class="srv-card'+(online?'':' offline')+(animate?' srv-in':'')+'" data-fp="'+fp+'"'+(animate?' style="animation-delay:'+delay+'ms"':'')+'><div class="srv-top"><span class="srv-dot"></span><span class="srv-name">'+esc(name)+'</span><span class="srv-tag">'+tag+'</span></div><div class="srv-meta" data-k="loc">'+loc+' · <b>'+ip+'</b></div><div class="srv-meta" data-k="sys">'+sys+'</div><div class="srv-nums"><div><div class="srv-num" data-k="conns">…</div><div class="srv-lab">当前连接</div></div><div><div class="srv-num" data-k="bans">…</div><div class="srv-lab">今日拉黑</div></div><div><div class="srv-num" data-k="ports">…</div><div class="srv-lab">监控端口</div></div></div><div class="srv-foot">'+esc(foot)+'</div>'+btns+'</div>';
+}
+function homeSetMeta(fp,m){
+  const c=homeCardEl(fp);if(!c||!m)return;
+  const l=c.querySelector('[data-k="loc"]');if(l)l.innerHTML=(m.flag?esc(m.flag)+' ':'')+esc(m.location||'未知')+' · <b>'+esc(m.ip||'未知')+'</b>';
+  const s=c.querySelector('[data-k="sys"]');if(s)s.textContent=(m.os||m.arch)?[m.os,m.arch].filter(Boolean).join(' · '):'未知';
 }
 $('#homeGrid').onclick=e=>{
+  const btn=e.target.closest('[data-act]');
+  if(btn){if(btn.dataset.act==='loc')openLocModal(btn.dataset.fp);else if(btn.dataset.act==='rm')openRemoveModal(btn.dataset.fp);return;}
   const card=e.target.closest('.srv-card');if(!card||card.classList.contains('offline'))return;
   const fp=card.dataset.fp;
   curServer=fp; // '' = 本机
   gotoTab('ov');
 };
+/* 首页卡片操作: 设置归属地(弹窗内编辑, 手动值优先于自动解析并据此匹配国旗)
+   与移除管理(应用内居中确认弹窗, 绝不用原生 confirm; 确认后主服务器删登记,
+   节点下次 ping 被吊销后自动回到初始二选一页)。反馈只在弹窗内。 */
+function openLocModal(fp){
+  const isLocal=!fp;
+  const cur=isLocal?localMeta:(homeServers.find(x=>x.fp===fp)||{});
+  const auto=isLocal?(localMeta.country||''):((cur||{}).country||'');
+  openCModal('<h3>设置归属地</h3><div class="csub">国家/地区文本，如 美国、日本、香港；留空 = 自动解析'+(auto?('（当前自动：'+esc(auto)+'）'):'')+'。手动值优先于自动解析，并据此匹配国旗。</div>'+
+    '<div style="display:flex;flex-direction:column;gap:12px"><input id="cmLoc" placeholder="国家/地区，留空为自动" value="'+esc(cur.manualLocation||'')+'"><div class="hint" id="cmLocErr"></div>'+
+    '<div style="display:flex;gap:10px"><button class="btn" id="cmLocCancel">取消</button><button class="btn primary" id="cmLocSave">保存</button></div></div>');
+  $('#cmLocCancel').onclick=closeCModal;
+  $('#cmLocSave').onclick=async()=>{
+    const loc=$('#cmLoc').value.trim();const errEl=$('#cmLocErr');
+    try{await apiLocal('POST','api/nodes/location',{fingerprint:isLocal?'local':fp,location:loc});closeCModal();if(curTab==='home')loadHome();}
+    catch(e){errEl.textContent='保存失败：'+e.message;}
+  };
+}
+function openRemoveModal(fp){
+  const s=homeServers.find(x=>x.fp===fp);if(!s)return;
+  openCModal('<h3>移除管理</h3><div class="csub">移除后 <b>'+esc(s.name)+'</b> 从首页消失，节点回到初始页面（设置密码独立用 / 绑定其他主服务器），需重新配对才能再次群控。确定移除吗？</div>'+
+    '<div class="hint" id="cmRmErr"></div>'+
+    '<div style="display:flex;gap:10px"><button class="btn" id="cmRmCancel">取消</button><button class="btn dangerfill" id="cmRmOk">确认移除</button></div>');
+  $('#cmRmCancel').onclick=closeCModal;
+  $('#cmRmOk').onclick=async()=>{
+    const errEl=$('#cmRmErr');
+    try{await apiLocal('POST','api/nodes/remove',{fingerprint:fp});closeCModal();
+      if(curServer===fp){curServer='';}
+      await refreshHomeNav();
+      if(curTab==='home')loadHome();else gotoTab(homeServers.length?'home':'ov');
+    }catch(e){errEl.textContent='移除失败：'+e.message;}
+  };
+}
+let localMeta={};
 $('#btnHomeAck').onclick=async()=>{
   const fps=homeAlertFps;if(!fps.length)return;
   try{await apiLocal('POST','api/nodes/home-ack',{fingerprints:fps});}catch(e){}
@@ -713,25 +767,31 @@ async function loadHome(){
     $('#homeAlertTx').textContent='新设备已接入：'+news.map(n=>n.name+'（'+n.fingerprint.slice(0,8)+'，'+fmtTs(n.createdAt*1000)+'）').join('、');
     al.style.display='';
   }else al.style.display='none';
+  // 本机卡片元信息(主 IP、归属地、国旗、系统): 先取, 网格重建时直接带上
+  try{localMeta=await apiLocal('GET','api/local-info');}catch(e){localMeta={};}
+  if(curTab!=='home')return;
   // 网格: 指纹集合变化才重建(新卡播进场动画), 否则只就地更新数字与状态, 不闪不跳
   const want=[''].concat(homeServers.map(s=>s.fp));
   const prevSet=new Set(homeMounted);
   if(JSON.stringify(want)!==JSON.stringify(homeMounted)){
     $('#homeGrid').innerHTML=want.map((fp,i)=>{
-      if(!fp)return homeCardHTML('','本机',true,'本机','本机面板',!prevSet.has(''),i*60);
+      if(!fp)return homeCardHTML('','本机',true,'本机','本机面板',!prevSet.has(''),i*60,localMeta);
       const s=homeServers.find(x=>x.fp===fp);
       const foot=s.online?(s.ver?'版本 '+s.ver:''):(s.last?('最后在线 '+fmtTs(s.last*1000)):'未上线过');
-      return homeCardHTML(fp,s.name,s.online,s.online?'在线':'离线',foot,!prevSet.has(fp),i*60);
+      return homeCardHTML(fp,s.name,s.online,s.online?'在线':'离线',foot,!prevSet.has(fp),i*60,s);
     }).join('');
     homeMounted=want;
   }else{
     homeServers.forEach(s=>{
       const c=homeCardEl(s.fp);if(!c)return;
       c.classList.toggle('offline',!s.online);
+      c.querySelector('.srv-name').textContent=s.name;
       c.querySelector('.srv-tag').textContent=s.online?'在线':'离线';
+      homeSetMeta(s.fp,s);
       if(!s.online)c.querySelector('.srv-foot').textContent=s.last?('最后在线 '+fmtTs(s.last*1000)):'未上线过';
       else if(s.ver)c.querySelector('.srv-foot').textContent='版本 '+s.ver;
     });
+    homeSetMeta('',localMeta);
   }
   // 本机数
   let local=null,localName='本机';
@@ -1392,6 +1452,9 @@ async function loadOverview(){
   $('#connBody').innerHTML=rest.map(c=>connRow(c,now)).join('');
   $('#connEmpty').style.display=rest.length?'none':'';
   let sess=[];if(!curServer){try{sess=await api('GET','api/auth/sessions')}catch(e){}}
+  // 查看节点时隐藏会话卡片: 节点本身没有本地登录(用户登的是主服务器),
+  // 节点上永远是 0, 属误导信息; 本机总览保留。
+  $('#sessCard').style.display=curServer?'none':'';
   $('#sessCount').textContent='（'+sess.length+'）';
   $('#sessBody').innerHTML=sess.map(s=>sessRow(s,now)).join('');
   $('#sessEmpty').style.display=sess.length?'none':'';
@@ -1933,6 +1996,10 @@ function collectSettings(){
 }
 async function loadVersion(){try{const v=await api('GET','api/version');$('#verNum').textContent=v.version||'未知'}catch(e){$('#verNum').textContent='未知'}}
 async function loadSettings(){
+  // 查看节点时: 2FA 与通用通知方式是主服务器本机配置, 节点设置页不显示;
+  // 节点 TG 通知卡由 loadNodeTg 单独控制(只在节点视图显示)。
+  $('#totpCard').style.display=curServer?'none':'';
+  $('#tgCard').style.display=curServer?'none':'';
   try{fillSettings(await api('GET','api/settings'))}catch(e){toast(e.message)}
   loadVersion();
   renderGeoCard();
@@ -2024,16 +2091,28 @@ async function loadPairPending(){
 async function pairDecide(fp,ok){
   $('#pairPendingMsg').textContent='';
   try{
-    await apiLocal('POST',ok?'api/nodes/approve':'api/nodes/reject',{fingerprint:fp});
-    $('#pairPendingMsg').textContent=ok?'已确认，节点已登记，首页出现该服务器卡片。':'已拒绝，该节点已移除。';
+    const d=await apiLocal('POST',ok?'api/nodes/approve':'api/nodes/reject',{fingerprint:fp});
+    if(ok){
+      const nm=(d&&d.server&&d.server.name)||'';
+      $('#pairMsg').innerHTML='已添加 '+esc(nm)+'，点击首页可查看管理 <button class="btn sm" id="btnPairGoHome">去首页</button>';
+      $('#btnPairGoHome').onclick=()=>gotoTab('home');
+    }else{
+      $('#pairPendingMsg').textContent='已拒绝，该节点已移除。';
+    }
     await loadPairPending();
     await refreshHomeNav();
   }catch(e){$('#pairPendingMsg').textContent=(ok?'确认失败：':'拒绝失败：')+e.message;}
 }
+let pairExpSec=0, pairHasCode=false;
 async function loadPairCard(){
   const card=$('#pairCard');
   if(curServer){card.style.display='none';return;}
   card.style.display='';
+  // 已生成的码过期后提示重生成(反馈只在卡内)。
+  if(pairHasCode&&pairExpSec&&Date.now()/1000>pairExpSec){
+    $('#pairCodeExp').textContent='已过期，请重新生成';
+    pairSetMsg('配对码已过期，请重新生成。');
+  }
   await loadPairPending();
 }
 $('#btnPairGen').onclick=async()=>{
@@ -2044,10 +2123,12 @@ $('#btnPairGen').onclick=async()=>{
     $('#pairCodeTx').textContent=d.code;
     $('#pairCodeExp').textContent=fmtTs(d.expiresAt*1000);
     $('#pairCodeBox').style.display='';
+    pairExpSec=d.expiresAt;pairHasCode=true;
     pairSetMsg('配对码已生成，30 分钟内有效，用完即废。');
+    b.textContent='重新生成';
     await loadPairPending();
-  }catch(e){pairSetMsg('生成失败：'+e.message);}
-  b.disabled=false;b.textContent=old;pairBusy=false;
+  }catch(e){pairSetMsg('生成失败：'+e.message);b.textContent=old;}
+  b.disabled=false;pairBusy=false;
 };
 $('#btnPairCopy').onclick=async()=>{
   const code=$('#pairCodeTx').textContent;if(!code)return;
@@ -2110,21 +2191,29 @@ $('#btnTrustLAN').onclick=()=>{
   $('#sTrusted').value=cur.join('\n');
   toast('已填入全部内网段，记得点本卡的「保存设置」');
 };
-/* 节点 TG 通知(群控): 只在查看节点时显示, 走代理链路调节点接口 */
+/* 节点 TG 通知(群控): 只在查看节点时显示, 走代理链路调节点接口。
+   单选即选择, 不再二次确认: 走主服务器时不显示任何 token/chatid 填写与测试;
+   只有选独立通知时才显示独立 Token、Chat ID 与连通性测试。 */
+function ntApplyModeVisibility(){
+  const ind=document.querySelector('input[name=nodeTgMode][value=independent]')?.checked;
+  ['ntTokenRow','ntChatRow','ntTestRow'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=ind?'':'none';});
+}
 async function loadNodeTg(){
   const c=$('#nodeTgCard');if(!curServer){c.style.display='none';return;}
   c.style.display='';
   const m=$('#ntMsg');
   try{const d=await api('GET','api/tg/mode');
     document.querySelector('input[name=nodeTgMode][value='+(d.mode==='independent'?'independent':'hub')+']').checked=true;
-    $('#ntOn').checked=!!d.enabled;$('#ntChat').value=d.chatId||'';$('#ntToken').value=d.hasToken?'********':'';
+    $('#ntChat').value=d.chatId||'';$('#ntToken').value=d.hasToken?'********':'';
     m.textContent='当前模式：'+(d.mode==='independent'?'独立通知':'走主服务器');
+    ntApplyModeVisibility();
   }catch(e){m.textContent='读取失败：'+e.message}
 }
+document.querySelectorAll('input[name=nodeTgMode]').forEach(r=>r.onchange=ntApplyModeVisibility);
 $('#btnNtSave').onclick=async()=>{
   const mode=document.querySelector('input[name=nodeTgMode]:checked')?.value||'hub';
   const m=$('#ntMsg');
-  try{const d=await api('POST','api/tg/mode',{mode:mode,enabled:$('#ntOn').checked,token:$('#ntToken').value.trim(),chatId:$('#ntChat').value.trim()});
+  try{const d=await api('POST','api/tg/mode',{mode:mode,token:$('#ntToken').value.trim(),chatId:$('#ntChat').value.trim()});
     m.textContent='已保存，当前模式：'+(d.mode==='independent'?'独立通知':'走主服务器');
   }catch(e){m.textContent='保存失败：'+e.message}
 };
@@ -2249,7 +2338,7 @@ function showLogin(setup){
   const ic=document.querySelector('link[rel=icon]');if(ic)$('#authLogo').src=ic.href;
   $('#loginView').style.display='';
   ['home','ov','ports','events','bans','prot','proxy','set'].forEach(t=>{$('#tab-'+t).style.display='none'});
-  $('#viewBar').style.display='none';
+  $('#managingTag').style.display='none';
   if(homeTimer){clearInterval(homeTimer);homeTimer=null;}
   $('#nav').style.display='none';
   $('#btnLogout').style.display='none';
@@ -2269,7 +2358,7 @@ function showChoice(joinError){
   const ic=document.querySelector('link[rel=icon]');if(ic)$('#authLogo').src=ic.href;
   $('#loginView').style.display='';
   ['home','ov','ports','events','bans','prot','proxy','set'].forEach(t=>{$('#tab-'+t).style.display='none'});
-  $('#viewBar').style.display='none';
+  $('#managingTag').style.display='none';
   if(homeTimer){clearInterval(homeTimer);homeTimer=null;}
   $('#nav').style.display='none';
   $('#btnLogout').style.display='none';

@@ -226,7 +226,11 @@ func reportTGModeToHub() {
 		return
 	}
 	cli := &http.Client{Timeout: 10 * time.Second}
-	linkPost(cli, hubURL+"/api/nodes/ping", tok, map[string]any{"version": appVersion, "tgMode": nodeTGMode()})
+	sysIP, sysOS, sysArch := nodeSysInfo()
+	linkPost(cli, hubURL+"/api/nodes/ping", tok, map[string]any{
+		"version": appVersion, "tgMode": nodeTGMode(), "name": nodeDisplayName(),
+		"ip": sysIP, "os": sysOS, "arch": sysArch,
+	})
 }
 
 // ---------- 节点 TG 模式接口(仅被群控节点可用, 走主服务器面板代理调用) ----------
@@ -253,10 +257,9 @@ func handleNodeTGMode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Mode    string `json:"mode"`
-		Enabled bool   `json:"enabled"`
-		Token   string `json:"token"`
-		ChatID  string `json:"chatId"`
+		Mode   string `json:"mode"`
+		Token  string `json:"token"`
+		ChatID string `json:"chatId"`
 	}
 	if json.NewDecoder(r.Body).Decode(&in) != nil {
 		errJSON(w, 400, "请求无效")
@@ -286,11 +289,13 @@ func handleNodeTGMode(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if mode == "independent" && in.Enabled && (token == "" || chatID == "") {
+	// 单选即选择, 不再二次确认: 选独立通知即启用(发送门 tgConfigured 认 enabled),
+	// 切回走主服务器即停用, 已存 token/chat 保留备用不清除。
+	if mode == "independent" && (token == "" || chatID == "") {
 		errJSON(w, 400, "独立通知需填写 Bot Token 与 Chat ID")
 		return
 	}
-	setNodeTGConfig(in.Enabled, token, chatID)
+	setNodeTGConfig(mode == "independent", token, chatID)
 	mu.Lock()
 	settings.NodeTGMode = mode
 	saveSettings()

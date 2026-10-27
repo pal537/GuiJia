@@ -34,6 +34,10 @@ type hubServer struct {
 	TGMode      string `json:"tgMode"` // hub | independent
 	TokenHash   string `json:"tokenHash"`
 	CreatedAt   int64  `json:"createdAt"`
+	IP          string `json:"ip,omitempty"`       // 节点上报的主 IP, 老版本节点为空
+	OS          string `json:"os,omitempty"`       // 节点上报的操作系统, 如 Debian 13
+	Arch        string `json:"arch,omitempty"`     // 节点上报的架构, 如 x86_64
+	Location    string `json:"location,omitempty"` // 手动归属地(管理员在卡片上设), 优先于自动解析
 }
 
 type hubPendingEntry struct {
@@ -199,11 +203,32 @@ func hubServerPublic(s *hubServer) map[string]any {
 	if hubNodeOnline(s) {
 		st = "online"
 	}
+	loc, country, flag := serverLocationDisplay(s.Location, s.IP)
 	return map[string]any{
 		"fingerprint": s.Fingerprint, "name": s.Name, "status": st,
 		"lastSeen": s.LastSeen, "version": s.Version, "tgMode": s.TGMode,
 		"createdAt": s.CreatedAt,
+		"ip":        s.IP, "os": s.OS, "arch": s.Arch,
+		"location": loc, "country": country, "flag": flag,
+		"manualLocation": s.Location,
 	}
+}
+
+// serverLocationDisplay 卡片归属地三件套: 手动值优先, 否则按 IP 自动解析
+// 国家, 都没有则“未知”; 内网 IP 显示“内网”且无旗; 命中不了的国家名无旗不猜。
+func serverLocationDisplay(manual, ip string) (location, country, flag string) {
+	if m := strings.TrimSpace(manual); m != "" {
+		return m, m, flagEmojiForCountry(m)
+	}
+	if ip != "" {
+		if c := geoLookup(ip).Country; c != "" {
+			if c == "内网" {
+				return "内网", "内网", ""
+			}
+			return c, c, flagEmojiForCountry(c)
+		}
+	}
+	return "未知", "", ""
 }
 
 func hubPendingPublic(p *hubPendingEntry) map[string]any {
@@ -237,6 +262,10 @@ func newPairingCode() (string, int64) {
 	}
 	exp := time.Now().Add(30 * time.Minute).Unix()
 	codeMu.Lock()
+	// 重新生成即作废旧码: 此前未用的码一律标记已用, 旧码再填即 403。
+	for _, c := range codes {
+		c.used = true
+	}
 	codes[sb.String()] = &pairingCode{code: sb.String(), expiresAt: exp}
 	codeMu.Unlock()
 	return sb.String(), exp
@@ -370,6 +399,71 @@ func handleNodeServers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"servers": servers, "pending": pending})
 }
 
+// handleNodeLocation 首页卡片手动归属地: fingerprint 为 "local" 时改本机
+// (存 settings.ManualLocation), 否则改注册表里该节点的 Location 并持久化;
+// location 为空 = 清除手动值, 回到自动解析。登录鉴权由中间件负责。
+func handleNodeLocation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	var in struct {
+		Fingerprint string `json:"fingerprint"`
+		Location    string `json:"location"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	loc := strings.TrimSpace(in.Location)
+	if len([]rune(loc)) > 64 {
+		errJSON(w, 400, "归属地过长")
+		return
+	}
+	if in.Fingerprint == "local" || in.Fingerprint == "" {
+		mu.Lock()
+		settings.ManualLocation = loc
+		saveSettings()
+		mu.Unlock()
+		writeJSON(w, 200, map[string]bool{"ok": true})
+		return
+	}
+	if !validFingerprint(in.Fingerprint) {
+		errJSON(w, 400, "指纹无效")
+		return
+	}
+	fp := strings.ToLower(in.Fingerprint)
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	s := findHubServer(fp)
+	if s == nil {
+		errJSON(w, 404, "没有该节点")
+		return
+	}
+	s.Location = loc
+	saveServersLocked()
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+// handleLocalInfo 本机卡片信息: 名称、主 IP、操作系统、架构、归属地与国旗。
+// 归属地 = 手动值优先, 否则按本机主 IP 自动解析, 都没有则“未知”。
+func handleLocalInfo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		errJSON(w, 405, "method")
+		return
+	}
+	ip, osName, arch := nodeSysInfo()
+	mu.Lock()
+	manual := settings.ManualLocation
+	mu.Unlock()
+	loc, country, flag := serverLocationDisplay(manual, ip)
+	writeJSON(w, 200, map[string]any{
+		"name": nodeDisplayName(), "ip": ip, "os": osName, "arch": arch,
+		"location": loc, "country": country, "flag": flag,
+		"manualLocation": manual,
+	})
+}
+
 func handleNodeApprove(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		errJSON(w, 405, "method")
@@ -476,6 +570,9 @@ func handleNodeHello(w http.ResponseWriter, r *http.Request) {
 		Name        string `json:"name"`
 		Version     string `json:"version"`
 		Code        string `json:"code"`
+		IP          string `json:"ip"`
+		OS          string `json:"os"`
+		Arch        string `json:"arch"`
 	}
 	if json.NewDecoder(r.Body).Decode(&in) != nil {
 		errJSON(w, 400, "请求无效")
@@ -497,7 +594,22 @@ func handleNodeHello(w http.ResponseWriter, r *http.Request) {
 	}
 	hubMu.Lock()
 	defer hubMu.Unlock()
-	if findHubServer(fp) != nil {
+	if s := findHubServer(fp); s != nil {
+		// 已登记节点每次 hello 都同步名称与系统信息(改名、换 IP 即随下次 hello/ping 同步)。
+		s.Name = name
+		if in.IP != "" {
+			s.IP = in.IP
+		}
+		if in.OS != "" {
+			s.OS = in.OS
+		}
+		if in.Arch != "" {
+			s.Arch = in.Arch
+		}
+		if in.Version != "" {
+			s.Version = in.Version
+		}
+		saveServersLocked()
 		writeJSON(w, 200, map[string]any{"status": "approved"})
 		return
 	}
@@ -604,6 +716,10 @@ func handleNodePing(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Version string `json:"version"`
 		TGMode  string `json:"tgMode"`
+		Name    string `json:"name"`
+		IP      string `json:"ip"`
+		OS      string `json:"os"`
+		Arch    string `json:"arch"`
 	}
 	json.NewDecoder(r.Body).Decode(&in)
 	hubMu.Lock()
@@ -611,6 +727,19 @@ func handleNodePing(w http.ResponseWriter, r *http.Request) {
 	s.LastSeen = time.Now().Unix()
 	if in.Version != "" {
 		s.Version = in.Version
+	}
+	// 节点每次 ping 都同步名称与系统信息: 节点改名后随下次 ping 同步到首页与顶部标识。
+	if n := normalizeServerName(in.Name); n != "" {
+		s.Name = n
+	}
+	if in.IP != "" {
+		s.IP = in.IP
+	}
+	if in.OS != "" {
+		s.OS = in.OS
+	}
+	if in.Arch != "" {
+		s.Arch = in.Arch
 	}
 	// 节点上报的 TG 模式即事实来源(节点自己决定事件走哪条路), 主服务器只做镜像。
 	if in.TGMode == "hub" || in.TGMode == "independent" {
