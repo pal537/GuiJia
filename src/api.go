@@ -58,10 +58,14 @@ func handleOverview(w http.ResponseWriter, r *http.Request) {
 			"rxTotal": t.RxTot, "txTotal": t.TxTot,
 		})
 	}
+	// 黑名单计数透明：生效中（activeBans 已归一化过期状态）之外，
+	// 同时给出全部记录数与解封/过期 breakdown，前端不再只看到生效数。
+	_, bansReleased, bansExpired, bansTotal := banCounts()
 	writeJSON(w, 200, map[string]any{
 		"traffic":  traffic,
 		"connsNow": n, "watchedPorts": watched, "starredPorts": starred,
-		"activeBans": len(activeBans()), "closedPorts": closed, "fwLinkOk": fwLinkOK, "pgLinkOk": pgLinkOK, "dryBan": dryBan,
+		"activeBans": len(activeBans()), "bansTotal": bansTotal, "bansReleased": bansReleased, "bansExpired": bansExpired,
+		"closedPorts": closed, "fwLinkOk": fwLinkOK, "pgLinkOk": pgLinkOK, "dryBan": dryBan,
 		"nftTimeoutBackstop": setSupportsTimeout(setV4) && setSupportsTimeout(setV6),
 		"rescueActive":       rescueActive, "rescueUntil": rescueUntil,
 		"honeypotBansToday": ds.HoneypotBans,

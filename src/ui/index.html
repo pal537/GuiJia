@@ -14,7 +14,7 @@ body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;backg
 svg{display:block}
 button{font-family:inherit;cursor:pointer}
 input,select,textarea{font-family:inherit;font-size:13.5px;color:var(--txt);background:#fff;border:1px solid var(--line);border-radius:9px;padding:7px 10px;outline:none;transition:border-color .15s, box-shadow .15s}
-input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(37,99,235,.14)}
+input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(37,99,235,.18)}
 .top{display:flex;align-items:center;gap:12px;padding:2px 2px 14px}
 .logo{width:42px;height:42px;border-radius:11px;overflow:hidden;flex:0 0 auto}.logo img{width:42px;height:42px;display:block}
 .ttl{font-size:19px;font-weight:700}
@@ -30,9 +30,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 .nav button.on{background:var(--blue);color:#fff;box-shadow:0 4px 14px rgba(36,86,200,.4)}
 .nav button.on:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(36,86,200,.5)}
 .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 10px 13px;box-shadow:var(--shadow);text-align:center}
-.stat.click{cursor:pointer;transition:transform .12s, box-shadow .12s}
-.stat.click:hover{transform:translateY(-1px);box-shadow:0 6px 14px rgba(16,24,40,.08)}
+.stat{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;padding:16px 10px 13px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 12px 32px rgba(37,99,235,.12);text-align:center;transition:transform .38s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease}
+.stat .sub{font-size:12px;color:var(--mut);margin-top:2px}
+.stat.click{cursor:pointer}
+.stat.click:hover{transform:translateY(-6px) scale(1.015);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 20px 40px rgba(37,99,235,.18)}
 .stat .chip{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px}
 .stat .num{font-size:26px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums}
 .stat .lab{color:var(--mut);font-size:12.5px;margin-top:4px}
@@ -58,7 +59,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 .srv-card .srv-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.15)}
 .srv-card.offline .srv-dot{background:#9aa5b1;box-shadow:0 0 0 3px rgba(154,165,177,.15)}
 .srv-card .srv-tag{font-size:12px;color:var(--mut);margin-left:auto;flex:0 0 auto}
-.srv-card .srv-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.srv-card .srv-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
 .srv-card .srv-num{font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;min-height:24px}
 .srv-card .srv-lab{color:var(--mut);font-size:12px;margin-top:3px}
 .srv-card .srv-foot{color:var(--mut);font-size:12px;margin-top:12px;min-height:16px}
@@ -91,7 +92,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 .home-alert{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13.5px}
 .home-alert .btn{flex:0 0 auto}
 @media (prefers-reduced-motion: reduce){.srv-card,.srv-card.srv-in{animation:none;transition:none}.srv-card:hover{transform:none}.srv-card.managing{animation:none;border:2px solid #2563eb}.nav button{transition:none}.nav button:hover{transform:none}}
-.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
+.panel{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 12px 32px rgba(37,99,235,.12);overflow:hidden;margin-bottom:16px}
 .ph{display:flex;align-items:center;padding:14px 18px 10px;gap:8px;flex-wrap:wrap}
 .ph h2{font-size:15px;font-weight:700}
 .ph .staric{color:var(--star);font-size:15px}
@@ -108,7 +109,7 @@ table.fixed{table-layout:fixed}
 .ipwrap{word-break:break-all}
 .evfoot{display:flex;align-items:center;justify-content:center;gap:16px;padding:13px 18px;border-top:1px solid var(--line)}
 .evfoot .cnt{color:var(--mut);font-size:12.5px;font-variant-numeric:tabular-nums}
-.trafbar{display:flex;align-items:center;gap:9px 26px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px 18px;margin-bottom:14px}
+.trafbar{display:flex;align-items:center;gap:9px 26px;flex-wrap:wrap;background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 12px 32px rgba(37,99,235,.12);padding:10px 18px;margin-bottom:14px}
 .trafbar .tlab{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--mut)}
 .traf-items{display:flex;align-items:center;gap:9px 26px;flex-wrap:wrap}
 .tnic{display:inline-flex;align-items:baseline;gap:9px;font-variant-numeric:tabular-nums}
@@ -136,13 +137,15 @@ tr.trusted td{background:#f7f9fc;opacity:.72}
 .tag{display:inline-flex;align-items:center;font-size:11.5px;font-weight:700;letter-spacing:.06em;line-height:1;padding:4px 9px;border-radius:8px;border:1.5px solid;white-space:nowrap}
 .memo{color:var(--mut);font-size:12.5px}
 .empty{padding:26px;text-align:center;color:var(--mut);font-size:13px}
-.btn{font-size:12.5px;font-weight:600;padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--txt);transition:background .12s}
-.btn:hover{background:#f4f7fb}
-.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
-.btn.primary:hover{background:#1e4bab}
+.btn{font-size:12.5px;font-weight:600;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--txt);transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease,background .12s ease;box-shadow:0 1px 3px rgba(16,24,40,.06)}
+.btn:hover{background:#f4f7fb;transform:translateY(-1px);box-shadow:0 6px 16px rgba(37,99,235,.18)}
+.btn.primary{background:var(--blue2);border-color:var(--blue2);color:#fff;box-shadow:0 4px 14px rgba(37,99,235,.35)}
+.btn.primary:hover{background:#1d4ed8;box-shadow:0 6px 18px rgba(37,99,235,.45)}
 .btn.danger{color:var(--red);border-color:rgba(212,58,47,.45)}
-.btn.danger:hover{background:rgba(212,58,47,.06)}
-.btn.dangerfill{background:var(--red);border-color:var(--red);color:#fff}
+.btn.danger:hover{background:rgba(212,58,47,.06);box-shadow:0 6px 16px rgba(212,58,47,.18)}
+.btn.dangerfill{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 4px 14px rgba(212,58,47,.35)}
+.btn.dangerfill:hover{box-shadow:0 6px 18px rgba(212,58,47,.45)}
+.btn:disabled:hover{transform:none}
 .btn.sm{padding:4px 11px;font-size:12px}
 .btn:disabled{opacity:.55;cursor:default}
 .ops{display:flex;gap:8px;white-space:nowrap}
@@ -171,10 +174,10 @@ tr.trusted td{background:#f7f9fc;opacity:.72}
 .sw input:checked + i{background:var(--blue2)}
 .sw input:checked + i:before{left:19px}
 .setgrid{display:flex;flex-direction:column}
-.scard{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:6px 0 14px;margin-bottom:16px}
+.scard{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 12px 32px rgba(37,99,235,.12);padding:6px 0 14px;margin-bottom:16px}
 .scard h3{font-size:14.5px;font-weight:700;padding:12px 18px 4px;display:flex;align-items:center;gap:8px}
 .scard h3 .cbadge{font-size:11px;font-weight:700;color:var(--blue2);background:rgba(37,99,235,.1);padding:3px 8px;border-radius:6px;letter-spacing:.04em}
-.frow{display:flex;align-items:center;gap:12px;padding:9px 18px}
+.frow{display:flex;align-items:center;gap:12px;padding:11px 18px}
 .frow .fl{flex:0 0 168px;font-weight:600;font-size:13.5px}
 .frow .fl .d{display:block;font-weight:400;color:var(--mut);font-size:12px;margin-top:2px}
 .frow .fv{flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -187,7 +190,7 @@ tr.trusted td{background:#f7f9fc;opacity:.72}
 #hpPresets input[type=checkbox]{flex:0 0 auto;width:auto;min-width:0}
 /* 端口防护省市多选下拉 */
 .pgfield{flex:1;min-width:120px;border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:#fff;display:flex;flex-wrap:wrap;gap:6px;align-items:center;cursor:pointer;min-height:36px}
-.pgfield:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(37,99,235,.14)}
+.pgfield:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(37,99,235,.18)}
 .pgchip{display:inline-flex;gap:4px;align-items:center;background:#eef3ff;border:1px solid #d3e0ff;border-radius:999px;padding:2px 9px;font-size:12.5px}
 .pgchip i{font-style:normal;color:var(--mut);cursor:pointer}
 .pgpair{display:flex;gap:10px;flex:1;min-width:0;flex-wrap:wrap}
@@ -204,7 +207,7 @@ tr.trusted td{background:#f7f9fc;opacity:.72}
 .savedtip{color:var(--green);font-size:12px;display:none}
 textarea.ta{width:calc(100% - 36px);margin:6px 18px 0;min-height:92px;resize:vertical;line-height:1.55}
 .geoline{display:flex;align-items:center;gap:10px;padding:9px 18px;font-size:13.5px}
-.pgcard{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:4px 0;margin:0 0 10px}
+.pgcard{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 12px 32px rgba(37,99,235,.12);padding:4px 0;margin:0 0 10px}
 .geoline .st{font-weight:600;flex:0 0 64px}
 .geoline .dt{color:var(--mut);font-size:12.5px}
 .chips{display:flex;gap:7px;flex-wrap:wrap}
@@ -255,6 +258,35 @@ body.auth #loginView{margin:auto}
 #loginView .btn.primary{width:100%;height:44px;font-size:15px;border-radius:10px;padding:0}
 #loginView #loginErr{text-align:center}
 @media (max-width:480px){#loginView{padding:26px 20px 20px}}
+
+/* ---------- 全站统一设计语言(2026-10-27 UI 统一): 与首页 .srv-card 同款毛玻璃, 绝不用紫色渐变 ---------- */
+/* 分区卡片: 标题 + 间距 + 操作区; 操作区(savebar)以顶部分隔线与内容区分 */
+.scard .savebar,.panel .savebar{border-top:1px solid var(--line);margin-top:10px;padding-top:12px}
+/* 分组眉题: 防护/设置页内把相邻卡片归成一组, 只作视觉分组, 不改卡片顺序与 id */
+.grp-head{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--mut);padding:6px 4px 10px}
+/* 统一说明文字: 卡片内大段说明一律走 .hint, 不再用内联 padding/color 文字墙 */
+.scard>.hint,.panel>.hint{padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65}
+.scard>.hint.warn,.panel>.hint.warn{padding-top:4px;color:var(--red)}
+.scard>.hint .warn{color:var(--red);font-weight:700}
+/* 表格: 圆角卡片容器由 .panel/.scard 玻璃提供; 行悬停高亮 */
+.tblwrap tbody tr:hover td{background:rgba(37,99,235,.05)}
+/* 页眉筛选: 搜索框/下拉框 pill 化 + 聚焦柔光(与全局输入框同一柔光) */
+.ph input,.ph select{border-radius:999px}
+.ph input:focus,.ph select:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(37,99,235,.18)}
+/* 分段控制器与 dur/chip pill: 悬停抬升, 激活态品牌蓝底白字(与菜单 pill 同语言) */
+.seg button,.fchip,#pop .dur{transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease,background .15s ease,color .15s ease}
+.seg button:hover,.fchip:hover,#pop .dur:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(37,99,235,.18)}
+.seg button.sel,.fchip.on{box-shadow:0 4px 14px rgba(37,99,235,.35)}
+/* 开关只统一外观(焦点柔光), 语义与事件一律不动 */
+.sw input:focus-visible + i{box-shadow:0 0 0 3px rgba(37,99,235,.18)}
+/* 弹窗: 按钮 pill 由 .btn 覆盖; 输入框/下拉框/textarea 圆角 + 聚焦柔光由全局规则覆盖; 弹窗卡片同款玻璃 */
+.cmcard{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 14px 34px rgba(16,24,40,.18)}
+#pop{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 14px 34px rgba(16,24,40,.18)}
+#pop:before{background:color-mix(in srgb, var(--card) 88%, transparent)}
+/* 登录按钮同样 pill 化 */
+#loginView .btn.primary{border-radius:999px}
+/* 减动效: 全站悬停抬升与过渡一并关闭(首页与菜单已有规则, 这里补其余) */
+@media (prefers-reduced-motion: reduce){.btn,.stat,.seg button,.fchip,#pop .dur{transition:none}.btn:hover,.stat.click:hover,.seg button:hover,.fchip:hover,#pop .dur:hover{transform:none;box-shadow:0 1px 3px rgba(16,24,40,.06)}}
 </style></head>
 <body>
 <div class="wrap">
@@ -367,7 +399,7 @@ body.auth #loginView{margin:auto}
       <div class="ph"><h2>监控端口</h2><span class="hint">彩色框 = 服务类型，后面灰字 = 备注；星标区置顶</span><span class="sp"></span>
         <button class="btn" id="btnScan">扫描添加</button>
         <button class="btn primary" id="btnAddPort">手动添加</button></div>
-      <div id="portStarWrap" style="display:none;border:1px solid var(--line);border-radius:12px;margin:0 18px 12px">
+      <div id="portStarWrap" style="display:none;border:1px solid var(--line);border-radius:16px;margin:0 18px 12px">
         <div class="ph" style="border:0;padding:10px 18px 0"><h2 style="font-size:14px">★ 重点端口</h2></div>
         <div class="tblwrap"><table class="fixed" style="min-width:860px"><colgroup><col style="width:48px"><col><col style="width:280px"><col style="width:76px"><col style="width:246px"></colgroup><thead><tr><th>重点</th><th>端口</th><th>状态</th><th>来源</th><th>操作</th></tr></thead><tbody id="portStarBody"></tbody></table></div>
       </div>
@@ -389,7 +421,7 @@ body.auth #loginView{margin:auto}
   <section id="tab-bans" style="display:none">
     <div class="scard">
       <h3>信任名单</h3>
-      <div style="padding:2px 18px 0;color:var(--mut);font-size:12.5px">名单内 IP 不报警、不可拉黑；支持单个 IP 或 CIDR（如 192.168.1.0/24）</div>
+      <div class="hint">名单内 IP 不报警、不可拉黑；支持单个 IP 或 CIDR（如 192.168.1.0/24）</div>
       <textarea class="ta" id="sTrusted" placeholder="203.0.113.10" style="display:none"></textarea>
       <div id="trustList"></div>
       <div style="display:flex;gap:8px;padding:10px 18px 2px"><input id="trustAdd" placeholder="新增 IP 或 CIDR，如 203.0.113.10"><button class="btn" id="btnTrustAdd">添加</button></div>
@@ -397,7 +429,7 @@ body.auth #loginView{margin:auto}
       <div class="savebar"><button class="btn primary" data-save>保存设置</button><label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="chkTrustLAN"> 信任全部内网 IP</label><span class="hint" id="trustLanMsg" style="display:none"></span><span class="savedtip">已保存</span></div>
     </div>
     <div class="panel">
-      <div class="ph"><h2>黑名单记录</h2><span class="hint">记录永久保留 · 到期/解封只改状态 · 内网与信任名单不可拉黑</span><span class="sp"></span><input id="banIpSearch" class="short" placeholder="搜索 IP…"><select id="banStatusFilter" class="short"><option value="">全部状态</option><option value="active">生效中</option><option value="released">已解封</option><option value="expired">已过期</option></select><select id="banSrcFilter" class="short"><option value="">全部来源</option><option value="honeypot">蜜罐</option><option value="auto">自动</option><option value="manual">手动</option><option value="tg">TG</option></select><button class="btn primary" id="btnAddBan">手动拉黑</button></div>
+      <div class="ph"><h2>黑名单记录</h2><span class="hint">记录永久保留 · 到期/解封只改状态 · 内网与信任名单不可拉黑</span><span class="hint" id="banBreakdown"></span><span class="sp"></span><input id="banIpSearch" class="short" placeholder="搜索 IP…"><select id="banStatusFilter" class="short"><option value="">全部状态</option><option value="active">生效中</option><option value="released">已解封</option><option value="expired">已过期</option></select><select id="banSrcFilter" class="short"><option value="">全部来源</option><option value="honeypot">蜜罐</option><option value="auto">自动</option><option value="manual">手动</option><option value="tg">TG</option></select><button class="btn primary" id="btnAddBan">手动拉黑</button></div>
       <div class="tblwrap"><table class="fixed" style="min-width:900px"><colgroup><col style="width:180px"><col><col style="width:200px"><col style="width:64px"><col style="width:80px"><col style="width:150px"><col style="width:84px"></colgroup><thead><tr><th>IP</th><th>归属地</th><th>原因</th><th>来源</th><th>状态</th><th>到期 / 解封</th><th>操作</th></tr></thead><tbody id="banBody"></tbody></table></div>
       <div class="empty" id="banEmpty" style="display:none">暂无拉黑记录</div>
       <div style="text-align:center;padding:10px 0 4px"><button class="btn" id="banExpand">展开</button></div>
@@ -411,14 +443,16 @@ body.auth #loginView{margin:auto}
         <div class="frow"><div class="fl">状态</div><div class="fv"><span class="mono" id="protRescueTx"></span><button class="btn primary" id="btnProtRestore">恢复防护</button></div></div>
       </div>
 
+      <div class="grp-head">建议与须知</div>
       <div class="scard">
         <h3>安全建议</h3>
-        <div style="padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65">建议修改默认的 SSH 端口和面板端口，不要使用默认端口。</div>
+        <div class="hint">建议修改默认的 SSH 端口和面板端口，不要使用默认端口。</div>
       </div>
 
+      <div class="grp-head">端口防护</div>
       <div class="scard">
         <h3>端口防护 <span class="cbadge">按省市白名单</span></h3>
-        <div style="padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65">给指定端口加省市白名单：只有白名单里的省或市能连，其他省一律在内核按端口封禁（不影响该 IP 的其他端口）。省份定位偶尔会跳，误封时 TG 报警里点「解除封禁」或在黑名单页解封；内网与信任名单永远豁免。删除规则不自动解封已封禁，到期或手动解封为止。</div>
+        <div class="hint">给指定端口加省市白名单：只有白名单里的省或市能连，其他省一律在内核按端口封禁（不影响该 IP 的其他端口）。省份定位偶尔会跳，误封时 TG 报警里点「解除封禁」或在黑名单页解封；内网与信任名单永远豁免。删除规则不自动解封已封禁，到期或手动解封为止。</div>
         <div id="pgRuleList" style="padding:6px 18px 0"></div>
         <div class="frow"><div class="fl">端口<div class="d">多个端口用英文逗号、中文逗号或斜杠分隔</div></div><div class="fv"><input id="pgPorts" placeholder="如 45167,3004"></div></div>
         <div class="frow"><div class="fl">白名单省市<div class="d">左边选省、右边选市，都可多选；选了省则该省所有市都放行，选了市则只放行该市</div></div><div class="fv"><div class="pgpair">
@@ -443,14 +477,15 @@ body.auth #loginView{margin:auto}
 
       <div class="scard">
         <h3>重点端口洪峰防护 <span class="cbadge">分布式爆破</span></h3>
-        <div style="padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65">防的是代理池分布式爆破：攻击者用成百上千个代理 IP、每个 IP 只试一两次，上面那种「单个 IP 失败 N 次」的阈值永远抓不到。开启后，同一个重点端口若在短时间内涌入大量不同来源 IP，将判定为洪峰，立即临时关闭该端口并通过 TG 升级报警。</div>
+        <div class="hint">防的是代理池分布式爆破：攻击者用成百上千个代理 IP、每个 IP 只试一两次，上面那种「单个 IP 失败 N 次」的阈值永远抓不到。开启后，同一个重点端口若在短时间内涌入大量不同来源 IP，将判定为洪峰，立即临时关闭该端口并通过 TG 升级报警。</div>
         <div class="frow"><div class="fl">启用洪峰防护<div class="d">只对重点（星标）端口生效</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sFldOn"><i></i></label></div></div>
         <div class="frow"><div class="fl">触发条件</div><div class="fv"><input type="number" id="sFldWin" min="1" max="60"><span class="mono">分钟内，同一重点端口出现</span><input type="number" id="sFldIPs" min="2"><span class="mono">个不同公网 IP 的新连接</span></div></div>
         <div class="frow"><div class="fl">触发动作</div><div class="fv"><span class="mono">临时关闭该端口</span><input type="number" id="sFldClose" min="1" max="1440"><span class="mono">分钟：期间公网新连接全部拒绝，内网不受影响；到期自动恢复，也可在「端口」页立即恢复</span></div></div>
-        <div style="padding:4px 18px 0;color:var(--red);font-size:12.5px;line-height:1.65">注意：下载类端口（qBittorrent、Transmission 等 BT 下载）千万不要设为重点端口——BT 对端成百上千是正常流量，会误触发关端口。重点端口只适合 SSH、面板、管理后台这类来源 IP 很少的服务。</div>
+        <div class="hint warn">注意：下载类端口（qBittorrent、Transmission 等 BT 下载）千万不要设为重点端口——BT 对端成百上千是正常流量，会误触发关端口。重点端口只适合 SSH、面板、管理后台这类来源 IP 很少的服务。</div>
         <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
       </div>
 
+      <div class="grp-head">行为检测</div>
       <div class="scard">
         <h3>爆破自动拉黑</h3>
         <div class="frow"><div class="fl">启用自动拉黑<div class="d">内网与信任名单豁免</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sAbOn"><i></i></label></div></div>
@@ -461,7 +496,7 @@ body.auth #loginView{margin:auto}
 
       <div class="scard">
         <h3>扫描识别 <span class="cbadge">被动观察</span></h3>
-        <div style="padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65">只看、不探：从本机连接与内核连接表里被动观察某 IP 在短时间内触达的不同 TCP 端口数，达阈值即判定为扫描。闭口试探（对方敲没开的端口）也能看见，因为它在内核连接表里留痕。采样间隔 1 秒；亚秒级全端口快扫理论上可能漏报。内网与信任名单豁免。</div>
+        <div class="hint">只看、不探：从本机连接与内核连接表里被动观察某 IP 在短时间内触达的不同 TCP 端口数，达阈值即判定为扫描。闭口试探（对方敲没开的端口）也能看见，因为它在内核连接表里留痕。采样间隔 1 秒；亚秒级全端口快扫理论上可能漏报。内网与信任名单豁免。</div>
         <div class="frow"><div class="fl">启用扫描识别<div class="d">默认关</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sScanOn"><i></i></label></div></div>
         <div class="frow"><div class="fl">触发条件</div><div class="fv"><input type="number" id="sScanWin" min="1"><span class="mono">分钟内，同一公网 IP 触达</span><input type="number" id="sScanThr" min="2"><span class="mono">个不同 TCP 端口</span></div></div>
         <div class="frow"><div class="fl">扫描报警<div class="d">同一 IP 报警后 1 小时内不再重复报警</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sScanAlert"><i></i></label></div></div>
@@ -471,8 +506,8 @@ body.auth #loginView{margin:auto}
 
       <div class="scard">
         <h3>蜜罐 <span class="cbadge">默认关</span></h3>
-        <div style="padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65">
-          <div style="color:var(--red);font-weight:700">⚠️ 谨慎开启</div>
+        <div class="hint">
+          <div class="warn">⚠️ 谨慎开启</div>
           <div>1. <b>先改默认端口（重中之重）</b>：SSH 和 webui 必须已经改离默认端口（建议 50000 以上高位），改完同步改路由器转发和客户端收藏。没改之前，默认端口当蜜罐根本不成立——真服务就占在上面，校验会直接拒绝；而且真服务挂在默认端口上，等于天天站在批量扫描的枪口下。</div>
           <div>2. 必须在软路由上把蜜罐端口转发到 NAS 本机，否则 0 命中不是坏了，是没转发；转发目标必须是 NAS 本机 IP。蜜罐别走雷池（雷池只反代真服务，走它来源 IP 会被挡一层）。</div>
           <div>3. 蜜罐端口绝不能是真服务端口（分层校验会拦截：格式 → 自身 → 系统已知 → 实时监听 → 历史流量 → 终局 bind，任一层拒绝都会说清被谁占了）。</div>
@@ -492,16 +527,17 @@ body.auth #loginView{margin:auto}
         <div class="savebar"><button class="btn primary" id="btnHpSave">保存蜜罐设置</button><span class="savedtip">已保存</span></div>
       </div>
 
+      <div class="grp-head">应急与情报</div>
       <div class="scard">
         <h3>急救 <span class="cbadge">TG 超级密码</span></h3>
-        <div style="padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65">在 Telegram 给机器人发送 /rescue 打开急救菜单：信任 IP、解封全部、关闭所有拦截（30 分钟后自动恢复）、恢复防护。破坏性动作（解封全部、关闭所有拦截）必须输对超级密码；日常拉黑、单个解封不走密码。内网 IP 永远不进黑名单，家里局域网永远是活路；应用挂了时 TG 也救不了，只能 SSH 上去改 bans.json 或清 nft 规则。</div>
+        <div class="hint">在 Telegram 给机器人发送 /rescue 打开急救菜单：信任 IP、解封全部、关闭所有拦截（30 分钟后自动恢复）、恢复防护。破坏性动作（解封全部、关闭所有拦截）必须输对超级密码；日常拉黑、单个解封不走密码。内网 IP 永远不进黑名单，家里局域网永远是活路；应用挂了时 TG 也救不了，只能 SSH 上去改 bans.json 或清 nft 规则。</div>
         <div class="frow"><div class="fl">超级密码<div class="d">只存哈希不存明文；空 = 清除密码保护（之后 TG 破坏性急救会被拒绝，需先设密码）</div></div><div class="fv"><input id="rescuePw" type="password" placeholder="至少 6 位"><button class="btn" id="btnRescuePw">保存密码</button></div></div>
         <div class="frow"><div class="fl">急救状态</div><div class="fv"><span class="mono" id="rescueStatusTx">…</span></div></div>
       </div>
 
       <div class="scard">
         <h3>威胁情报 <span class="cbadge">默认关 · 手动开启</span></h3>
-        <div style="padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65">外部攻击名单单独分区：底层 nft 全端口封禁，不进入黑名单记录、不计入今日拉黑与黑名单总数。信任白名单优先于黑名单与情报名单，加入信任后照样能连。</div>
+        <div class="hint">外部攻击名单单独分区：底层 nft 全端口封禁，不进入黑名单记录、不计入今日拉黑与黑名单总数。信任白名单优先于黑名单与情报名单，加入信任后照样能连。</div>
         <div class="frow"><div class="fl">启用威胁情报<div class="d">默认关；开启后立即拉取并生效；关闭立即清空情报集合</div></div><div class="fv"><label class="sw"><input type="checkbox" id="itOn"><i></i></label></div></div>
         <div class="frow"><div class="fl">名单直链<div class="d">默认 FireHOL level1，可改；免费、无需 Key；约一天一更</div></div><div class="fv"><input id="itPubUrl" style="width:100%"></div></div>
         <div class="frow"><div class="fl">每天更新次数<div class="d">1～24 次</div></div><div class="fv"><input id="itUpd" type="number" min="1" max="24" class="short"></div></div>
@@ -529,7 +565,7 @@ body.auth #loginView{margin:auto}
     <div class="setgrid">
       <div class="scard">
         <h3>证书</h3>
-        <div style="padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65">证书只有两个来源：在线申请（ACME）与手动上传，列表只显示元数据、不显示私钥。申请的证书按首域名分子目录存放，上传的证书存在数据目录的 certs 子目录；申请、上传、删除完成后列表自动刷新。下载为 zip（含证书与私钥，妥善保管）。</div>
+        <div class="hint">证书只有两个来源：在线申请（ACME）与手动上传，列表只显示元数据、不显示私钥。申请的证书按首域名分子目录存放，上传的证书存在数据目录的 certs 子目录；申请、上传、删除完成后列表自动刷新。下载为 zip（含证书与私钥，妥善保管）。</div>
         <div class="tblwrap"><table class="fixed" style="width:100%"><colgroup><col style="width:150px"><col style="width:220px"><col style="width:80px"><col style="width:150px"><col style="width:70px"><col></colgroup><thead><tr><th>名称</th><th>域名</th><th>状态</th><th>到期</th><th>来源</th><th>操作</th></tr></thead><tbody id="pxCertBody"></tbody></table></div>
         <div class="empty" id="pxCertEmpty" style="display:none">暂无证书，可在线申请或手动上传。</div>
         <div class="frow"><div class="fl">添加证书<div class="d">手动上传已有证书（成对的 .crt + .key）</div></div><div class="fv"><button class="btn primary" id="btnPxCertAdd">添加证书</button></div></div>
@@ -539,6 +575,7 @@ body.auth #loginView{margin:auto}
   </section>
 
   <section id="tab-set" style="display:none">
+    <div class="grp-head">登录与面板</div>
     <div class="panel" style="margin-bottom:14px" id="totpCard">
       <div class="ph"><h2>二次验证（2FA）</h2><span class="hint" id="totpState">…</span><span class="sp"></span><button class="btn" id="btnTotpSetup">开通 2FA</button></div>
       <div id="totpDisableBox" style="display:none">
@@ -556,19 +593,20 @@ body.auth #loginView{margin:auto}
     </div>
     <div class="panel" style="margin-bottom:14px" id="pairCard">
       <div class="ph"><h2>生成配对码</h2><span class="hint">给新服务器加入本机（主服务器）用</span></div>
-      <div style="padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65">配对码一次性、30 分钟有效、用完即废。把码填到新服务器首次打开面板的“连接到主服务器”里；节点加入后在下方待添加列表点确认，确认后首页出现该服务器卡片。</div>
+      <div class="hint">配对码一次性、30 分钟有效、用完即废。把码填到新服务器首次打开面板的“连接到主服务器”里；节点加入后在下方待添加列表点确认，确认后首页出现该服务器卡片。</div>
       <div class="frow"><div class="fl">配对码<div class="d">点生成后显示，有效期 30 分钟</div></div><div class="fv"><button class="btn primary" id="btnPairGen">生成配对码</button></div></div>
       <div id="pairCodeBox" style="display:none">
         <div class="frow"><div class="fl">新配对码</div><div class="fv"><span class="mono" id="pairCodeTx" style="font-size:16px;letter-spacing:1px"></span><button class="btn" id="btnPairCopy">复制</button></div></div>
         <div class="frow"><div class="fl">有效期至</div><div class="fv"><span class="mono" id="pairCodeExp"></span></div></div>
       </div>
-      <div class="hint" id="pairMsg" style="margin:0 18px 10px"></div>
+      <div class="hint" id="pairMsg" style="margin:0 0 10px"></div>
       <div style="border-top:1px solid var(--line);margin:6px 0 0"></div>
       <div class="frow"><div class="fl">待添加节点<div class="d">节点填码加入后出现在这里，点确认即登记上线</div></div><div class="fv"><button class="btn" id="btnPairRefresh">刷新</button></div></div>
       <div id="pairPending"></div>
-      <div class="hint" id="pairPendingMsg" style="margin:0 18px 10px"></div>
+      <div class="hint" id="pairPendingMsg" style="margin:0 0 10px"></div>
     </div>
     <div class="setgrid">
+      <div class="grp-head">通知</div>
       <div class="scard" id="tgCard">
         <h3>通知方式 <span class="cbadge">Telegram</span></h3>
         <div class="frow"><div class="fl">启用 TG 报警<div class="d">报警消息带一键拉黑按钮</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sTgOn"><i></i></label></div></div>
@@ -588,6 +626,7 @@ body.auth #loginView{margin:auto}
         <div class="savebar"><button class="btn primary" id="btnNtSave">保存节点 TG 设置</button></div>
       </div>
 
+      <div class="grp-head">报警与统计</div>
       <div class="scard">
         <h3>报警项目</h3>
         <div id="alertRows"></div>
@@ -596,7 +635,7 @@ body.auth #loginView{margin:auto}
 
       <div class="scard">
         <h3>连接流量统计</h3>
-        <div style="padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65">每条连接的流量数字来自内核的连接字节计数（nf_conntrack_acct）。开启后，本应用会在启动时自动打开它，任何人装上就能用，不需要改系统设置；设备重启后应用也会自动重新打开。应用退出时会把自己打开的开关恢复原样；若这个开关原本就是开着的（别的软件打开的），应用不会动它。</div>
+        <div class="hint">每条连接的流量数字来自内核的连接字节计数（nf_conntrack_acct）。开启后，本应用会在启动时自动打开它，任何人装上就能用，不需要改系统设置；设备重启后应用也会自动重新打开。应用退出时会把自己打开的开关恢复原样；若这个开关原本就是开着的（别的软件打开的），应用不会动它。</div>
         <div class="frow"><div class="fl">启用流量统计<div class="d">流量列、实时速率与流量排序的数据源</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sAcctOn"><i></i></label><span class="mono" id="acctStatus"></span></div></div>
         <div class="frow"><div class="fl">累计账本<div class="d">每个对端的历次连接总量（悬停在流量上可见）：永久保留、只增不减，仅可在下方「数据清理」里手动清空</div></div><div class="fv"><span class="mono">永久</span></div></div>
         <div class="frow"><div class="fl">每日明细保留<div class="d">每天一份「各对端当天传了多少」的明细文件</div></div><div class="fv"><input type="number" id="sLedgerKeep" min="0" max="3650"><span class="mono">天；填 0 = 永久保留</span></div></div>
@@ -611,6 +650,7 @@ body.auth #loginView{margin:auto}
         <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
       </div>
 
+      <div class="grp-head">数据与维护</div>
       <div class="scard">
         <h3>归属地库</h3>
         <div class="geoline"><span class="st">IPv4 库</span><span class="dt" id="geoV4Info">…</span><span style="flex:1"></span><span id="geoV4Btns"></span></div>
@@ -629,21 +669,22 @@ body.auth #loginView{margin:auto}
 
       <div class="scard">
         <h3>备份与恢复</h3>
-        <div style="padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65">设置备份 = 全部配置（设置 + 端口 + 蜜罐），不含数据；数据备份 = 黑名单 + 统计 + 事件 + 流量账本。只恢复设置不会带回黑名单，要黑名单必须恢复数据。恢复前自动拍当前快照（data/snapshots，每种最新 5 份，可用同样入口导回）；恢复数据后立即重做 nft 对账。</div>
+        <div class="hint">设置备份 = 全部配置（设置 + 端口 + 蜜罐），不含数据；数据备份 = 黑名单 + 统计 + 事件 + 流量账本。只恢复设置不会带回黑名单，要黑名单必须恢复数据。恢复前自动拍当前快照（data/snapshots，每种最新 5 份，可用同样入口导回）；恢复数据后立即重做 nft 对账。</div>
         <div class="frow"><div class="fl">备份设置<div class="d">一个 JSON 下载；含 TG 机器人 token，妥善保管、勿外传</div></div><div class="fv"><button class="btn" id="btnDlSettings">下载设置备份</button></div></div>
         <div class="frow"><div class="fl">备份数据<div class="d">一个 zip 下载，Windows 可直接打开看</div></div><div class="fv"><button class="btn" id="btnDlData">下载数据备份</button></div></div>
         <div class="frow"><div class="fl">恢复设置<div class="d">上传设置备份 JSON；版本不匹配会先警告</div></div><div class="fv"><input type="file" id="upSettings" accept=".json" style="display:none"><button class="btn" id="btnUpSettings">选择文件恢复</button></div></div>
         <div class="frow"><div class="fl">恢复数据<div class="d">上传数据备份 zip；黑名单随数据一起回来</div></div><div class="fv"><input type="file" id="upData" accept=".zip" style="display:none"><button class="btn" id="btnUpData">选择文件恢复</button></div></div>
       </div>
+      <div class="grp-head">版本</div>
     <div class="panel" style="margin-bottom:14px" id="upCard">
       <div class="ph"><h2>版本与升级</h2><span class="hint">升级会重启面板，重启后请重新登录</span></div>
       <div class="frow"><div class="fl">当前版本</div><div class="fv"><span class="mono" id="upCur">…</span><button class="btn" id="btnUpCheck">检查更新</button></div></div>
       <div class="frow"><div class="fl">最新版本</div><div class="fv"><span class="mono" id="upLatest">—</span></div></div>
-      <div class="hint" id="upMsg" style="margin:0 18px 10px"></div>
+      <div class="hint" id="upMsg" style="margin:0 0 10px"></div>
       <div id="upPushSec">
         <div style="border-top:1px solid var(--line);margin:6px 0 0"></div>
         <div class="frow"><div class="fl">推送到全部在线节点<div class="d">在线节点各自下载升级；单个失败不影响其他节点</div></div><div class="fv"><button class="btn" id="btnUpPushAll">推送升级到全部节点</button></div></div>
-        <div class="hint" id="upPushMsg" style="margin:0 18px 10px"></div>
+        <div class="hint" id="upPushMsg" style="margin:0 0 10px"></div>
       </div>
     </div>
       <div style="text-align:center;color:var(--mut);font-size:12.5px;padding:16px 18px 6px">当前版本 <span id="verNum">…</span></div>
@@ -721,11 +762,12 @@ $('#managingTag').onclick=()=>{curServer='';managingLocal=false;gotoTab(homeServ
 function homeCardEl(fp){
   return $('#homeGrid').querySelector('[data-fp="'+fp+'"]');
 }
-function homeSetNums(fp,conns,bans,ports,foot){
+function homeSetNums(fp,conns,bans,ports,foot,blist){
   const c=homeCardEl(fp);if(!c)return;
   c.querySelector('[data-k="conns"]').textContent=conns;
   c.querySelector('[data-k="bans"]').textContent=bans;
   c.querySelector('[data-k="ports"]').textContent=ports;
+  if(blist!==undefined)c.querySelector('[data-k="blist"]').textContent=blist;
   if(foot!==undefined)c.querySelector('.srv-foot').textContent=foot;
 }
 /* 卡片国旗图: 真实国旗图片(Windows 下 emoji 旗只显示字母, 故不用 emoji);
@@ -759,7 +801,7 @@ function homeCardHTML(fp,name,online,tag,foot,animate,delay,meta){
   const ip=esc(m.ip||'未知');
   const logo=osLogo(m.os,m.arch);
   const menu='<div class="srv-foot2"><button class="btn sm" data-act="menu" data-fp="'+fp+'">设置</button>'+logo+'</div>';
-  return '<div class="srv-card'+(online?'':' offline')+(animate?' srv-in':'')+(((fp&&fp===curServer)||(!fp&&managingLocal))?' managing':'')+'" data-fp="'+fp+'"'+(animate?' style="animation-delay:'+delay+'ms"':'')+'><div class="srv-top"><span class="srv-dot"></span><span class="srv-name">'+esc(name)+'</span><span class="srv-tag">'+tag+'</span></div><div class="srv-meta" data-k="loc">'+loc+' · <b>'+ip+'</b></div><div class="srv-nums"><div><div class="srv-num" data-k="conns">…</div><div class="srv-lab">当前连接</div></div><div><div class="srv-num" data-k="bans">…</div><div class="srv-lab">今日拉黑</div></div><div><div class="srv-num" data-k="ports">…</div><div class="srv-lab">监控端口</div></div></div><div class="srv-foot">'+esc(foot)+'</div>'+menu+'</div>';
+  return '<div class="srv-card'+(online?'':' offline')+(animate?' srv-in':'')+(((fp&&fp===curServer)||(!fp&&managingLocal))?' managing':'')+'" data-fp="'+fp+'"'+(animate?' style="animation-delay:'+delay+'ms"':'')+'><div class="srv-top"><span class="srv-dot"></span><span class="srv-name">'+esc(name)+'</span><span class="srv-tag">'+tag+'</span></div><div class="srv-meta" data-k="loc">'+loc+' · <b>'+ip+'</b></div><div class="srv-nums"><div><div class="srv-num" data-k="conns">…</div><div class="srv-lab">当前连接</div></div><div><div class="srv-num" data-k="bans">…</div><div class="srv-lab">今日拉黑</div></div><div><div class="srv-num" data-k="ports">…</div><div class="srv-lab">监控端口</div></div><div><div class="srv-num" data-k="blist" title="黑名单：生效 / 全部记录">…</div><div class="srv-lab">黑名单</div></div></div><div class="srv-foot">'+esc(foot)+'</div>'+menu+'</div>';
 }
 function homeSetMeta(fp,m){
   const c=homeCardEl(fp);if(!c||!m)return;
@@ -925,8 +967,8 @@ async function loadHome(){
   try{const st=await apiLocal('GET','api/settings');if(st.serverName){localName=st.serverName;localDisplayName=st.serverName;}}catch(e){}
   if(curTab!=='home')return;
   const lc=homeCardEl('');if(lc){lc.querySelector('.srv-name').textContent=localName;lc.classList.toggle('managing',managingLocal);}
-  if(local)homeSetNums('',local.connsNow,local.today.bans,local.watchedPorts);
-  else homeSetNums('','—','—','—');
+  if(local)homeSetNums('',local.connsNow,local.today.bans,local.watchedPorts,undefined,(local.activeBans??'—')+'/'+(local.bansTotal??'—'));
+  else homeSetNums('','—','—','—',undefined,'—');
   // 节点数: 并行取, 各卡独立; 离线不取, 超时 15 秒按失败计
   const jobs=homeServers.map(s=>{
     if(!s.online)return Promise.resolve({fp:s.fp,off:true});
@@ -939,8 +981,8 @@ async function loadHome(){
   if(curTab!=='home')return;
   results.forEach(r=>{
     if(r.off)return;
-    if(r.o)homeSetNums(r.fp,r.o.connsNow,r.o.today.bans,r.o.watchedPorts);
-    else homeSetNums(r.fp,'—','—','—','数据获取失败');
+    if(r.o)homeSetNums(r.fp,r.o.connsNow,r.o.today.bans,r.o.watchedPorts,undefined,(r.o.activeBans??'—')+'/'+(r.o.bansTotal??'—'));
+    else homeSetNums(r.fp,'—','—','—','数据获取失败','—');
   });
   $('#homeTime').textContent=' · 更新于 '+new Date().toTimeString().slice(0,8);
 }
@@ -1490,7 +1532,7 @@ const STATDEF=[
  {ic:'M12 21s-7-4.6-9.3-9A5.4 5.4 0 0 1 12 6.5 5.4 5.4 0 0 1 21.3 12C19 16.4 12 21 12 21z',c:'#0891b2',lab:'今日新来源 IP',get:o=>o.today.newSources,go:()=>gotoTab('events',{type:'new_src'})},
  {ic:'M12 3l7 3v5c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6zM9.5 9.5l5 5M14.5 9.5l-5 5',c:'#d43a2f',lab:'今日拉黑次数',get:o=>o.today.bans,go:()=>gotoTab('bans')},
  {ic:'M5 5.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5v13A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5zM12 8v4M12 15.5v.2',c:'#ea580c',lab:'今日 SSH 失败',get:o=>o.today.sshFails,go:()=>gotoTab('events',{type:'ssh_fail'})},
- {ic:'M8 6h13M8 12h13M8 18h13M4 6h.2M4 12h.2M4 18h.2',c:'#4f46e5',lab:'黑名单生效中',get:o=>o.activeBans,go:()=>gotoTab('bans')},
+ {ic:'M8 6h13M8 12h13M8 18h13M4 6h.2M4 12h.2M4 18h.2',c:'#4f46e5',lab:'黑名单生效中',get:o=>o.activeBans,sub:o=>o.bansTotal!=null?('共 '+o.bansTotal+' 条记录'):'' ,go:()=>gotoTab('bans')},
  {ic:'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',c:'#059669',lab:'监控端口',get:o=>o.watchedPorts,go:()=>gotoTab('ports')}];
 let geoState={v6:false};
 function renderPills(o){
@@ -1555,7 +1597,7 @@ async function loadOverview(){
     $('#rescueBannerTx').textContent='自动拦截已关闭'+(left>0?'，约 '+fmtDur(left)+' 后自动恢复':'，已到自动恢复时间（刷新后生效）');
     rb.style.display='';
   }else rb.style.display='none';
-  $('#cards').innerHTML=STATDEF.map((s,i)=>'<div class="stat'+(s.go?' click':'')+'" data-stat="'+i+'"><span class="chip" style="background:'+tint(s.c,.12)+';color:'+s.c+'"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="'+s.ic+'"/></svg></span><div class="num">'+s.get(o)+'</div><div class="lab">'+s.lab+'</div></div>').join('');
+  $('#cards').innerHTML=STATDEF.map((s,i)=>'<div class="stat'+(s.go?' click':'')+'" data-stat="'+i+'"><span class="chip" style="background:'+tint(s.c,.12)+';color:'+s.c+'"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="'+s.ic+'"/></svg></span><div class="num">'+s.get(o)+'</div><div class="lab">'+s.lab+'</div>'+(s.sub?'<div class="sub">'+s.sub(o)+'</div>':'')+'</div>').join('');
   $$('#cards [data-stat]').forEach(el=>{const s=STATDEF[+el.dataset.stat];if(s.go)el.onclick=s.go});
   $('#ovTime').textContent='更新于 '+new Date().toTimeString().slice(0,8)+' · 每 5 秒刷新';
   let conns=[];try{conns=await api('GET','api/connections')}catch(e){}
@@ -2060,6 +2102,10 @@ $('#btnTrustAdd').onclick=()=>{
 };
 async function loadBans(){
   let bs=[];try{bs=await api('GET','api/bans')}catch(e){toast(e.message);return}
+  // 计数透明：breakdown 按全部记录计（不受下方状态/来源/搜索筛选影响），
+  // 让“生效 100、记录 162”这类落差一眼看清（62 条是到期翻态，不是被删）。
+  {const ca={active:0,released:0,expired:0};for(const b of bs)ca[b.status||'active']=(ca[b.status||'active']||0)+1;
+   const bd=$('#banBreakdown');if(bd)bd.textContent='生效中 '+ca.active+' · 已解封 '+ca.released+' · 已过期 '+ca.expired+' · 全部 '+bs.length;}
   const srcF=$('#banSrcFilter').value;
   const stF=$('#banStatusFilter').value;
   const q=($('#banIpSearch').value||'').trim();

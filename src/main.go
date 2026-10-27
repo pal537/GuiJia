@@ -578,6 +578,7 @@ func main() {
 	mux.HandleFunc("/api/backup/export", handleBackupExport)
 	mux.HandleFunc("/api/sync/apply-lists", handleSyncApplyLists)
 	mux.HandleFunc("/api/sync/shared-state", handleSyncSharedState)
+	mux.HandleFunc("/api/sync/full-bans", handleSyncFullBans)
 	mux.HandleFunc("/api/local-info", handleLocalInfo)
 	mux.HandleFunc("/api/nodes/hello", linkLimit(handleNodeHello))
 	mux.HandleFunc("/api/nodes/challenge", linkLimit(handleNodeChallenge))

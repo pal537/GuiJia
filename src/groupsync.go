@@ -409,7 +409,15 @@ func handleGroupSyncNow(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, 400, "分组无效")
 		return
 	}
-	ok, total, detail := syncGroupToAllOnline(in.Group)
+	// 黑名单同步先做并集合并（从各在线节点吸入主服务器没有的 IP），
+	// 再推给全部在线节点；白名单仍以主服务器为唯一源。
+	var ok, total int
+	var detail string
+	if in.Group == "blacklist" {
+		ok, total, detail = syncBlacklistToAllOnline()
+	} else {
+		ok, total, detail = syncGroupToAllOnline(in.Group)
+	}
 	markGroupSyncResult(in.Group, ok, total, detail)
 	writeJSON(w, 200, map[string]any{
 		"ok": true, "synced": ok, "total": total, "detail": detail,
@@ -445,10 +453,13 @@ func maybeAutoSyncNewNode(fp, name string) {
 		if !online {
 			return
 		}
+		// 批准自动同步：黑名单先合并（含新节点独有 IP）再推给全部在线节点，
+		// 新节点一次拿到全网并集；白名单仍只推新节点（主服务器为唯一源）。
 		if bl {
-			if good, d := syncGroupToNode("blacklist", fp); good {
+			ok, _, detail := syncBlacklistToAllOnline()
+			if ok > 0 {
 				gsMu.Lock()
-				gsCfg.Blacklist.LastDetail = "新节点 " + name + " 已自动同步：" + d
+				gsCfg.Blacklist.LastDetail = "新节点 " + name + " 已自动同步：" + detail
 				saveGroupSyncLocked()
 				gsMu.Unlock()
 			}
@@ -488,7 +499,14 @@ func startGroupSyncTickerLocked() {
 				if g.cfg.LastSyncAt > 0 && now-g.cfg.LastSyncAt < int64(g.cfg.IntervalMin)*60 {
 					continue
 				}
-				ok, total, detail := syncGroupToAllOnline(g.name)
+				// 黑名单 ticker 同样先合并再推；白名单只推。
+				var ok, total int
+				var detail string
+				if g.name == "blacklist" {
+					ok, total, detail = syncBlacklistToAllOnline()
+				} else {
+					ok, total, detail = syncGroupToAllOnline(g.name)
+				}
 				markGroupSyncResult(g.name, ok, total, detail)
 			}
 		}
