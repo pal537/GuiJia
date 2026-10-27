@@ -36,12 +36,17 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 .stat .lab{color:var(--mut);font-size:12.5px;margin-top:4px}
 /* ---------- 多服务器首页 ---------- */
 .home-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(272px,1fr));gap:14px;margin-bottom:16px}
-.srv-card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:18px;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease, opacity .3s ease}
-.srv-card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(16,24,40,.13)}
+/* 首页卡片: 毛玻璃底色(半透明 + blur + 细边框 + 柔和阴影), 悬停抬升 + 阴影加深;
+   绝不用紫色渐变; prefers-reduced-motion 时关动画 */
+.srv-card{background:color-mix(in srgb, var(--card) 72%, transparent);backdrop-filter:blur(14px) saturate(1.25);-webkit-backdrop-filter:blur(14px) saturate(1.25);border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 24px rgba(16,24,40,.08);padding:18px;cursor:pointer;transition:transform .22s ease, box-shadow .22s ease, opacity .3s ease}
+.srv-card:hover{transform:translateY(-4px);box-shadow:0 16px 32px rgba(16,24,40,.14)}
 .srv-card.offline{opacity:.55;filter:saturate(.4);cursor:default}
-.srv-card.offline:hover{transform:none;box-shadow:var(--shadow)}
+.srv-card.offline:hover{transform:none;box-shadow:0 8px 24px rgba(16,24,40,.08)}
 .srv-card.srv-in{animation:srvIn .45s ease both}
 @keyframes srvIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+/* 正在管理的卡片: 蓝青色渐变闪烁边框 + 微光(绝不用紫色); 回首页(未查看节点)时不发光 */
+.srv-card.managing{border:2px solid #38bdf8;animation:glowPulse 2.2s ease-in-out infinite}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 0 2px rgba(37,99,235,.35),0 0 14px rgba(34,211,238,.35)}50%{box-shadow:0 0 0 3px rgba(37,99,235,.6),0 0 26px rgba(34,211,238,.65)}}
 .srv-card .srv-top{display:flex;align-items:center;gap:8px;margin-bottom:14px}
 .srv-card .srv-name{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .srv-card .srv-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.15)}
@@ -53,8 +58,21 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 .srv-card .srv-foot{color:var(--mut);font-size:12px;margin-top:12px;min-height:16px}
 .srv-card .srv-meta{color:var(--mut);font-size:12.5px;margin-top:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .srv-card .srv-meta b{color:var(--txt);font-weight:600}
-.srv-card .srv-btns{display:flex;gap:8px;margin-top:12px}
-.srv-card .srv-btns .btn{flex:1;text-align:center}
+/* 卡片底部: 左下角设置按钮 + 右下角系统 LOGO(系统文字行已删, 全集成到 LOGO 的 title 里) */
+.srv-card .srv-foot2{display:flex;align-items:center;gap:8px;margin-top:14px}
+.srv-card .srv-logo{margin-left:auto;flex:0 0 auto;line-height:0}
+.srv-card .srv-logo svg{width:28px;height:28px;display:block}
+/* 卡片国旗图: 真实国旗图片(Windows 下 emoji 旗只显示字母, 故不用 emoji) */
+.flag-img{width:20px;height:14px;object-fit:cover;border-radius:2px;vertical-align:-2px;margin-right:5px}
+/* 卡内状态线(第 2 项): 全站卡内状态/进度/结果文字统一走这个样式, 不再有裸黑字进度;
+   进行中与成功 = 绿字 + 虚线框 + 淡绿底, 失败 = 红字 + 虚线框 + 淡红底 */
+.sline{display:block;padding:8px 12px;border-radius:9px;font-size:12.5px;line-height:1.6;margin:8px 0}
+.sline.run,.sline.ok{color:#15803d;border:1px dashed #86efac;background:#f0fdf4}
+.sline.fail{color:#b91c1c;border:1px dashed #fca5a5;background:#fef2f2}
+/* 分段控制器(节点 TG 通知模式): 两段 pill 开关, 替代原生 radio 圆圈 */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;gap:3px;background:#f4f7fb}
+.seg button{border:none;background:transparent;padding:6px 16px;border-radius:999px;font-size:13px;font-weight:600;color:var(--mut);cursor:pointer}
+.seg button.sel{background:var(--blue);color:#fff;box-shadow:0 1px 4px rgba(36,86,200,.35)}
 /* 模式二选一两按钮同宽、同内边距、同对齐, 视觉齐平 */
 #modeBtns .btn{width:100%;box-sizing:border-box;padding:11px 14px;text-align:center}
 /* 顶部正在管理标识: 放拦截链 pill 左边, 显眼可点, 点回首页 */
@@ -62,7 +80,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 #managingTag .dot{width:8px;height:8px;border-radius:50%;background:#fff;flex:0 0 auto}
 .home-alert{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13.5px}
 .home-alert .btn{flex:0 0 auto}
-@media (prefers-reduced-motion: reduce){.srv-card,.srv-card.srv-in{animation:none;transition:none}.srv-card:hover{transform:none}}
+@media (prefers-reduced-motion: reduce){.srv-card,.srv-card.srv-in{animation:none;transition:none}.srv-card:hover{transform:none}.srv-card.managing{animation:none;border:2px solid #2563eb}}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
 .ph{display:flex;align-items:center;padding:14px 18px 10px;gap:8px;flex-wrap:wrap}
 .ph h2{font-size:15px;font-weight:700}
@@ -305,7 +323,7 @@ body.auth #loginView{margin:auto}
   <section id="tab-home" style="display:none">
     <div class="home-alert" id="homeAlert" style="display:none"><span id="homeAlertTx"></span><span class="sp"></span><button class="btn sm" id="btnHomeAck">知道了</button></div>
     <div class="home-grid" id="homeGrid"></div>
-    <div style="color:var(--mut);font-size:12.5px;padding:2px 4px 6px">点卡片切换到那台服务器的面板；离线卡片不可点。<span id="homeTime"></span></div>
+    <div style="display:flex;align-items:center;gap:10px;color:var(--mut);font-size:12.5px;padding:2px 4px 6px">点卡片切换到那台服务器的面板；离线卡片不可点。<span id="homeTime"></span><span style="flex:1"></span><button class="btn sm" id="btnGroupSync">群控设置</button></div>
   </section>
 
   <div class="panel" id="rescueBanner" style="display:none;border-color:rgba(212,58,47,.5)">
@@ -518,8 +536,8 @@ body.auth #loginView{margin:auto}
       <div class="frow"><div class="fl">登录封禁次数<div class="d">密码连续错几次封 IP（时长固定 7 天）</div></div><div class="fv"><input type="number" id="sPanelBan" min="1" max="100" style="width:90px"></div></div>
       <div class="frow"><div class="fl">服务器名称<div class="d">TG 通知标题用；留空则使用系统主机名</div></div><div class="fv"><input id="sServerName" maxlength="32" placeholder="服务器名称"></div></div>
       <div class="frow"><div class="fl">面板端口<div class="d">改动后写环境文件并重启面板，当前页会断开，请用新端口重新打开</div></div><div class="fv"><input type="number" id="sPanelPort" min="1" max="65535" style="width:110px"><button class="btn" id="btnPanelPortSave">保存并重启</button></div></div>
-      <div class="frow"><div class="fl">修改密码<div class="d">改密后其他登录全部失效，当前登录保留</div></div><div class="fv"><button class="btn" id="btnPanelPwChange">修改密码</button></div></div>
-      <div class="hint" id="panelPortHint" style="margin-top:8px"></div>
+      <div class="frow" id="pwChangeRow"><div class="fl">修改密码<div class="d">改密后其他登录全部失效，当前登录保留</div></div><div class="fv"><button class="btn" id="btnPanelPwChange">修改密码</button></div></div>
+      <div class="sline" id="panelPortHint" style="margin-top:8px;display:none"></div>
     </div>
     <div class="panel" style="margin-bottom:14px" id="pairCard">
       <div class="ph"><h2>生成配对码</h2><span class="hint">给新服务器加入本机（主服务器）用</span></div>
@@ -547,11 +565,11 @@ body.auth #loginView{margin:auto}
 
       <div class="scard" id="nodeTgCard" style="display:none">
         <h3>节点 TG 通知 <span class="cbadge">群控</span></h3>
-        <div class="frow"><div class="fl">通知模式<div class="d">默认走主服务器 bot 统一发；切独立后本节点用自己的 bot 发，主服务器不再替发</div></div><div class="fv"><label><input type="radio" name="nodeTgMode" value="hub"> 走主服务器</label><label style="margin-left:14px"><input type="radio" name="nodeTgMode" value="independent"> 独立通知</label></div></div>
+        <div class="frow"><div class="fl">通知模式<div class="d">默认走主服务器 bot 统一发；切独立后本节点用自己的 bot 发，主服务器不再替发</div></div><div class="fv"><div class="seg" id="ntSeg"><button type="button" data-mode="hub">走主服务器</button><button type="button" data-mode="independent">独立通知</button></div></div></div>
         <div class="frow" id="ntTokenRow"><div class="fl">独立 Bot Token<div class="d">仅独立模式用；只存本机 0600 文件，面板不回显明文</div></div><div class="fv"><input id="ntToken" type="password" placeholder="123456:ABC-..."></div></div>
         <div class="frow" id="ntChatRow"><div class="fl">独立 Chat ID<div class="d">只认这个会话的拉黑回调</div></div><div class="fv"><input id="ntChat" placeholder="例如 123456789"></div></div>
         <div class="frow" id="ntTestRow"><div class="fl">连通性测试<div class="d">用当前填写的值发送，无需先保存</div></div><div class="fv"><button class="btn" id="btnNtTest">发送测试消息</button></div></div>
-        <div class="hint" id="ntMsg" style="margin-top:8px"></div>
+        <div class="sline" id="ntMsg" style="margin-top:8px;display:none"></div>
         <div class="savebar"><button class="btn primary" id="btnNtSave">保存节点 TG 设置</button></div>
       </div>
 
@@ -582,7 +600,7 @@ body.auth #loginView{margin:auto}
         <h3>归属地库</h3>
         <div class="geoline"><span class="st">IPv4 库</span><span class="dt" id="geoV4Info">…</span><span style="flex:1"></span><span id="geoV4Btns"></span></div>
         <div class="geoline"><span class="st">IPv6 库</span><span class="dt" id="geoV6Info">…</span><span style="flex:1"></span><span id="geoV6Btns"></span></div>
-        <div class="geoline" id="geoChkLine" style="display:none;padding-top:0"><span class="dt" id="geoChkTx"></span></div>
+        <div class="geoline" id="geoChkLine" style="display:none;padding-top:0"><span class="sline run" id="geoChkTx"></span></div>
       </div>
 
       <div class="scard">
@@ -663,7 +681,7 @@ let homeAlertFps=[];
 async function refreshHomeNav(){
   let list=null;
   try{const d=await apiLocal('GET','api/nodes/servers');list=d.servers||[];}catch(e){return homeServers;}
-  homeServers=list.map(s=>({fp:s.fingerprint,name:s.name,online:s.status==='online',last:s.lastSeen,created:s.createdAt,ver:s.version||'',ip:s.ip||'',os:s.os||'',arch:s.arch||'',location:s.location||'未知',country:s.country||'',flag:s.flag||'',manualLocation:s.manualLocation||''}));
+  homeServers=list.map(s=>({fp:s.fingerprint,name:s.name,online:s.status==='online',last:s.lastSeen,created:s.createdAt,ver:s.version||'',ip:s.ip||'',os:s.os||'',arch:s.arch||'',location:s.location||'未知',country:s.country||'',flag:s.flag||'',countryCode:s.countryCode||'',manualLocation:s.manualLocation||''}));
   $('#navHome').style.display=homeServers.length?'':'none';
   if(curServer&&!homeServers.some(s=>s.fp===curServer)){curServer='';gotoTab('ov');}
   else if(curTab==='home'&&!homeServers.length)gotoTab('ov');
@@ -692,24 +710,98 @@ function homeSetNums(fp,conns,bans,ports,foot){
   c.querySelector('[data-k="ports"]').textContent=ports;
   if(foot!==undefined)c.querySelector('.srv-foot').textContent=foot;
 }
+/* 卡片国旗图: 真实国旗图片(Windows 下 emoji 旗只显示字母, 故不用 emoji);
+   加载失败时图片自删, 只剩文字, 绝不显示裸国家码 */
+function flagImg(code){
+  code=(code||'').toLowerCase();
+  if(!/^[a-z]{2}$/.test(code))return '';
+  return '<img class="flag-img" src="https://flagcdn.com/w40/'+code+'.png" alt="" onerror="this.remove()">';
+}
+/* 系统 LOGO: 按系统名自动匹配的内联 SVG 标识(常见发行版几何简标, 认不出用通用 Linux 兜底);
+   完整系统版本与架构放 title 里, 鼠标悬停可见 */
+function osLogo(os,arch){
+  const s=(os||'').toLowerCase();
+  const title=esc([os,arch].filter(Boolean).join(' · ')||'未知系统');
+  let svg='';
+  if(s.includes('debian'))svg='<svg viewBox="0 0 28 28"><path d="M14 14 m0 -9 a9 9 0 1 1 -9 9 a6.5 6.5 0 1 0 6.5 -6.5 a4 4 0 1 1 -4 4" fill="none" stroke="#D70A53" stroke-width="2" stroke-linecap="round"/></svg>';
+  else if(s.includes('ubuntu'))svg='<svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="10" fill="none" stroke="#E95420" stroke-width="2"/><circle cx="14" cy="5" r="2.6" fill="#E95420"/><circle cx="21.8" cy="18.5" r="2.6" fill="#E95420"/><circle cx="6.2" cy="18.5" r="2.6" fill="#E95420"/></svg>';
+  else if(s.includes('arch'))svg='<svg viewBox="0 0 28 28"><path d="M14 3 L25 25 H20 L14 11 L8 25 H3 Z" fill="#1793D1"/></svg>';
+  else if(s.includes('alpine'))svg='<svg viewBox="0 0 28 28"><path d="M2 23 L10 8 L14 16 L18 9 L26 23 Z" fill="#0D597F"/></svg>';
+  else if(s.includes('fedora'))svg='<svg viewBox="0 0 28 28"><path d="M18 4 c-3.5 0 -6 2.5 -6 6 v14 M9 12 h11" fill="none" stroke="#51A2DA" stroke-width="2.6" stroke-linecap="round"/></svg>';
+  else if(s.includes('centos'))svg='<svg viewBox="0 0 28 28"><path d="M21 7 a10 10 0 1 0 0 14" fill="none" stroke="#932279" stroke-width="3" stroke-linecap="round"/></svg>';
+  else if(s.includes('opensuse')||s.includes('suse'))svg='<svg viewBox="0 0 28 28"><rect x="2" y="2" width="24" height="24" rx="6" fill="#73BA25"/><text x="14" y="19" font-size="14" font-weight="700" fill="#fff" text-anchor="middle" font-family="sans-serif">S</text></svg>';
+  else if(s.includes('rocky'))svg='<svg viewBox="0 0 28 28"><rect x="2" y="2" width="24" height="24" rx="6" fill="#2E7D32"/><text x="14" y="19" font-size="14" font-weight="700" fill="#fff" text-anchor="middle" font-family="sans-serif">R</text></svg>';
+  else if(s.includes('alma'))svg='<svg viewBox="0 0 28 28"><rect x="2" y="2" width="24" height="24" rx="6" fill="#2563eb"/><text x="14" y="19" font-size="14" font-weight="700" fill="#fff" text-anchor="middle" font-family="sans-serif">A</text></svg>';
+  else svg='<svg viewBox="0 0 28 28"><rect x="2" y="2" width="24" height="24" rx="6" fill="#64748b"/><text x="14" y="19" font-size="11" font-weight="700" fill="#fff" text-anchor="middle" font-family="monospace">&gt;_</text></svg>';
+  return '<span class="srv-logo" title="'+title+'">'+svg+'</span>';
+}
 function homeCardHTML(fp,name,online,tag,foot,animate,delay,meta){
   const m=meta||{};
-  const loc=(m.flag?esc(m.flag)+' ':'')+esc(m.location||'未知');
+  const loc=flagImg(m.countryCode)+esc(m.location||'未知');
   const ip=esc(m.ip||'未知');
-  const sys=(m.os||m.arch)?esc([m.os,m.arch].filter(Boolean).join(' · ')):'未知';
-  const btns=fp
-    ?'<div class="srv-btns"><button class="btn sm" data-act="loc" data-fp="'+fp+'">设置归属地</button><button class="btn sm danger" data-act="rm" data-fp="'+fp+'">移除管理</button></div>'
-    :'<div class="srv-btns"><button class="btn sm" data-act="loc" data-fp="">设置归属地</button></div>';
-  return '<div class="srv-card'+(online?'':' offline')+(animate?' srv-in':'')+'" data-fp="'+fp+'"'+(animate?' style="animation-delay:'+delay+'ms"':'')+'><div class="srv-top"><span class="srv-dot"></span><span class="srv-name">'+esc(name)+'</span><span class="srv-tag">'+tag+'</span></div><div class="srv-meta" data-k="loc">'+loc+' · <b>'+ip+'</b></div><div class="srv-meta" data-k="sys">'+sys+'</div><div class="srv-nums"><div><div class="srv-num" data-k="conns">…</div><div class="srv-lab">当前连接</div></div><div><div class="srv-num" data-k="bans">…</div><div class="srv-lab">今日拉黑</div></div><div><div class="srv-num" data-k="ports">…</div><div class="srv-lab">监控端口</div></div></div><div class="srv-foot">'+esc(foot)+'</div>'+btns+'</div>';
+  const logo=osLogo(m.os,m.arch);
+  const menu='<div class="srv-foot2"><button class="btn sm" data-act="menu" data-fp="'+fp+'">设置</button>'+logo+'</div>';
+  return '<div class="srv-card'+(online?'':' offline')+(animate?' srv-in':'')+((fp&&fp===curServer)?' managing':'')+'" data-fp="'+fp+'"'+(animate?' style="animation-delay:'+delay+'ms"':'')+'><div class="srv-top"><span class="srv-dot"></span><span class="srv-name">'+esc(name)+'</span><span class="srv-tag">'+tag+'</span></div><div class="srv-meta" data-k="loc">'+loc+' · <b>'+ip+'</b></div><div class="srv-nums"><div><div class="srv-num" data-k="conns">…</div><div class="srv-lab">当前连接</div></div><div><div class="srv-num" data-k="bans">…</div><div class="srv-lab">今日拉黑</div></div><div><div class="srv-num" data-k="ports">…</div><div class="srv-lab">监控端口</div></div></div><div class="srv-foot">'+esc(foot)+'</div>'+menu+'</div>';
 }
 function homeSetMeta(fp,m){
   const c=homeCardEl(fp);if(!c||!m)return;
-  const l=c.querySelector('[data-k="loc"]');if(l)l.innerHTML=(m.flag?esc(m.flag)+' ':'')+esc(m.location||'未知')+' · <b>'+esc(m.ip||'未知')+'</b>';
-  const s=c.querySelector('[data-k="sys"]');if(s)s.textContent=(m.os||m.arch)?[m.os,m.arch].filter(Boolean).join(' · '):'未知';
+  const l=c.querySelector('[data-k="loc"]');if(l)l.innerHTML=flagImg(m.countryCode)+esc(m.location||'未知')+' · <b>'+esc(m.ip||'未知')+'</b>';
 }
+/* 卡片设置菜单: 左下角“设置”按钮点开的弹窗菜单; 本机卡只有设置归属地,
+   节点卡另有移除管理。反馈只在弹窗内。 */
+function openCardMenu(fp){
+  const isLocal=!fp;
+  openCModal('<h3>卡片设置</h3><div style="display:flex;flex-direction:column;gap:10px">'+
+    '<button class="btn" id="cmMenuLoc">设置归属地</button>'+
+    (isLocal?'':'<button class="btn danger" id="cmMenuRm">移除管理</button>')+
+    '<button class="btn" id="cmMenuCancel">取消</button></div>');
+  $('#cmMenuCancel').onclick=closeCModal;
+  $('#cmMenuLoc').onclick=()=>{closeCModal();openLocModal(fp);};
+  if(!isLocal)$('#cmMenuRm').onclick=()=>{closeCModal();openRemoveModal(fp);};
+}
+/* 群控设置(第 11 项): 只在首页有入口, 点开弹窗, 内含共享黑名单 / 共享白名单两组,
+   每组开关 + 同步间隔选择(默认 10 分钟) + 立即同步按钮 + 上次同步状态。
+   开关与间隔改动即保存, 反馈只在弹窗内。 */
+function gsSectionHTML(group,title,desc,cfg){
+  const stCls=!cfg.lastSyncAt?'hint':(cfg.lastStatus==='failed'?'sline fail':cfg.lastStatus==='ok'?'sline ok':'sline run');
+  const stTx=cfg.lastSyncAt?('上次同步：'+fmtTs(cfg.lastSyncAt*1000)+(cfg.lastDetail?' · '+esc(cfg.lastDetail):'')):'上次同步：从未同步';
+  return '<div style="border:1px solid var(--line);border-radius:12px;padding:14px"><div style="display:flex;align-items:center;gap:10px"><b>'+title+'</b><span style="flex:1"></span><label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="gsEn_'+group+'"'+(cfg.enabled?' checked':'')+'> 开启共享</label></div>'+
+  '<div class="csub" style="margin:6px 0 10px">'+desc+'</div>'+
+  '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13px">同步间隔</span><select id="gsIv_'+group+'">'+[5,10,30,60].map(v=>'<option value="'+v+'"'+(cfg.intervalMin===v?' selected':'')+'>'+v+' 分钟</option>').join('')+'</select>'+
+  '<button class="btn" id="gsNow_'+group+'">立即同步</button></div>'+
+  '<div class="'+stCls+'" id="gsSt_'+group+'" style="margin-top:10px">'+stTx+'</div></div>';
+}
+async function openGroupSyncModal(){
+  let cfg;try{cfg=await apiLocal('GET','api/group-sync/settings');}catch(e){openCModal('<h3>群控设置</h3><div class="sline fail">读取失败：'+esc(e.message)+'</div>');return;}
+  const bl=cfg.blacklist||{enabled:false,intervalMin:10}, wl=cfg.whitelist||{enabled:false,intervalMin:10};
+  openCModal('<h3>群控设置</h3><div style="display:flex;flex-direction:column;gap:12px">'+
+    gsSectionHTML('blacklist','共享黑名单','主服务器的黑名单为源，推向各节点；只新增与改状态，绝不删记录，本机条目不动。开启后新加入节点批准后立即自动同步一次。',bl)+
+    gsSectionHTML('whitelist','共享白名单','主服务器的信任名单为源，推向各节点；只动共享标记的条目，本机条目不动。开启后新加入节点批准后立即自动同步一次。',wl)+
+    '<div><button class="btn" id="gsClose">关闭</button></div></div>');
+  $('#gsClose').onclick=closeCModal;
+  ['blacklist','whitelist'].forEach(g=>{
+    const save=async()=>{
+      const stEl=$('#gsSt_'+g);
+      try{await apiLocal('POST','api/group-sync/settings',{group:g,enabled:$('#gsEn_'+g).checked,intervalMin:+$('#gsIv_'+g).value});
+        stEl.className='sline ok';stEl.textContent='已保存';
+      }catch(e){stEl.className='sline fail';stEl.textContent='保存失败：'+e.message;}
+    };
+    $('#gsEn_'+g).onchange=save;
+    $('#gsIv_'+g).onchange=save;
+    $('#gsNow_'+g).onclick=async()=>{
+      const stEl=$('#gsSt_'+g);
+      stEl.className='sline run';stEl.textContent='正在同步…';
+      try{const d=await apiLocal('POST','api/group-sync/now',{group:g});
+        stEl.className='sline '+(d.total>0&&d.synced===d.total?'ok':(d.synced>0?'run':'fail'));
+        stEl.textContent='同步完成：'+d.synced+'/'+d.total+' 台成功'+(d.detail?' · '+d.detail:'');
+      }catch(e){stEl.className='sline fail';stEl.textContent='同步失败：'+e.message;}
+    };
+  });
+}
+$('#btnGroupSync').onclick=openGroupSyncModal;
 $('#homeGrid').onclick=e=>{
   const btn=e.target.closest('[data-act]');
-  if(btn){if(btn.dataset.act==='loc')openLocModal(btn.dataset.fp);else if(btn.dataset.act==='rm')openRemoveModal(btn.dataset.fp);return;}
+  if(btn){if(btn.dataset.act==='menu')openCardMenu(btn.dataset.fp);return;}
   const card=e.target.closest('.srv-card');if(!card||card.classList.contains('offline'))return;
   const fp=card.dataset.fp;
   curServer=fp; // '' = 本机
@@ -723,19 +815,19 @@ function openLocModal(fp){
   const cur=isLocal?localMeta:(homeServers.find(x=>x.fp===fp)||{});
   const auto=isLocal?(localMeta.country||''):((cur||{}).country||'');
   openCModal('<h3>设置归属地</h3><div class="csub">国家/地区文本，如 美国、日本、香港；留空 = 自动解析'+(auto?('（当前自动：'+esc(auto)+'）'):'')+'。手动值优先于自动解析，并据此匹配国旗。</div>'+
-    '<div style="display:flex;flex-direction:column;gap:12px"><input id="cmLoc" placeholder="国家/地区，留空为自动" value="'+esc(cur.manualLocation||'')+'"><div class="hint" id="cmLocErr"></div>'+
+    '<div style="display:flex;flex-direction:column;gap:12px"><input id="cmLoc" placeholder="国家/地区，留空为自动" value="'+esc(cur.manualLocation||'')+'"><div class="sline fail" id="cmLocErr" style="display:none"></div>'+
     '<div style="display:flex;gap:10px"><button class="btn" id="cmLocCancel">取消</button><button class="btn primary" id="cmLocSave">保存</button></div></div>');
   $('#cmLocCancel').onclick=closeCModal;
   $('#cmLocSave').onclick=async()=>{
     const loc=$('#cmLoc').value.trim();const errEl=$('#cmLocErr');
     try{await apiLocal('POST','api/nodes/location',{fingerprint:isLocal?'local':fp,location:loc});closeCModal();if(curTab==='home')loadHome();}
-    catch(e){errEl.textContent='保存失败：'+e.message;}
+    catch(e){errEl.textContent='保存失败：'+e.message;errEl.style.display='';}
   };
 }
 function openRemoveModal(fp){
   const s=homeServers.find(x=>x.fp===fp);if(!s)return;
   openCModal('<h3>移除管理</h3><div class="csub">移除后 <b>'+esc(s.name)+'</b> 从首页消失，节点回到初始页面（设置密码独立用 / 绑定其他主服务器），需重新配对才能再次群控。确定移除吗？</div>'+
-    '<div class="hint" id="cmRmErr"></div>'+
+    '<div class="sline fail" id="cmRmErr" style="display:none"></div>'+
     '<div style="display:flex;gap:10px"><button class="btn" id="cmRmCancel">取消</button><button class="btn dangerfill" id="cmRmOk">确认移除</button></div>');
   $('#cmRmCancel').onclick=closeCModal;
   $('#cmRmOk').onclick=async()=>{
@@ -744,7 +836,7 @@ function openRemoveModal(fp){
       if(curServer===fp){curServer='';}
       await refreshHomeNav();
       if(curTab==='home')loadHome();else gotoTab(homeServers.length?'home':'ov');
-    }catch(e){errEl.textContent='移除失败：'+e.message;}
+    }catch(e){errEl.textContent='移除失败：'+e.message;errEl.style.display='';}
   };
 }
 let localMeta={};
@@ -785,6 +877,7 @@ async function loadHome(){
     homeServers.forEach(s=>{
       const c=homeCardEl(s.fp);if(!c)return;
       c.classList.toggle('offline',!s.online);
+      c.classList.toggle('managing',!!s.fp&&s.fp===curServer);
       c.querySelector('.srv-name').textContent=s.name;
       c.querySelector('.srv-tag').textContent=s.online?'在线':'离线';
       homeSetMeta(s.fp,s);
@@ -1998,8 +2091,10 @@ async function loadVersion(){try{const v=await api('GET','api/version');$('#verN
 async function loadSettings(){
   // 查看节点时: 2FA 与通用通知方式是主服务器本机配置, 节点设置页不显示;
   // 节点 TG 通知卡由 loadNodeTg 单独控制(只在节点视图显示)。
+  // 修改密码行同样隐藏: 节点根本没设过密码, 面板已被主服务器接管, 改密无意义。
   $('#totpCard').style.display=curServer?'none':'';
   $('#tgCard').style.display=curServer?'none':'';
+  $('#pwChangeRow').style.display=curServer?'none':'';
   try{fillSettings(await api('GET','api/settings'))}catch(e){toast(e.message)}
   loadVersion();
   renderGeoCard();
@@ -2023,8 +2118,32 @@ function upScheduleReload(){
   setTimeout(()=>{location.reload();},1500);
 }
 function upSetBtn(text,disabled,primary){const b=$('#btnUpCheck');b.textContent=text;b.disabled=!!disabled;b.classList.toggle('primary',!!primary);}
-function upSetMsg(t){$('#upMsg').textContent=t||'';}
-function upSetPushMsg(t){$('#upPushMsg').textContent=t||'';}
+/* 升级卡状态文字统一走状态线样式(第 2 项): 失败红虚线框, 完成绿虚线框, 其余进行中绿虚线框 */
+function upSetMsg(t){const el=$('#upMsg');if(!t){el.textContent='';el.className='hint';return;}
+  el.textContent=t;
+  el.className=/失败/.test(t)?'sline fail':(/完成|已升级/.test(t)?'sline ok':'sline run');
+}
+function upSetPushMsg(t){const el=$('#upPushMsg');el.innerHTML='';el.textContent=t||'';el.className='hint';}
+/* 推送升级状态轮询(第 1 项): 推送后每 5 秒查各节点任务, 逐条推进到成功/失败;
+   节点重启期间短暂离线不算失败(后端 120 秒宽限), 5 分钟未到目标版判失败 */
+let upPushPoll=null;
+function upPushStop(){if(upPushPoll){clearInterval(upPushPoll);upPushPoll=null;}}
+function upPushRenderJob(j){
+  const cls=j.state==='failed'?'fail':(j.state==='done'?'ok':'run');
+  const tx=j.state==='done'?('升级成功：'+(j.version||j.target||'')):j.state==='failed'?('升级失败：'+(j.detail||'原因未知')):(j.detail||'升级中…');
+  return '<span class="sline '+cls+'">'+esc(j.name||j.fingerprint)+'：'+esc(tx)+'</span>';
+}
+function upPushPollStart(){
+  upPushStop();
+  upPushPoll=setInterval(async()=>{
+    if(document.body.classList.contains('auth'))return;
+    let d;try{d=await apiLocal('GET','api/nodes/upgrade-push-status');}catch(e){return;}
+    const jobs=d.jobs||[];
+    if(!jobs.length){upPushStop();return;}
+    const el=$('#upPushMsg');el.className='';el.innerHTML=jobs.map(upPushRenderJob).join('');
+    if(!jobs.some(j=>j.state==='upgrading'))upPushStop();
+  },5000);
+}
 function stopUpPoll(){if(upPoll){clearInterval(upPoll);upPoll=null;}}
 function upStartPoll(){
   stopUpPoll();
@@ -2073,12 +2192,18 @@ async function loadUpCard(){
    生成码调 POST api/nodes/pairing-code(返回 code、expiresAt 秒); 待添加来自 GET api/nodes/servers 的 pending 字段;
    确认/拒绝调 POST api/nodes/approve、reject(传 fingerprint)。全部反馈只在卡内, 不弹顶部提示。 */
 let pairBusy=false;
-function pairSetMsg(t){$('#pairMsg').textContent=t||'';}
+/* 配对卡状态文字统一走状态线样式(第 2 项) */
+function pairSetMsg(t){const el=$('#pairMsg');if(!t){el.textContent='';el.className='hint';return;}
+  el.textContent=t;el.className=/失败|过期/.test(t)?'sline fail':(/成功|已添加|已生成/.test(t)?'sline ok':'sline run');
+}
+function pairPendMsg(t,fail){const el=$('#pairPendingMsg');if(!t){el.textContent='';el.className='hint';return;}
+  el.textContent=t;el.className=fail?'sline fail':'sline ok';
+}
 function pairPendingRow(p){
   return '<div class="frow"><div class="fl">'+esc(p.name||'未命名')+'<div class="d">指纹 '+esc(p.fingerprint.slice(0,8))+' · 加入 '+fmtTs(p.firstSeen*1000)+'</div></div><div class="fv"><button class="btn primary" data-pair-ok="'+esc(p.fingerprint)+'">确认</button><button class="btn" data-pair-no="'+esc(p.fingerprint)+'">拒绝</button></div></div>';
 }
 async function loadPairPending(){
-  const box=$('#pairPending');$('#pairPendingMsg').textContent='';
+  const box=$('#pairPending');pairPendMsg('');
   try{
     const d=await apiLocal('GET','api/nodes/servers');
     const list=d.pending||[];
@@ -2086,22 +2211,23 @@ async function loadPairPending(){
     else{box.innerHTML=list.map(pairPendingRow).join('');}
     box.querySelectorAll('[data-pair-ok]').forEach(b=>b.onclick=()=>pairDecide(b.dataset.pairOk,true));
     box.querySelectorAll('[data-pair-no]').forEach(b=>b.onclick=()=>pairDecide(b.dataset.pairNo,false));
-  }catch(e){box.innerHTML='';$('#pairPendingMsg').textContent='加载失败：'+e.message;}
+  }catch(e){box.innerHTML='';pairPendMsg('加载失败：'+e.message,true);}
 }
 async function pairDecide(fp,ok){
-  $('#pairPendingMsg').textContent='';
+  pairPendMsg('');
   try{
     const d=await apiLocal('POST',ok?'api/nodes/approve':'api/nodes/reject',{fingerprint:fp});
     if(ok){
       const nm=(d&&d.server&&d.server.name)||'';
-      $('#pairMsg').innerHTML='已添加 '+esc(nm)+'，点击首页可查看管理 <button class="btn sm" id="btnPairGoHome">去首页</button>';
+      const el=$('#pairMsg');el.className='sline ok';
+      el.innerHTML='已添加 '+esc(nm)+'，点击首页可查看管理 <button class="btn sm" id="btnPairGoHome">去首页</button>';
       $('#btnPairGoHome').onclick=()=>gotoTab('home');
     }else{
-      $('#pairPendingMsg').textContent='已拒绝，该节点已移除。';
+      pairPendMsg('已拒绝，该节点已移除。',true);
     }
     await loadPairPending();
     await refreshHomeNav();
-  }catch(e){$('#pairPendingMsg').textContent=(ok?'确认失败：':'拒绝失败：')+e.message;}
+  }catch(e){pairPendMsg((ok?'确认失败：':'拒绝失败：')+e.message,true);}
 }
 let pairExpSec=0, pairHasCode=false;
 async function loadPairCard(){
@@ -2160,11 +2286,16 @@ async function upDoApply(){
 $('#btnUpPushAll').onclick=async()=>{
   const b=$('#btnUpPushAll');
   if(b.disabled)return;
-  b.disabled=true;const old=b.textContent;b.textContent='正在推送…';upSetPushMsg('正在推送…');
+  b.disabled=true;const old=b.textContent;b.textContent='正在推送…';
+  const el=$('#upPushMsg');el.className='';el.innerHTML='<span class="sline run">正在推送…</span>';
   try{const d=await apiLocal('POST','api/nodes/upgrade-all',{});
     const rs=d.results||[];
-    upSetPushMsg(rs.length?rs.map(r=>(r.name||r.fingerprint)+'：'+(r.ok?'已开始升级':r.detail)).join('；'):'暂无在线节点');
-  }catch(e){upSetPushMsg('推送失败：'+e.message);}
+    if(!rs.length){el.className='hint';el.innerHTML='';el.textContent='暂无在线节点';}
+    else{
+      el.innerHTML=rs.map(r=>'<span class="sline '+(r.ok?'run':'fail')+'">'+esc(r.name||r.fingerprint)+'：'+esc(r.ok?'已开始升级':r.detail)+'</span>').join('');
+      if(rs.some(r=>r.ok))upPushPollStart();
+    }
+  }catch(e){el.className='';el.innerHTML='<span class="sline fail">推送失败：'+esc(e.message)+'</span>';}
   b.disabled=false;b.textContent=old;
 };
 $$('[data-save]').forEach(b=>b.onclick=async()=>{
@@ -2192,36 +2323,45 @@ $('#btnTrustLAN').onclick=()=>{
   toast('已填入全部内网段，记得点本卡的「保存设置」');
 };
 /* 节点 TG 通知(群控): 只在查看节点时显示, 走代理链路调节点接口。
-   单选即选择, 不再二次确认: 走主服务器时不显示任何 token/chatid 填写与测试;
+   分段控制器即状态(走主服务器 | 独立通知), 不再另起一行重复显示当前模式;
+   走主服务器时不显示任何 token/chatid 填写与测试;
    只有选独立通知时才显示独立 Token、Chat ID 与连通性测试。 */
+let ntMode='hub';
+function ntSetMode(mode){
+  ntMode=mode;
+  document.querySelectorAll('#ntSeg button').forEach(b=>b.classList.toggle('sel',b.dataset.mode===mode));
+  ntApplyModeVisibility();
+}
 function ntApplyModeVisibility(){
-  const ind=document.querySelector('input[name=nodeTgMode][value=independent]')?.checked;
+  const ind=ntMode==='independent';
   ['ntTokenRow','ntChatRow','ntTestRow'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=ind?'':'none';});
+}
+function ntShowMsg(text,fail){
+  const m=$('#ntMsg');
+  if(!text){m.style.display='none';m.textContent='';return;}
+  m.style.display='';m.textContent=text;
+  m.className='sline '+(fail?'fail':'ok');
 }
 async function loadNodeTg(){
   const c=$('#nodeTgCard');if(!curServer){c.style.display='none';return;}
   c.style.display='';
-  const m=$('#ntMsg');
+  ntShowMsg('');
   try{const d=await api('GET','api/tg/mode');
-    document.querySelector('input[name=nodeTgMode][value='+(d.mode==='independent'?'independent':'hub')+']').checked=true;
+    ntSetMode(d.mode==='independent'?'independent':'hub');
     $('#ntChat').value=d.chatId||'';$('#ntToken').value=d.hasToken?'********':'';
-    m.textContent='当前模式：'+(d.mode==='independent'?'独立通知':'走主服务器');
-    ntApplyModeVisibility();
-  }catch(e){m.textContent='读取失败：'+e.message}
+  }catch(e){ntShowMsg('读取失败：'+e.message,true)}
 }
-document.querySelectorAll('input[name=nodeTgMode]').forEach(r=>r.onchange=ntApplyModeVisibility);
+document.querySelectorAll('#ntSeg button').forEach(b=>b.onclick=()=>ntSetMode(b.dataset.mode));
 $('#btnNtSave').onclick=async()=>{
-  const mode=document.querySelector('input[name=nodeTgMode]:checked')?.value||'hub';
-  const m=$('#ntMsg');
+  const mode=ntMode;
   try{const d=await api('POST','api/tg/mode',{mode:mode,token:$('#ntToken').value.trim(),chatId:$('#ntChat').value.trim()});
-    m.textContent='已保存，当前模式：'+(d.mode==='independent'?'独立通知':'走主服务器');
-  }catch(e){m.textContent='保存失败：'+e.message}
+    ntShowMsg('已保存');
+  }catch(e){ntShowMsg('保存失败：'+e.message,true)}
 };
 $('#btnNtTest').onclick=async()=>{
-  const m=$('#ntMsg');
   try{await api('POST','api/tg/mode/test',{token:$('#ntToken').value.trim(),chatId:$('#ntChat').value.trim()});
-    m.textContent='测试消息已发送，去 Telegram 看一下';
-  }catch(e){m.textContent='测试失败：'+e.message}
+    ntShowMsg('测试消息已发送，去 Telegram 看一下');
+  }catch(e){ntShowMsg('测试失败：'+e.message,true)}
 };
 /* 归属地库卡片: 未就绪才显示下载; 已就绪显示检查更新 */
 /* 归属地库卡片: v4/v6 各一行, 各自手动检查更新(一步完成: 检查即下载比对,
@@ -2230,19 +2370,19 @@ function geoChkBtn(v,btnId){
   const btn=$(btnId);
   if(!btn)return;
   btn.onclick=async()=>{
-    const line=$('#geoChkLine'),tx=$('#geoChkTx');line.style.display='';tx.textContent='正在检查上游最新库…';
+    const line=$('#geoChkLine'),tx=$('#geoChkTx');line.style.display='';tx.textContent='正在检查上游最新库…';tx.className='sline run';
     try{
       await api('POST','api/geo/check?v='+v);
       const poll=async()=>{
         const s=await api('GET','api/geo/check/status?v='+v);
         if(s.running){setTimeout(poll,3000);return}
         const r=s.result||{};
-        if(r.error){tx.textContent='检查失败：'+r.error}
-        else if(r.updated){tx.textContent='已经更新到最新版本（'+fmtMB(s.size)+(s.date?' · '+fmtDate(s.date):'')+'）';loadOverview().then(renderGeoCard)}
-        else{tx.textContent='当前版本已是最新（'+fmtMB(s.size)+(s.date?' · '+fmtDate(s.date):'')+'）'}
+        if(r.error){tx.textContent='检查失败：'+r.error;tx.className='sline fail'}
+        else if(r.updated){tx.textContent='已经更新到最新版本（'+fmtMB(s.size)+(s.date?' · '+fmtDate(s.date):'')+'）';tx.className='sline ok';loadOverview().then(renderGeoCard)}
+        else{tx.textContent='当前版本已是最新（'+fmtMB(s.size)+(s.date?' · '+fmtDate(s.date):'')+'）';tx.className='sline ok'}
       };
       poll();
-    }catch(e){tx.textContent='检查失败：'+e.message}
+    }catch(e){tx.textContent='检查失败：'+e.message;tx.className='sline fail'}
   };
 }
 function renderGeoCard(){
@@ -2286,10 +2426,17 @@ $$('[data-clear]').forEach(b=>b.onclick=()=>{
 });
 /* ---------- 备份与恢复(第 9 项) ---------- */
 function dlViaA(url){const a=document.createElement('a');a.href=url;document.body.appendChild(a);a.click();a.remove()}
+/* 备份下载防窜(第 9 项): 查看节点时走主服务器按指纹路由的节点备份端点,
+   文件名带服务器名、内容确为该节点数据; 本机视图仍走本机端点。
+   旧写法在节点视图也点本机相对地址, 下的是主服务器自己的备份, 是真窜。 */
+function nodeBackupUrl(kind){
+  if(!curServer)return 'api/backup/'+kind;
+  return 'api/nodes/backup-download?fp='+encodeURIComponent(curServer)+'&kind='+kind;
+}
 $('#btnDlSettings').onclick=e=>{
-  confirmPop(e.currentTarget,'下载设置备份','设置备份里含 TG 机器人 token，请妥善保管、勿外传。确认下载吗？','确认下载',()=>dlViaA('api/backup/settings'));
+  confirmPop(e.currentTarget,'下载设置备份','设置备份里含 TG 机器人 token，请妥善保管、勿外传。确认下载吗？','确认下载',()=>dlViaA(nodeBackupUrl('settings')));
 };
-$('#btnDlData').onclick=()=>dlViaA('api/backup/data');
+$('#btnDlData').onclick=()=>dlViaA(nodeBackupUrl('data'));
 async function restoreUpload(kind,file,confirm){
   if(curServer)throw new Error('备份恢复暂不支持跨节点，请先切换回本机');
   const fd=new FormData();fd.append('file',file);if(confirm)fd.append('confirm','1');
@@ -2532,15 +2679,30 @@ $('#btnPanelPwChange').onclick=()=>{
 };
 $('#btnPanelPortSave').onclick=async()=>{
   const p=+$('#sPanelPort').value||0;
-  if(!p){toast('请填写端口');return}
+  const hint=$('#panelPortHint');
+  const setHint=(t,cls)=>{hint.style.display=t?'':'none';hint.textContent=t||'';hint.className='sline '+(cls||'run');};
+  if(!p){setHint('请填写端口','fail');return}
   try{
     const r=await api('POST','api/panel/port',{port:p});
     const host=window.location.hostname;
-    if(r.restart==='auto')$('#panelPortHint').textContent='面板将重启，请用新地址访问：http://'+host+':'+p;
-    else if(r.restart==='manual')$('#panelPortHint').textContent=r.docker?'已保存端口，但面板跑在容器里无 systemctl，请手动执行 docker restart guijia 后用新地址访问：http://'+host+':'+p:'已保存端口，但本机无 systemctl，请手动执行 systemctl restart guijia 后用新地址访问：http://'+host+':'+p;
-    else $('#panelPortHint').textContent='面板端口未变化，已同步到环境文件。';
-    toast('面板端口已保存');
-  }catch(e){toast(e.message)}
+    if(curServer){
+      // 节点视图: 主服务器管节点走节点主动建的长轮询命令通道, 不直连节点面板端口,
+      // 故端口改了管理不断; 轮询主服务器登记直到节点重新在线(60 秒超时), 卡内报结果。
+      setHint('面板端口已保存，正在确认节点重新在线…','run');
+      const fp=curServer;let left=12;
+      const iv=setInterval(async()=>{
+        let online=false;
+        try{const d=await apiLocal('GET','api/nodes/servers');
+          const s=(d.servers||[]).find(x=>x.fingerprint===fp);
+          online=!!(s&&s.status==='online');
+        }catch(e){}
+        if(online){clearInterval(iv);setHint('面板端口已改，节点连接正常','ok');}
+        else if(--left<=0){clearInterval(iv);setHint('面板端口已改，但 60 秒内节点未重新在线，请检查节点服务','fail');}
+      },5000);
+    }else if(r.restart==='auto')setHint('面板将重启，请用新地址访问：http://'+host+':'+p,'run');
+    else if(r.restart==='manual')setHint(r.docker?'已保存端口，但面板跑在容器里无 systemctl，请手动执行 docker restart guijia 后用新地址访问：http://'+host+':'+p:'已保存端口，但本机无 systemctl，请手动执行 systemctl restart guijia 后用新地址访问：http://'+host+':'+p,'run');
+    else setHint('面板端口未变化，已同步到环境文件。','ok');
+  }catch(e){setHint(e.message,'fail')}
 };
 /* ---------- 启动 ---------- */
 checkAuth();

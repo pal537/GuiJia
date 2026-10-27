@@ -799,6 +799,204 @@ func handleUpgradeStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, loadUpgradeStatus())
 }
 
+// ---------- 推送升级状态跟踪(第 1 项) ----------
+// handleNodeUpgradeAll 只回“已开始升级”就结束, 面板此前再无下文。
+// 这里记下每台被推节点的推送任务, 后台每 10 秒刷新一次(与节点升级状态
+// 对照), 前端轮询 GET /api/nodes/upgrade-push-status 逐节点推进状态线:
+// 升级中 -> 升级成功(版本已到目标)/已是最新/升级失败: 原因。
+// 任务只存内存: 主服务器重启即清空, 前端轮询到空即停, 不编造旧状态。
+
+type pushJob struct {
+	Fingerprint string `json:"fingerprint"`
+	Name        string `json:"name"`
+	FromVersion string `json:"fromVersion"`
+	Target      string `json:"target"`
+	StartedAt   int64  `json:"startedAt"`
+	State       string `json:"state"` // upgrading | done | failed
+	Detail      string `json:"detail"`
+	Version     string `json:"version"` // 完成时节点版本
+	evaluating  bool
+}
+
+var (
+	pushMu   sync.Mutex
+	pushJobs = map[string]*pushJob{}
+	pushLoop bool
+)
+
+// pushGraceSec 节点重启宽限: 推送后 2 分钟内离线只算“重启中”, 不算失败。
+const pushGraceSec = 120
+
+// pushTimeoutSec 推送超时: 5 分钟未到目标版即判失败。
+const pushTimeoutSec = 300
+
+func pushJobPublic(j *pushJob) map[string]any {
+	return map[string]any{
+		"fingerprint": j.Fingerprint, "name": j.Name, "state": j.State,
+		"detail": j.Detail, "version": j.Version, "target": j.Target,
+	}
+}
+
+func handleNodeUpgradePushStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		errJSON(w, 405, "method")
+		return
+	}
+	pushMu.Lock()
+	defer pushMu.Unlock()
+	out := []map[string]any{}
+	for _, j := range pushJobs {
+		out = append(out, pushJobPublic(j))
+	}
+	writeJSON(w, 200, map[string]any{"jobs": out})
+}
+
+// seedPushJob 推送成功发出后记任务(调用方须已确认节点在线)。
+func seedPushJob(fp, name, fromVersion, target string) {
+	pushMu.Lock()
+	pushJobs[fp] = &pushJob{
+		Fingerprint: fp, Name: name, FromVersion: fromVersion, Target: target,
+		StartedAt: time.Now().Unix(), State: "upgrading", Detail: "升级中…",
+	}
+	needLoop := !pushLoop
+	if needLoop {
+		pushLoop = true
+	}
+	pushMu.Unlock()
+	if needLoop {
+		go pushRefreshLoop()
+	}
+}
+
+// evalPushJob 纯判定(供测试): 按注册表版本、节点升级状态文件、在线与耗时
+// 判定任务状态。proxyState: 节点 api/upgrade/status 的 state(""=没拿到);
+// proxyUpdatedAt: 该状态文件的 UpdatedAt; online: 注册表是否在线。
+func evalPushJob(j *pushJob, nodeVersion string, nodeGone bool, online bool, proxyState string, proxyUpdatedAt int64, proxyErr string, now int64) (state, detail string) {
+	elapsed := now - j.StartedAt
+	if nodeGone {
+		return "failed", "节点已移除"
+	}
+	if nodeVersion != "" && nodeVersion != j.FromVersion {
+		return "done", "升级成功：" + nodeVersion
+	}
+	if proxyState == "done" && proxyUpdatedAt >= j.StartedAt {
+		return "done", "升级成功"
+	}
+	if proxyState == "failed" && proxyUpdatedAt >= j.StartedAt {
+		if strings.Contains(proxyErr, "已是最新") {
+			return "done", "已是最新"
+		}
+		if proxyErr != "" {
+			return "failed", "升级失败：" + proxyErr
+		}
+		return "failed", "升级失败"
+	}
+	if proxyState == "applying" {
+		return "upgrading", "升级中…"
+	}
+	if !online {
+		if elapsed < pushGraceSec {
+			return "upgrading", "升级中（节点重启中…）"
+		}
+		if elapsed >= pushTimeoutSec {
+			return "failed", "升级失败：超时未完成"
+		}
+		return "upgrading", "升级中…"
+	}
+	if elapsed >= pushTimeoutSec {
+		return "failed", "升级失败：超时未完成"
+	}
+	return "upgrading", "升级中…"
+}
+
+// refreshPushJobOnce 刷新单个任务(可能调节点代理, 慢; 调用方须是后台 goroutine)。
+func refreshPushJobOnce(fp string) {
+	pushMu.Lock()
+	j := pushJobs[fp]
+	if j == nil || j.State != "upgrading" || j.evaluating {
+		pushMu.Unlock()
+		return
+	}
+	j.evaluating = true
+	pushMu.Unlock()
+	defer func() {
+		pushMu.Lock()
+		if jj := pushJobs[fp]; jj != nil {
+			jj.evaluating = false
+		}
+		pushMu.Unlock()
+	}()
+	hubMu.Lock()
+	s := findHubServer(fp)
+	var nodeVersion string
+	var online bool
+	nodeGone := s == nil
+	if s != nil {
+		nodeVersion = s.Version
+		online = hubNodeOnline(s)
+	}
+	hubMu.Unlock()
+	// 节点升级状态文件(经命令通道, 节点重启中拿不到属正常, 不算失败)。
+	var proxyState, proxyErr string
+	var proxyUpdatedAt int64
+	if !nodeGone {
+		if st, body, kind := hubCallNode(fp, "GET", "api/upgrade/status", nil); kind == "" && st >= 200 && st < 300 {
+			var v struct {
+				State     string `json:"state"`
+				Error     string `json:"error"`
+				UpdatedAt int64  `json:"updatedAt"`
+			}
+			if json.Unmarshal(body, &v) == nil {
+				proxyState, proxyErr, proxyUpdatedAt = v.State, v.Error, v.UpdatedAt
+			}
+		}
+	}
+	pushMu.Lock()
+	jj := pushJobs[fp]
+	if jj == nil || jj.State != "upgrading" {
+		pushMu.Unlock()
+		return
+	}
+	state, detail := evalPushJob(jj, nodeVersion, nodeGone, online, proxyState, proxyUpdatedAt, proxyErr, time.Now().Unix())
+	jj.State, jj.Detail = state, detail
+	if state == "done" && nodeVersion != "" {
+		jj.Version = nodeVersion
+	}
+	pushMu.Unlock()
+}
+
+// pushRefreshLoop 后台刷新: 只要还有 upgrading 任务就每 10 秒刷一轮,
+// 全部终态后退出(下次推送再起)。
+func pushRefreshLoop() {
+	for {
+		time.Sleep(10 * time.Second)
+		pushMu.Lock()
+		fps := []string{}
+		anyUpgrading := false
+		for fp, j := range pushJobs {
+			if j.State == "upgrading" {
+				fps = append(fps, fp)
+				anyUpgrading = true
+			}
+		}
+		if !anyUpgrading {
+			pushLoop = false
+			pushMu.Unlock()
+			return
+		}
+		pushMu.Unlock()
+		var wg sync.WaitGroup
+		for _, fp := range fps {
+			wg.Add(1)
+			go func(fp string) {
+				defer wg.Done()
+				refreshPushJobOnce(fp)
+			}(fp)
+		}
+		wg.Wait()
+	}
+}
+
 // handleNodeUpgradeAll: 主服务器点一下, 把升级推给全部在线节点(各自下载+验签+回滚)。
 // 单节点失败只报该节点, 不影响其他节点与主服务器; 离线节点跳过。
 func handleNodeUpgradeAll(w http.ResponseWriter, r *http.Request) {
@@ -835,6 +1033,8 @@ func handleNodeUpgradeAll(w http.ResponseWriter, r *http.Request) {
 			_ = json.Unmarshal(respBody, &d)
 			if status >= 200 && status < 300 {
 				out = append(out, res{s.Fingerprint, s.Name, true, "已开始升级"})
+				// 记推送任务, 后台刷新状态线(第 1 项): 成功与否不再只凭这一句。
+				seedPushJob(s.Fingerprint, s.Name, s.Version, in.Version)
 			} else if d.Error != "" {
 				out = append(out, res{s.Fingerprint, s.Name, false, d.Error})
 			} else {

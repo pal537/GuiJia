@@ -353,6 +353,11 @@ func executeNodeCommand(cmd hubCommand) (int, []byte) {
 	if rdr != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	// 内部命令(主服务器群控同步)打头, 内部接口只认该头; 面板代理的命令
+	// 绝不带此头, 面板用户无法伪造内部调用。
+	if cmd.Internal {
+		req.Header.Set("X-Guijia-Internal", "1")
+	}
 	rec := httptest.NewRecorder()
 	rootMux.ServeHTTP(rec, req)
 	return rec.Code, rec.Body.Bytes()

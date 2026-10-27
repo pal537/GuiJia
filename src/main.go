@@ -245,6 +245,7 @@ func loadAll() {
 	loadNodeIdentity() // 节点身份(密钥对), 缺失即生成并落盘 0600
 	loadServers()      // 主服务器侧节点登记(servers.json)
 	loadHomeSeen()     // 首页新设备提醒已确认集合(home-seen.json)
+	loadGroupSync()    // 群控共享名单配置(groupsync.json)
 }
 
 // newServerID 生成 8 位 hex 服务器指纹(4 字节随机数); 失败时回落时间戳 hex, 绝不返回空。
@@ -459,12 +460,13 @@ func main() {
 		saveOnExit() // 退出前把账本、统计落盘并恢复流量开关
 		os.Exit(0)
 	}()
-	go trafficLoop()   // 物理网卡实时流量采样(2 秒)
-	go ledgerLoop()    // 流量账本采样(2 秒): 断续连接的总量持续累加, 不随流消亡丢失
-	go collectLoop()   // 连接采样 + 监听快照 + 日志尾随
-	go housekeepLoop() // nft 看门狗 + 事件清理
-	go tgLoop()        // TG 报警发送与机器人轮询
-	go reportLoop()    // TG 日报
+	go trafficLoop()       // 物理网卡实时流量采样(2 秒)
+	go ledgerLoop()        // 流量账本采样(2 秒): 断续连接的总量持续累加, 不随流消亡丢失
+	go collectLoop()       // 连接采样 + 监听快照 + 日志尾随
+	go housekeepLoop()     // nft 看门狗 + 事件清理
+	go tgLoop()            // TG 报警发送与机器人轮询
+	go reportLoop()        // TG 日报
+	startGroupSyncTicker() // 群控共享名单后台同步(仅已开启的组)
 	if effectiveRunMode() == "managed" {
 		startLinkLoop()   // 被群控节点: 拨号器连主服务器(CLI 模式已在前面退出, 不会误起)
 		ensureHubSender() // 事件上报主服务器的发送循环(主服务器挂了本地攒着)
@@ -536,6 +538,12 @@ func main() {
 	mux.HandleFunc("/api/nodes/reject", handleNodeReject)
 	mux.HandleFunc("/api/nodes/remove", handleNodeRemove)
 	mux.HandleFunc("/api/nodes/location", handleNodeLocation)
+	mux.HandleFunc("/api/nodes/upgrade-push-status", handleNodeUpgradePushStatus)
+	mux.HandleFunc("/api/nodes/backup-download", handleNodeBackupDownload)
+	mux.HandleFunc("/api/group-sync/settings", handleGroupSyncSettings)
+	mux.HandleFunc("/api/group-sync/now", handleGroupSyncNow)
+	mux.HandleFunc("/api/backup/export", handleBackupExport)
+	mux.HandleFunc("/api/sync/apply-lists", handleSyncApplyLists)
 	mux.HandleFunc("/api/local-info", handleLocalInfo)
 	mux.HandleFunc("/api/nodes/hello", linkLimit(handleNodeHello))
 	mux.HandleFunc("/api/nodes/challenge", linkLimit(handleNodeChallenge))

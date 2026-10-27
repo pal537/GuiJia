@@ -210,12 +210,37 @@ func hubServerPublic(s *hubServer) map[string]any {
 		"createdAt": s.CreatedAt,
 		"ip":        s.IP, "os": s.OS, "arch": s.Arch,
 		"location": loc, "country": country, "flag": flag,
+		"countryCode":    serverLocationCode(s.Location, s.IP),
 		"manualLocation": s.Location,
 	}
 }
 
+// serverLocationCode 卡片国旗图用国家代码(小写, flagcdn 用):
+// 手动值按手动名匹配, 自动值按 IP 库的国家代码, 都没有则按国家名匹配,
+// 仍没有返回 ""(前端不画旗, 绝不显示裸国家码)。
+func serverLocationCode(manual, ip string) string {
+	if m := strings.TrimSpace(manual); m != "" {
+		if c := countryCodeForName(m); c != "" {
+			return strings.ToLower(c)
+		}
+		return ""
+	}
+	if ip != "" {
+		if g := geoLookup(ip); g.Code != "" {
+			return strings.ToLower(g.Code)
+		} else if g.Country != "" && g.Country != "内网" {
+			if c := countryCodeForName(g.Country); c != "" {
+				return strings.ToLower(c)
+			}
+		}
+	}
+	return ""
+}
+
 // serverLocationDisplay 卡片归属地三件套: 手动值优先, 否则按 IP 自动解析
 // 国家, 都没有则“未知”; 内网 IP 显示“内网”且无旗; 命中不了的国家名无旗不猜。
+// 注意: 手动值一旦设定, 返回的 location 就是手动值本身, 绝不带自动码/自动名;
+// 前端国旗图另走 serverLocationCode, 不再用 emoji(Windows 下 emoji 旗只显示字母)。
 func serverLocationDisplay(manual, ip string) (location, country, flag string) {
 	if m := strings.TrimSpace(manual); m != "" {
 		return m, m, flagEmojiForCountry(m)
@@ -452,7 +477,9 @@ func handleLocalInfo(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, 405, "method")
 		return
 	}
-	ip, osName, arch := nodeSysInfo()
+	// 本机卡片 IP: 公网优先(异步回显服务, 不阻塞), NAT 机不再只显示内网 IP。
+	ip := localDisplayIP()
+	_, osName, arch := nodeSysInfo()
 	mu.Lock()
 	manual := settings.ManualLocation
 	mu.Unlock()
@@ -460,6 +487,7 @@ func handleLocalInfo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"name": nodeDisplayName(), "ip": ip, "os": osName, "arch": arch,
 		"location": loc, "country": country, "flag": flag,
+		"countryCode":    serverLocationCode(manual, ip),
 		"manualLocation": manual,
 	})
 }
@@ -501,6 +529,8 @@ func handleNodeApprove(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	saveServersLocked()
+	// 群控共享已开启时, 新节点批准后立即自动同步一次(后台等上线, 不阻塞返回)。
+	maybeAutoSyncNewNode(fp, p.Name)
 	writeJSON(w, 200, map[string]any{"ok": true, "server": hubServerPublic(s)})
 }
 
@@ -825,10 +855,12 @@ func linkLimit(next http.HandlerFunc) http.HandlerFunc {
 // ---------- 命令通道(长轮询, 标准库) ----------
 
 type hubCommand struct {
-	ID     string          `json:"id"`
-	Method string          `json:"method"`
-	Path   string          `json:"path"`
-	Body   json.RawMessage `json:"body,omitempty"`
+	ID       string          `json:"id"`
+	Method   string          `json:"method"`
+	Path     string          `json:"path"`
+	Body     json.RawMessage `json:"body,omitempty"`
+	Internal bool            `json:"internal,omitempty"` // 主服务器内部命令(群控同步等):
+	// 面板代理与 TG 回调绝不置位; 节点执行时据此打内部头, 内部接口只认该头。
 }
 
 type hubCmdResult struct {
@@ -952,7 +984,15 @@ func handleNodeResult(w http.ResponseWriter, r *http.Request) {
 // "notfound"=无此节点, "offline"=节点离线, "nochan"=未建立命令通道,
 // "timeout"=节点响应超时。调用方按场景映射 HTTP 状态或提示文案。
 func hubCallNode(fp, method, path string, body json.RawMessage) (int, []byte, string) {
-	if !isProxyablePath(path) {
+	return hubCallNodeInternal(fp, method, path, body, false)
+}
+
+// hubCallNodeInternal 命令通道通用发送: internal=true 时跳过面板代理放行
+// 集检查(只给主服务器内部命令用, 如群控同步; 面板代理一律走 false)。
+// 内部命令执行时节点侧打 X-Guijia-Internal 头, 内部接口只认该头,
+// 面板用户无法伪造(代理入口不接受 internal 字段)。
+func hubCallNodeInternal(fp, method, path string, body json.RawMessage, internal bool) (int, []byte, string) {
+	if !internal && !isProxyablePath(path) {
 		return 403, []byte(`{"error":"该接口不允许跨节点调用"}`), ""
 	}
 	hubMu.Lock()
@@ -997,7 +1037,7 @@ func hubCallNode(fp, method, path string, body json.RawMessage) (int, []byte, st
 		cmdMu.Unlock()
 	}
 	select {
-	case wch <- hubCommand{ID: id, Method: method, Path: path, Body: body}:
+	case wch <- hubCommand{ID: id, Method: method, Path: path, Body: body, Internal: internal}:
 	case <-time.After(10 * time.Second):
 		cleanup()
 		return 504, nil, "timeout"
@@ -1012,6 +1052,108 @@ func hubCallNode(fp, method, path string, body json.RawMessage) (int, []byte, st
 		cleanup()
 		return 504, nil, "timeout"
 	}
+}
+
+// sanitizeBackupServerName 备份文件名用服务器名: 只留字母数字、中文与 -_,
+// / 其余字符换 _, 超长截断, 为空回落指纹前 8 位。文件名绝不带路径分隔符。
+func sanitizeBackupServerName(name, fp string) string {
+	var sb strings.Builder
+	for _, r := range name {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' ||
+			r == '-' || r == '_' || r >= 0x4e00 && r <= 0x9fff {
+			sb.WriteRune(r)
+		} else if r == ' ' {
+			sb.WriteRune('_')
+		} else {
+			sb.WriteRune('_')
+		}
+	}
+	out := sb.String()
+	if len([]rune(out)) > 32 {
+		out = string([]rune(out)[:32])
+	}
+	if strings.Trim(out, "_") == "" {
+		if len(fp) >= 8 {
+			return fp[:8]
+		}
+		return "node"
+	}
+	return out
+}
+
+// handleNodeBackupDownload 主服务器代下载节点备份(第 9 项):
+// 此前面板在节点视图下点“下载备份”仍是相对路径, 实际下的是主服务器自己
+// 的备份(窜了)。现在: 节点视图下载走本接口, 经命令通道取节点导出
+// (base64 JSON), 落盘文件名带节点名, 内容确为该节点数据。
+func handleNodeBackupDownload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		errJSON(w, 405, "method")
+		return
+	}
+	fp := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("fp")))
+	kind := r.URL.Query().Get("kind")
+	if !validFingerprint(fp) || (kind != "settings" && kind != "data") {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	hubMu.Lock()
+	s := findHubServer(fp)
+	var name string
+	if s != nil {
+		name = s.Name
+	}
+	hubMu.Unlock()
+	if s == nil {
+		errJSON(w, 404, "没有该节点")
+		return
+	}
+	status, respBody, errKind := hubCallNode(fp, "GET", "api/backup/export?kind="+kind, nil)
+	if errKind != "" {
+		switch errKind {
+		case "notfound":
+			errJSON(w, 404, "没有该节点")
+		case "offline":
+			errJSON(w, 502, "节点离线")
+		case "nochan":
+			errJSON(w, 502, "节点未建立命令通道")
+		case "timeout":
+			errJSON(w, 504, "节点响应超时")
+		default:
+			errJSON(w, 502, errKind)
+		}
+		return
+	}
+	if status < 200 || status >= 300 {
+		errJSON(w, status, "节点备份导出失败")
+		return
+	}
+	var exp struct {
+		Mime string `json:"mime"`
+		Ext  string `json:"ext"`
+		Data string `json:"data"`
+	}
+	if json.Unmarshal(respBody, &exp) != nil || exp.Data == "" {
+		errJSON(w, 502, "节点备份导出返回异常")
+		return
+	}
+	raw, err := base64.StdEncoding.DecodeString(exp.Data)
+	if err != nil {
+		errJSON(w, 502, "节点备份解码失败")
+		return
+	}
+	mime := exp.Mime
+	if mime == "" {
+		mime = "application/octet-stream"
+	}
+	ext := exp.Ext
+	if ext == "" {
+		ext = ".bin"
+	}
+	fname := "guijia-" + kind + "-" + sanitizeBackupServerName(name, fp) + "-" +
+		time.Now().Format("20060102-150405") + ext
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Content-Disposition", "attachment; filename="+fname)
+	w.Write(raw)
 }
 
 // handleNodeProxy 面板登录后转发管理请求给节点, 节点原样状态 + Body 回传。

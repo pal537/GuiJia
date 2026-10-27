@@ -90,6 +90,7 @@ type GeoInfo struct {
 	Province string `json:"province"`
 	City     string `json:"city"`
 	ISP      string `json:"isp"`
+	Code     string `json:"code"` // 国家代码(数据第 5 段, 如 US), 供卡片国旗图用
 	Text     string `json:"text"` // 展示用: 中国 江苏省 南京市 · 联通 / 美国 · xx
 	Private  bool   `json:"private"`
 }
@@ -220,6 +221,7 @@ func geoLookup(ipStr string) GeoInfo {
 		g.Province = get(1)
 		g.City = get(2)
 		g.ISP = get(3)
+		g.Code = get(4)
 		var loc []string
 		if g.Country != "" {
 			loc = append(loc, g.Country)

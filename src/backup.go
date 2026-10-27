@@ -15,6 +15,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -534,6 +535,43 @@ func handleBackupData(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", "attachment; filename="+backupDownloadName("data"))
 	w.Write(b)
+}
+
+// handleBackupExport 备份导出(JSON 包装, 供主服务器经命令通道代下载):
+// 命令通道只能走 JSON, 二进制 zip 无法原样穿过, 故 base64 包一层。
+// 路径 /api/backup/export 在 isProxyablePath 放行集内(不在 nodes/auth/setup
+// 屏蔽前缀里); 但面板代理调它只能拿到 base64 JSON, 真正落盘成文件走主
+// 服务器的 /api/nodes/backup-download(带节点名文件名)。直接 HTTP 调本接口
+// 仍受登录中间件保护, 被群控节点上管理接口一律 403。
+func handleBackupExport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		errJSON(w, 405, "method")
+		return
+	}
+	kind := r.URL.Query().Get("kind")
+	var b []byte
+	var err error
+	var mime, ext string
+	switch kind {
+	case "settings":
+		b, err = buildSettingsBackup()
+		mime, ext = "application/json", ".json"
+	case "data":
+		b, err = buildDataBackup()
+		mime, ext = "application/zip", ".zip"
+	default:
+		errJSON(w, 400, "kind 非法")
+		return
+	}
+	if err != nil {
+		errJSON(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]any{
+		"filename": backupDownloadName(kind),
+		"mime":     mime, "ext": ext,
+		"data": base64.StdEncoding.EncodeToString(b),
+	})
 }
 
 func readRestoreFile(r *http.Request) ([]byte, bool, error) {
