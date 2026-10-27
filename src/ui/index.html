@@ -511,6 +511,20 @@ body.auth #loginView{margin:auto}
       <div class="frow"><div class="fl">修改密码<div class="d">改密后其他登录全部失效，当前登录保留</div></div><div class="fv"><button class="btn" id="btnPanelPwChange">修改密码</button></div></div>
       <div class="hint" id="panelPortHint" style="margin-top:8px"></div>
     </div>
+    <div class="panel" style="margin-bottom:14px" id="pairCard">
+      <div class="ph"><h2>生成配对码</h2><span class="hint">给新服务器加入本机（主服务器）用</span></div>
+      <div style="padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65">配对码一次性、30 分钟有效、用完即废。把码填到新服务器首次打开面板的“连接到主服务器”里；节点加入后在下方待添加列表点确认，确认后首页出现该服务器卡片。</div>
+      <div class="frow"><div class="fl">配对码<div class="d">点生成后显示，有效期 30 分钟</div></div><div class="fv"><button class="btn primary" id="btnPairGen">生成配对码</button></div></div>
+      <div id="pairCodeBox" style="display:none">
+        <div class="frow"><div class="fl">新配对码</div><div class="fv"><span class="mono" id="pairCodeTx" style="font-size:16px;letter-spacing:1px"></span><button class="btn" id="btnPairCopy">复制</button></div></div>
+        <div class="frow"><div class="fl">有效期至</div><div class="fv"><span class="mono" id="pairCodeExp"></span></div></div>
+      </div>
+      <div class="hint" id="pairMsg" style="margin:0 18px 10px"></div>
+      <div style="border-top:1px solid var(--line);margin:6px 0 0"></div>
+      <div class="frow"><div class="fl">待添加节点<div class="d">节点填码加入后出现在这里，点确认即登记上线</div></div><div class="fv"><button class="btn" id="btnPairRefresh">刷新</button></div></div>
+      <div id="pairPending"></div>
+      <div class="hint" id="pairPendingMsg" style="margin:0 18px 10px"></div>
+    </div>
     <div class="setgrid">
       <div class="scard">
         <h3>通知方式 <span class="cbadge">Telegram</span></h3>
@@ -1921,6 +1935,7 @@ async function loadSettings(){
   refreshTotpState();
   loadNodeTg();
   loadUpCard();
+  loadPairCard();
 }
 /* 版本与升级: 当前视图的服务器(本机或节点)走 api() 代理; 推送全部节点只在本机视图用 apiLocal。
    检查按钮状态机: 检查更新 → 正在检查…(禁用) → 升级到 X / 当前版本已是最新；
@@ -1983,6 +1998,61 @@ async function loadUpCard(){
     else{upSetMsg('');}
   }
 }
+/* 配对卡: 设置页 → 面板设置卡正下方; 仅本机视图, 看节点时隐藏(配对是主服务器本地动作, 只走 apiLocal)。
+   生成码调 POST api/nodes/pairing-code(返回 code、expiresAt 秒); 待添加来自 GET api/nodes/servers 的 pending 字段;
+   确认/拒绝调 POST api/nodes/approve、reject(传 fingerprint)。全部反馈只在卡内, 不弹顶部提示。 */
+let pairBusy=false;
+function pairSetMsg(t){$('#pairMsg').textContent=t||'';}
+function pairPendingRow(p){
+  return '<div class="frow"><div class="fl">'+esc(p.name||'未命名')+'<div class="d">指纹 '+esc(p.fingerprint.slice(0,8))+' · 加入 '+fmtTs(p.firstSeen*1000)+'</div></div><div class="fv"><button class="btn primary" data-pair-ok="'+esc(p.fingerprint)+'">确认</button><button class="btn" data-pair-no="'+esc(p.fingerprint)+'">拒绝</button></div></div>';
+}
+async function loadPairPending(){
+  const box=$('#pairPending');$('#pairPendingMsg').textContent='';
+  try{
+    const d=await apiLocal('GET','api/nodes/servers');
+    const list=d.pending||[];
+    if(!list.length){box.innerHTML='<div class="hint" style="margin:0 18px 10px">暂无待添加节点</div>';}
+    else{box.innerHTML=list.map(pairPendingRow).join('');}
+    box.querySelectorAll('[data-pair-ok]').forEach(b=>b.onclick=()=>pairDecide(b.dataset.pairOk,true));
+    box.querySelectorAll('[data-pair-no]').forEach(b=>b.onclick=()=>pairDecide(b.dataset.pairNo,false));
+  }catch(e){box.innerHTML='';$('#pairPendingMsg').textContent='加载失败：'+e.message;}
+}
+async function pairDecide(fp,ok){
+  $('#pairPendingMsg').textContent='';
+  try{
+    await apiLocal('POST',ok?'api/nodes/approve':'api/nodes/reject',{fingerprint:fp});
+    $('#pairPendingMsg').textContent=ok?'已确认，节点已登记，首页出现该服务器卡片。':'已拒绝，该节点已移除。';
+    await loadPairPending();
+    await refreshHomeNav();
+  }catch(e){$('#pairPendingMsg').textContent=(ok?'确认失败：':'拒绝失败：')+e.message;}
+}
+async function loadPairCard(){
+  const card=$('#pairCard');
+  if(curServer){card.style.display='none';return;}
+  card.style.display='';
+  await loadPairPending();
+}
+$('#btnPairGen').onclick=async()=>{
+  if(pairBusy)return;pairBusy=true;
+  const b=$('#btnPairGen');b.disabled=true;const old=b.textContent;b.textContent='正在生成…';pairSetMsg('');
+  try{
+    const d=await apiLocal('POST','api/nodes/pairing-code',{});
+    $('#pairCodeTx').textContent=d.code;
+    $('#pairCodeExp').textContent=fmtTs(d.expiresAt*1000);
+    $('#pairCodeBox').style.display='';
+    pairSetMsg('配对码已生成，30 分钟内有效，用完即废。');
+    await loadPairPending();
+  }catch(e){pairSetMsg('生成失败：'+e.message);}
+  b.disabled=false;b.textContent=old;pairBusy=false;
+};
+$('#btnPairCopy').onclick=async()=>{
+  const code=$('#pairCodeTx').textContent;if(!code)return;
+  let ok=false;
+  try{await navigator.clipboard.writeText(code);ok=true;}
+  catch(e){const ta=document.createElement('textarea');ta.value=code;document.body.appendChild(ta);ta.select();try{ok=document.execCommand('copy');}catch(e2){}ta.remove();}
+  pairSetMsg(ok?'已复制到剪贴板。':'复制失败，请手动选中复制。');
+};
+$('#btnPairRefresh').onclick=()=>{loadPairPending();};
 $('#btnUpCheck').onclick=async()=>{
   if(upBusy)return;
   const btn=$('#btnUpCheck');

@@ -27,6 +27,15 @@ func TestUIIDs(t *testing.T) {
 		"sServerName",            // 设置页面板服务器名称输入(TG 通知标题用)
 		"btnPanelPortSave",       // 设置页面板端口保存按钮
 		"panelPortHint",          // 面板端口提示行
+		"pairCard",               // 设置页生成配对码卡片(面板设置卡正下方)
+		"btnPairGen",             // 生成配对码按钮
+		"pairCodeTx",             // 生成的配对码显示
+		"pairCodeExp",            // 配对码有效期显示
+		"btnPairCopy",            // 配对码复制按钮
+		"pairMsg",                // 配对卡内状态行
+		"pairPending",            // 待添加节点列表区
+		"pairPendingMsg",         // 待添加区状态行
+		"btnPairRefresh",         // 待添加刷新按钮
 		"cmodalOnClose",          // 弹窗关闭清理钩子(证书申请轮询)
 		"cmRuleErr",              // 反代规则弹窗内状态行
 		"cmDelErr",               // 删除规则弹窗内状态行
