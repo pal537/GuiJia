@@ -58,7 +58,7 @@ func TestFreshInstallProtectionsOff(t *testing.T) {
 	n := len(pgRules)
 	pgMu.Unlock()
 	if n != 0 {
-		t.Errorf("新装端口防护应无默认规则，得到 %d 条", n)
+		t.Errorf("新装防火墙应无默认规则，得到 %d 条", n)
 	}
 	if settings.FloodWindowMin != 1 || settings.FloodDistinctIPs != 30 || settings.FloodCloseMin != 60 {
 		t.Errorf("洪峰数值应取新默认值 1/30/60，得到 %d/%d/%d",

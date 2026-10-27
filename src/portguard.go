@@ -1,9 +1,41 @@
 package main
 
-// 端口防护(第 9 项): 按省/市限制指定端口的访问。
-// 一条规则 = 多个端口 + 多个白名单省市(省和市可混选, 任一命中即放行)。
-// 封禁走黑名单记录(作用域 = 规则的端口列表), 因此 TG 解封、应用解封、
-// 记录永不删、数据清理单独问黑名单等硬规矩全部自动适用。
+// 防火墙(原端口防护, 2026-10-27 PAPA 拍板改名并重做)。
+//
+// 一条规则 = 端口(单个/逗号分隔/范围) + 通信协议(全部/TCP/UDP) +
+// 来源范围 + 动作(允许/拒绝) + 生效/禁用 + 封禁时长(小时, 0=永久,
+// 留空=24 小时)。来源范围单选其一: 自定义 IP / 全部 IPv4 / 全部 IPv6 /
+// 中国大陆境内 / 中国大陆境外 / 自定义位置 / 全部 IP。
+//
+// 执行语义(与 DESIGN.md 一致, 改语义先改文档再改代码):
+// 1. 端口被任一生效规则覆盖即受防护; 覆盖看规则的端口范围与协议。
+// 2. 新连接命中生效拒绝规则 -> 按规则端口作用域封禁(只封该规则的
+//    端口, 绝不扩成全局封禁, 复用 Ban 的 Scopes 作用域)。
+// 3. 命中生效允许规则 -> 放行。
+// 4. 多条命中时拒绝优先于允许。
+// 5. 无任何规则命中 -> 按受防护端口默认处理: 非白名单即封禁,
+//    作用域与时长取首个生效覆盖规则(按规则创建顺序)。
+// 6. 内网/回环/保留段/信任名单永远豁免(复用 bannable 守门)。
+// 7. 归属地库查不到国家的 IP(未知)不命中任何国家/省份类允许规则,
+//    走默认封禁, 原因记"归属地未知", 界面展示"未知"。
+// 8. 删除规则不自动解封其已封禁(封禁记录独立管理, 到期或解封);
+//    编辑规则后该规则下已封禁 IP 的生效端口随新规则走(旧范围的
+//    nft 规则会被删掉重建, 集合成员保留)。
+// 9. 港澳台判定看库的省份字段(库里港澳台的国家仍是"中国", 省份是
+//    香港特别行政区/澳门特别行政区/台湾省, 2026-10-27 实测确认)。
+//
+// 内核层: 每条规则两个集合 fw4_<规则ID>/fw6_<规则ID> + 按规则端口
+// 范围的 drop 规则(TCP/UDP 按协议分建)。1-65535 这类大范围不再展开
+// 成单端口列表(旧展开方式会生成 65535 个 PortWatch 条目, 已废弃);
+// 采集层用 fwCoversPort() 查范围覆盖, 未监听的防护端口照样可见。
+// 规则删除后集合与规则保留(其封禁记录仍要生效, 对齐时按记录里的
+// 范围重建, 协议未知时按双协议重建, 只保不丢)。
+//
+// 旧规则迁移: loadPortGuard 识别旧格式(有 ports+locations、无 source)
+// 自动转为新规则(端口不变、协议全部、来源=自定义位置且省份=旧省
+// 名单、动作为允许、生效态与时长不变), 转完以新格式回写。旧省白名单
+// UI 已下线, 但 guardLocationAllowed 等省市匹配逻辑仍由自定义位置复用。
+// 旧 Ports 封禁记录继续走原按端口集合通道, 与新 Scopes 记录并存。
 
 import (
 	"crypto/rand"
@@ -20,7 +52,7 @@ import (
 	"unicode"
 )
 
-// GuardLocation 白名单里的一个省或市。Name/Province 一律存归一化形式
+// GuardLocation 自定义位置里的一个省或市。Name/Province 一律存归一化形式
 // (去省/市/自治区等后缀, 如 江苏、南京、内蒙古), 匹配时与归一化后的
 // 归属地字段直接比对, 数据库里是"南京"还是"南京市"都能对上。
 type GuardLocation struct {
@@ -29,11 +61,36 @@ type GuardLocation struct {
 	Province string `json:"province,omitempty"` // 市所属的省(归一化); 省条目为空
 }
 
+// FWSource 规则的来源范围, 单选其一(kind 决定语义, 其余字段按 kind 取舍)。
+type FWSource struct {
+	Kind      string          `json:"kind"`                // custom_ip | all_v4 | all_v6 | cn_in | cn_out | custom_loc | all
+	CIDR      string          `json:"cidr,omitempty"`      // custom_ip: IP 或 CIDR(原样存, 匹配用解析后的 cidrNet)
+	Countries []string        `json:"countries,omitempty"` // custom_loc: 国家多选(库原字符串 + 香港/澳门/台湾)
+	Locations []GuardLocation `json:"locations,omitempty"` // custom_loc: 省市多选(任一命中即命中)
+
+	cidrNet *net.IPNet // CIDR 解析结果(load 与校验时填充, 不落盘)
+}
+
+// PortGuardRule 防火墙规则。ranges 由 PortText 解析而来(不落盘, load 与
+// 校验时填充); 展示与封禁作用域一律用 ranges, 不用 PortText 原文。
 type PortGuardRule struct {
+	ID       string   `json:"id"`
+	PortText string   `json:"portText"`
+	Proto    string   `json:"proto"` // all | tcp | udp
+	Source   FWSource `json:"source"`
+	Action   string   `json:"action"`   // allow | deny
+	BanHours int      `json:"banHours"` // 封禁时长(小时); 0=永久
+	Enabled  bool     `json:"enabled"`
+
+	ranges [][2]int `json:"-"`
+}
+
+// legacyPortGuardRule 旧格式(迁移专用, 读完即转新格式, 不再写出)。
+type legacyPortGuardRule struct {
 	ID        string          `json:"id"`
 	Ports     []int           `json:"ports"`
 	Locations []GuardLocation `json:"locations"`
-	BanHours  int             `json:"banHours"` // 封禁时长(小时); 0=永久
+	BanHours  int             `json:"banHours"`
 	Enabled   bool            `json:"enabled"`
 }
 
@@ -49,7 +106,42 @@ func loadPortGuard() {
 	defer pgMu.Unlock()
 	pgRules = nil
 	if b, err := os.ReadFile(portGuardFile()); err == nil {
-		json.Unmarshal(b, &pgRules)
+		var raw []json.RawMessage
+		if json.Unmarshal(b, &raw) == nil {
+			migrated := false
+			for _, item := range raw {
+				var probe map[string]json.RawMessage
+				if json.Unmarshal(item, &probe) != nil {
+					continue
+				}
+				if _, ok := probe["source"]; ok {
+					var r PortGuardRule
+					if json.Unmarshal(item, &r) == nil {
+						r.ranges, _ = parsePortRanges(r.PortText)
+						r.Source.cidrNet = parseCIDRNet(r.Source.CIDR)
+						pgRules = append(pgRules, &r)
+					}
+					continue
+				}
+				// 旧格式: 端口不变、协议全部、来源=自定义位置(旧省名单)、允许、生效态与时长不变
+				var old legacyPortGuardRule
+				if json.Unmarshal(item, &old) != nil {
+					continue
+				}
+				r := &PortGuardRule{
+					ID: old.ID, PortText: formatPorts(old.Ports), Proto: "all",
+					Source:   FWSource{Kind: "custom_loc", Locations: old.Locations},
+					Action:   "allow",
+					BanHours: old.BanHours, Enabled: old.Enabled,
+				}
+				r.ranges = portsToRanges(old.Ports)
+				pgRules = append(pgRules, r)
+				migrated = true
+			}
+			if migrated {
+				savePortGuardLocked()
+			}
+		}
 	}
 	if pgRules == nil {
 		pgRules = []*PortGuardRule{}
@@ -74,115 +166,157 @@ func normRegionName(s string) string {
 	return strings.TrimSpace(s)
 }
 
-// parsePortList 解析端口列表: 分隔符支持英文逗号、中文逗号、正反斜杠、顿号,
-// 空格只做修剪不做分隔。重复自动去重并升序。出错时返回带问题片段的报错,
-// 其中含非法符号的按 PAPA 原话提示"符号不对, 不可以"。
-func parsePortList(s string) ([]int, error) {
+// parsePortRanges 解析端口文本: 分隔符支持英文逗号、中文逗号、正反斜杠、
+// 顿号, 空格只做修剪不做分隔; 每段可为单个端口或 lo-hi 范围(如 1-65535)。
+// 重叠/相邻范围自动合并并升序。出错时返回带问题片段的报错, 其中含非法
+// 符号的按 PAPA 原话提示"符号不对, 不可以"。
+func parsePortRanges(s string) ([][2]int, error) {
 	if strings.TrimSpace(s) == "" {
 		return nil, fmt.Errorf("请填写端口")
 	}
 	fields := strings.FieldsFunc(s, func(r rune) bool {
 		return r == ',' || r == '，' || r == '/' || r == '\\' || r == '、'
 	})
-	seen := map[int]bool{}
-	out := []int{}
+	out := [][2]int{}
 	for _, f := range fields {
 		t := strings.TrimSpace(f)
 		if t == "" {
 			continue
 		}
-		for _, r := range t {
-			if !unicode.IsDigit(r) {
-				return nil, fmt.Errorf("符号 '%c' 不对，不可以", r)
+		if strings.Contains(t, "-") {
+			parts := strings.Split(t, "-")
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("端口范围 %s 格式不对", t)
 			}
-		}
-		n := 0
-		for _, r := range t {
-			n = n*10 + int(r-'0')
-			if n > 65535 {
-				break
+			lo, err1 := parsePortNum(strings.TrimSpace(parts[0]))
+			hi, err2 := parsePortNum(strings.TrimSpace(parts[1]))
+			if err1 != nil || err2 != nil {
+				if err1 != nil {
+					return nil, err1
+				}
+				return nil, err2
 			}
+			if lo > hi {
+				return nil, fmt.Errorf("端口范围 %s 起止不对", t)
+			}
+			out = append(out, [2]int{lo, hi})
+			continue
 		}
-		if n < 1 || n > 65535 {
-			return nil, fmt.Errorf("端口 %s 超出范围(1-65535)", t)
+		n, err := parsePortNum(t)
+		if err != nil {
+			return nil, err
 		}
-		if !seen[n] {
-			seen[n] = true
-			out = append(out, n)
-		}
+		out = append(out, [2]int{n, n})
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("请填写端口")
 	}
-	sort.Ints(out)
-	return out, nil
+	return mergeRanges(out), nil
 }
 
-// quirkProvMap: 库里个别 Cloudflare 中国 IP 把市写进了省份字段(省=广州/武汉),
-// 匹配前先归属到真实省份, 否则广东/武汉规则匹配不上这些 IP。
-var quirkProvMap = map[string]string{"广州": "广东", "武汉": "湖北"}
-
-// guardLocationAllowed 白名单判定: 任一位置命中即放行。省条目比省份字段,
-// 市条目比城市字段 + 所属省(防同名市)。空 allowlist 默认拦( fail closed )。
-func guardLocationAllowed(locs []GuardLocation, geo GeoInfo) bool {
-	prov := normRegionName(geo.Province)
-	if q, ok := quirkProvMap[prov]; ok {
-		prov = q
+func parsePortNum(t string) (int, error) {
+	if t == "" {
+		return 0, fmt.Errorf("请填写端口")
 	}
-	city := normRegionName(geo.City)
-	if prov == "" && city == "" {
+	for _, r := range t {
+		if !unicode.IsDigit(r) {
+			return 0, fmt.Errorf("符号 '%c' 不对，不可以", r)
+		}
+	}
+	n := 0
+	for _, r := range t {
+		n = n*10 + int(r-'0')
+		if n > 65535 {
+			break
+		}
+	}
+	if n < 1 || n > 65535 {
+		return 0, fmt.Errorf("端口 %s 超出范围(1-65535)", t)
+	}
+	return n, nil
+}
+
+// mergeRanges 排序并合并重叠/相邻的范围。
+func mergeRanges(in [][2]int) [][2]int {
+	if len(in) == 0 {
+		return in
+	}
+	sorted := append([][2]int{}, in...)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i][0] != sorted[j][0] {
+			return sorted[i][0] < sorted[j][0]
+		}
+		return sorted[i][1] < sorted[j][1]
+	})
+	out := [][2]int{sorted[0]}
+	for _, r := range sorted[1:] {
+		last := &out[len(out)-1]
+		if r[0] <= last[1]+1 {
+			if r[1] > last[1] {
+				last[1] = r[1]
+			}
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+func rangesEqual(a, b [][2]int) bool {
+	if len(a) != len(b) {
 		return false
 	}
-	for _, l := range locs {
-		switch l.Kind {
-		case "province":
-			if l.Name != "" && prov == l.Name {
-				return true
-			}
-		case "city":
-			if l.Name != "" && city == l.Name && (l.Province == "" || prov == l.Province) {
-				return true
-			}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// formatPortRanges 范围展示: 单端口 "80"、范围 "8000-8010"、全范围 "全部端口"。
+func formatPortRanges(ranges [][2]int) string {
+	if len(ranges) == 1 && ranges[0][0] == 1 && ranges[0][1] == 65535 {
+		return "全部端口"
+	}
+	parts := []string{}
+	for _, r := range ranges {
+		if r[0] == r[1] {
+			parts = append(parts, itoa(r[0]))
+		} else {
+			parts = append(parts, itoa(r[0])+"-"+itoa(r[1]))
+		}
+	}
+	return strings.Join(parts, ",")
+}
+
+// formatPorts 旧端口列表转文本(迁移用)。
+func formatPorts(ports []int) string {
+	parts := []string{}
+	for _, p := range ports {
+		parts = append(parts, itoa(p))
+	}
+	return strings.Join(parts, ",")
+}
+
+func portsToRanges(ports []int) [][2]int {
+	out := [][2]int{}
+	for _, p := range ports {
+		out = append(out, [2]int{p, p})
+	}
+	return mergeRanges(out)
+}
+
+func rangeCovers(ranges [][2]int, port int) bool {
+	for _, r := range ranges {
+		if port >= r[0] && port <= r[1] {
+			return true
 		}
 	}
 	return false
 }
 
-// guardRuleForPort 返回覆盖该端口的启用规则(一条端口只归属一条规则, 后建的优先)。
-func guardRuleForPort(port int) *PortGuardRule {
-	pgMu.Lock()
-	defer pgMu.Unlock()
-	for i := len(pgRules) - 1; i >= 0; i-- {
-		r := pgRules[i]
-		if !r.Enabled {
-			continue
-		}
-		for _, p := range r.Ports {
-			if p == port {
-				return r
-			}
-		}
-	}
-	return nil
-}
-
-// guardPorts 返回全部启用规则覆盖的端口(供采集循环纳入 eff, 不受 ignoredPorts 影响)。
-func guardPorts() map[int]bool {
-	pgMu.Lock()
-	defer pgMu.Unlock()
-	out := map[int]bool{}
-	for _, r := range pgRules {
-		if !r.Enabled {
-			continue
-		}
-		for _, p := range r.Ports {
-			out[p] = true
-		}
-	}
-	return out
-}
-
-// ---------- 省市清单校验与展示 ----------
+// ---------- 省市清单校验与展示(自定义位置复用) ----------
 
 var regionProvSet, regionCitySet map[string]bool
 
@@ -208,7 +342,7 @@ func validGuardLocation(l GuardLocation) bool {
 	return false
 }
 
-// guardDisplay 白名单展示名(用清单里的 Display, 如 江苏省、南京市（江苏省）)。
+// guardDisplay 省市展示名(用清单里的 Display, 如 江苏省、南京市（江苏省）)。
 func guardDisplay(locs []GuardLocation) string {
 	parts := []string{}
 	for _, l := range locs {
@@ -227,7 +361,206 @@ func guardDisplay(locs []GuardLocation) string {
 	return strings.Join(parts, "、")
 }
 
-// ---------- 按端口 nft 集合 ----------
+// ---------- 归属地分类(按 2026-10-27 内嵌库实测字段写, 不许凭空假设) ----------
+
+// quirkProvMap: 库里个别 Cloudflare 中国 IP 把市写进了省份字段(省=广州/武汉),
+// 匹配前先归属到真实省份, 否则广东/武汉规则匹配不上这些 IP。
+var quirkProvMap = map[string]string{"广州": "广东", "武汉": "湖北"}
+
+// guardLocationAllowed 省市判定: 任一位置命中即放行。省条目比省份字段,
+// 市条目比城市字段 + 所属省(防同名市)。空 allowlist 默认拦( fail closed )。
+func guardLocationAllowed(locs []GuardLocation, geo GeoInfo) bool {
+	prov := normRegionName(geo.Province)
+	if q, ok := quirkProvMap[prov]; ok {
+		prov = q
+	}
+	city := normRegionName(geo.City)
+	if prov == "" && city == "" {
+		return false
+	}
+	for _, l := range locs {
+		switch l.Kind {
+		case "province":
+			if l.Name != "" && prov == l.Name {
+				return true
+			}
+		case "city":
+			if l.Name != "" && city == l.Name && (l.Province == "" || prov == l.Province) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// geoSAR: 该归属地是否港澳台, 是则返回"香港"/"澳门"/"台湾", 否则返回 ""。
+// 实测: 库里港澳台的国家字段仍是"中国"(如 116.48.125.74 -> 中国|香港特别
+// 行政区), 必须看省份, 不能只看国家。Code 分支是 v6 库兼容(v4 库里香港
+// 的 Code 也是 CN, 指望不上)。
+func geoSAR(geo GeoInfo) string {
+	switch normRegionName(geo.Province) {
+	case "香港", "澳门", "台湾":
+		return normRegionName(geo.Province)
+	}
+	switch geo.Country {
+	case "香港", "澳门", "台湾":
+		return geo.Country
+	case "中国香港":
+		return "香港"
+	case "中国澳门":
+		return "澳门"
+	case "中国台湾":
+		return "台湾"
+	}
+	switch geo.Code {
+	case "HK":
+		return "香港"
+	case "MO":
+		return "澳门"
+	case "TW":
+		return "台湾"
+	}
+	return ""
+}
+
+// geoIsMainland: 是否中国大陆(国家是中国且省份不在港澳台)。港澳台在此算"国外"。
+func geoIsMainland(geo GeoInfo) bool {
+	return geo.Country == "中国" && geoSAR(geo) == ""
+}
+
+// parseCIDRNet: IP 或 CIDR 转网段。裸 IP 按单地址(/32 或 /128)处理;
+// 解析失败返回 nil(调用方按不命中处理, 校验层会先拦住非法输入)。
+func parseCIDRNet(s string) *net.IPNet {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	if strings.Contains(s, "/") {
+		_, n, err := net.ParseCIDR(s)
+		if err != nil {
+			return nil
+		}
+		return n
+	}
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return nil
+	}
+	bits := 128
+	if ip.To4() != nil {
+		bits = 32
+	}
+	return &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)}
+}
+
+// fwSourceMatch: 该来源范围是否命中(单选其一, 任一命中即命中)。
+// 未知归属地(Country=="")不命中任何国家/省份类来源, 只命中"全部 IP"
+// (与"全部 IPv4/IPv6"按地址族判定, 与归属地无关)。
+func fwSourceMatch(src FWSource, ip net.IP, geo GeoInfo) bool {
+	switch src.Kind {
+	case "all":
+		return true
+	case "all_v4":
+		return ip.To4() != nil
+	case "all_v6":
+		return ip.To4() == nil
+	case "cn_in":
+		return geoIsMainland(geo)
+	case "cn_out":
+		// 境外 = 非大陆: 外国 + 港澳台(港澳台不算大陆, 故可访问); 未知与私网不命中
+		return geo.Country != "" && !geo.Private && !geoIsMainland(geo)
+	case "custom_ip":
+		return src.cidrNet != nil && src.cidrNet.Contains(ip)
+	case "custom_loc":
+		// 国家多选: 港澳台归属地只认港澳台选项, "中国"选项不含港澳台;
+		// 大陆归属地只认库原国家字符串。省市多选任一命中即命中。
+		if sar := geoSAR(geo); sar != "" {
+			for _, c := range src.Countries {
+				if c == sar {
+					return true
+				}
+			}
+		} else if geo.Country != "" {
+			for _, c := range src.Countries {
+				if c == geo.Country {
+					return true
+				}
+			}
+		}
+		return guardLocationAllowed(src.Locations, geo)
+	}
+	return false
+}
+
+// fwSourceSummary 来源范围的用户可见展示(对话框与规则列表共用)。
+func fwSourceSummary(src FWSource) string {
+	switch src.Kind {
+	case "custom_ip":
+		return src.CIDR
+	case "all_v4":
+		return "全部 IPv4"
+	case "all_v6":
+		return "全部 IPv6"
+	case "cn_in":
+		return "中国大陆境内"
+	case "cn_out":
+		return "中国大陆境外"
+	case "custom_loc":
+		parts := []string{}
+		parts = append(parts, src.Countries...)
+		if d := guardDisplay(src.Locations); d != "" {
+			parts = append(parts, d)
+		}
+		if len(parts) == 0 {
+			return "自定义位置"
+		}
+		return strings.Join(parts, "、")
+	case "all":
+		return "全部 IP"
+	}
+	return src.Kind
+}
+
+func fwProtoLabel(proto string) string {
+	switch proto {
+	case "tcp":
+		return "TCP"
+	case "udp":
+		return "UDP"
+	}
+	return "全部协议"
+}
+
+// fwRuleDesc 规则的用户可见描述(封禁原因与规则列表共用)。
+func fwRuleDesc(r *PortGuardRule) string {
+	return "端口 " + formatPortRanges(r.ranges) + " · " + fwProtoLabel(r.Proto) + " · " + fwSourceSummary(r.Source)
+}
+
+// fwRulesFor 覆盖指定端口与协议的生效规则(按创建顺序)。
+func fwRulesFor(port int, proto string) []*PortGuardRule {
+	pgMu.Lock()
+	defer pgMu.Unlock()
+	out := []*PortGuardRule{}
+	for _, r := range pgRules {
+		if !r.Enabled {
+			continue
+		}
+		if r.Proto != "all" && r.Proto != proto {
+			continue
+		}
+		if rangeCovers(r.ranges, port) {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// fwCoversPort 该端口与协议是否被任一生效规则覆盖(采集层可见性判定)。
+func fwCoversPort(port int, proto string) bool {
+	return len(fwRulesFor(port, proto)) > 0
+}
+
+// ---------- 旧按端口 nft 集合(旧 Ports 记录专用, 新规则走 fw 集合) ----------
 
 var pgLinkOK bool
 
@@ -279,20 +612,14 @@ func ensurePortGuardSet(port int) bool {
 	return ok
 }
 
-// ensurePortGuardSets 为全部规则端口 + 全部按端口封禁记录的端口建集合与规则。
+// ensurePortGuardSets 为全部旧按端口封禁记录的端口建集合与规则(规则端口
+// 不再走这里, 新规则由 ensureFWSets 建 fw 集合)。
 func ensurePortGuardSets() {
 	if dryBan {
 		pgLinkOK = true
 		return
 	}
 	ports := map[int]bool{}
-	pgMu.Lock()
-	for _, r := range pgRules {
-		for _, p := range r.Ports {
-			ports[p] = true
-		}
-	}
-	pgMu.Unlock()
 	banMu.Lock()
 	for _, b := range bans {
 		for _, p := range b.Ports {
@@ -323,7 +650,7 @@ func pgDelElement(ip string, port int) {
 	nft("delete", "element", "inet", nftTable, pgSetNameFor(ip, port), "{", ip, "}")
 }
 
-// reconcilePortGuard 按端口集合与按端口记录对齐: 生效中必封、非生效中必不在集合。
+// reconcilePortGuard 旧按端口集合与旧按端口记录对齐: 生效中必封、非生效中必不在集合。
 func reconcilePortGuard() {
 	if dryBan {
 		return
@@ -374,35 +701,291 @@ func reconcilePortGuard() {
 	}
 }
 
-// ----------  enforcement ----------
+// ---------- 防火墙 nft 集合(按规则, 范围不展开) ----------
 
-// portGuardCheck 新连接的端口防护检查(采集循环调用): 命中规则、白名单外、
-// 非内网非信任且未全局封禁的, 按规则时长按端口封禁并事件 + TG 报警(带解封按钮)。
-func portGuardCheck(srcIP string, dstPort int) {
-	rule := guardRuleForPort(dstPort)
-	if rule == nil {
+func fwSetName(ruleID string, v6 bool) string {
+	if v6 {
+		return "fw6_" + ruleID
+	}
+	return "fw4_" + ruleID
+}
+
+func fwSetNameFor(ip string, ruleID string) string {
+	if pip := net.ParseIP(ip); pip != nil && pip.To4() == nil {
+		return fwSetName(ruleID, true)
+	}
+	return fwSetName(ruleID, false)
+}
+
+func fwRangeExpr(r [2]int) string {
+	if r[0] == r[1] {
+		return itoa(r[0])
+	}
+	return itoa(r[0]) + "-" + itoa(r[1])
+}
+
+// ensureFWRuleRanges 为某规则 ID 建集合 + 按范围的 drop 规则(幂等)。
+// proto=all 时 TCP/UDP 各建一条; 单协议只建该协议。规则只丢"来源在
+// 集合里 且 目标端口在范围里"的包, 不影响该 IP 的其他端口。
+func ensureFWRuleRanges(ruleID string, ranges [][2]int, proto string) bool {
+	if dryBan {
+		pgLinkOK = true
+		return true
+	}
+	ok := true
+	for _, s := range []struct{ name, typ string }{{fwSetName(ruleID, false), "ipv4_addr"}, {fwSetName(ruleID, true), "ipv6_addr"}} {
+		if _, err := nft("add", "set", "inet", nftTable, s.name, "{", "type", s.typ, ";", "flags", "timeout", ";", "}"); err != nil {
+			if _, lerr := nft("list", "set", "inet", nftTable, s.name); lerr != nil {
+				ok = false
+			}
+		}
+	}
+	out, err := nft("list", "chain", "inet", nftTable, "input")
+	if err != nil {
+		return false
+	}
+	protos := []string{"tcp", "udp"}
+	if proto == "tcp" {
+		protos = []string{"tcp"}
+	} else if proto == "udp" {
+		protos = []string{"udp"}
+	}
+	for _, r := range ranges {
+		for _, v6 := range []bool{false, true} {
+			fam := "ip"
+			if v6 {
+				fam = "ip6"
+			}
+			set := fwSetName(ruleID, v6)
+			for _, pr := range protos {
+				needle := "@" + set + " " + pr + " dport " + fwRangeExpr(r) + " drop"
+				if strings.Contains(out, needle) {
+					continue
+				}
+				if _, err := nft("add", "rule", "inet", nftTable, "input", fam, "saddr", "@"+set, pr, "dport", fwRangeExpr(r), "drop"); err != nil {
+					ok = false
+				}
+			}
+		}
+	}
+	return ok
+}
+
+func ensureFWRule(r *PortGuardRule) bool {
+	return ensureFWRuleRanges(r.ID, r.ranges, r.Proto)
+}
+
+// ensureFWSets 为全部规则 + 已删规则的封禁记录建 fw 集合与规则。
+// 已删规则按记录里的范围、双协议重建(协议未知时只保不丢); 现存规则
+// 按自身协议建, 不多建另一协议。
+func ensureFWSets() {
+	if dryBan {
+		pgLinkOK = true
+		return
+	}
+	ok := true
+	pgMu.Lock()
+	rules := append([]*PortGuardRule{}, pgRules...)
+	pgMu.Unlock()
+	live := map[string]bool{}
+	for _, r := range rules {
+		live[r.ID] = true
+		if !ensureFWRule(r) {
+			ok = false
+		}
+	}
+	banMu.Lock()
+	recs := append([]*Ban{}, bans...)
+	banMu.Unlock()
+	seen := map[string]bool{}
+	for _, b := range recs {
+		for _, s := range b.Scopes {
+			if live[s.RuleID] || seen[s.RuleID] {
+				continue
+			}
+			seen[s.RuleID] = true
+			if !ensureFWRuleRanges(s.RuleID, s.Ranges, "all") {
+				ok = false
+			}
+		}
+	}
+	pgLinkOK = ok
+}
+
+// fwDeleteRules 按 handle 删掉某规则 ID 的全部 nft 规则(编辑规则换范围时
+// 用; 集合与成员保留, 已封禁 IP 的生效端口随新规则走)。删失败返回 false,
+// 调用方不因此中断(旧规则残留是多封、不是漏封)。
+func fwDeleteRules(ruleID string) bool {
+	if dryBan {
+		return true
+	}
+	out, err := nft("-a", "list", "chain", "inet", nftTable, "input")
+	if err != nil {
+		return false
+	}
+	ok := true
+	for _, line := range strings.Split(out, "\n") {
+		if !strings.Contains(line, "@fw4_"+ruleID) && !strings.Contains(line, "@fw6_"+ruleID) {
+			continue
+		}
+		idx := strings.Index(line, "# handle ")
+		if idx < 0 {
+			continue
+		}
+		h := strings.TrimSpace(line[idx+len("# handle "):])
+		if sp := strings.IndexAny(h, " \t"); sp >= 0 {
+			h = h[:sp]
+		}
+		if _, err := nft("delete", "rule", "inet", nftTable, "input", "handle", h); err != nil {
+			ok = false
+		}
+	}
+	return ok
+}
+
+func fwAddElement(ip string, ruleID string, timeoutSec int) {
+	set := fwSetNameFor(ip, ruleID)
+	elem := ip
+	if timeoutSec > 0 && setSupportsTimeout(set) {
+		elem = ip + " timeout " + itoa(timeoutSec) + "s"
+	}
+	nft("delete", "element", "inet", nftTable, set, "{", ip, "}")
+	nft("add", "element", "inet", nftTable, set, "{", elem, "}")
+}
+
+func fwDelElement(ip string, ruleID string) {
+	nft("delete", "element", "inet", nftTable, fwSetNameFor(ip, ruleID), "{", ip, "}")
+}
+
+// reconcileFirewall fw 集合与 Scopes 记录对齐: 生效中必封、非生效中必不在集合。
+// 规则删除后仍按记录里的范围对齐(先重建集合与规则, 再对成员); 现存规则
+// 按自身协议重建, 已删规则按双协议重建。
+func reconcileFirewall() {
+	if dryBan {
+		return
+	}
+	now := time.Now().Unix()
+	desired := map[string]map[string]*Ban{}
+	ruleIDs := map[string]bool{}
+	banMu.Lock()
+	allRecs := append([]*Ban{}, bans...)
+	banMu.Unlock()
+	for _, b := range allRecs {
+		for _, s := range b.Scopes {
+			ruleIDs[s.RuleID] = true
+		}
+	}
+	for _, b := range activeBans() {
+		for _, s := range b.Scopes {
+			if desired[s.RuleID] == nil {
+				desired[s.RuleID] = map[string]*Ban{}
+			}
+			desired[s.RuleID][b.IP] = b
+		}
+	}
+	pgMu.Lock()
+	live := map[string]*PortGuardRule{}
+	for _, r := range pgRules {
+		live[r.ID] = r
+	}
+	pgMu.Unlock()
+	for id := range ruleIDs {
+		if r, ok := live[id]; ok {
+			ensureFWRule(r)
+			continue
+		}
+		merged := [][2]int{}
+		for _, b := range allRecs {
+			for _, s := range b.Scopes {
+				if s.RuleID == id {
+					merged = append(merged, s.Ranges...)
+				}
+			}
+		}
+		ensureFWRuleRanges(id, mergeRanges(merged), "all")
+	}
+	for id := range ruleIDs {
+		for _, v6 := range []bool{false, true} {
+			set := fwSetName(id, v6)
+			actual, err := nftListSet(set)
+			if err != nil {
+				continue // 集合缺失或读失败时本轮跳过, 上面已重建
+			}
+			for ip := range actual {
+				if _, want := desired[id][ip]; !want {
+					nft("delete", "element", "inet", nftTable, set, "{", ip, "}")
+				}
+			}
+			for ip, b := range desired[id] {
+				if fwSetNameFor(ip, id) != set || actual[ip] {
+					continue
+				}
+				fwAddElement(ip, id, banKernelTimeout(b, now))
+			}
+		}
+	}
+}
+
+// ---------- enforcement ----------
+
+// portGuardCheck 新连接的防火墙检查(采集循环调用, proto 为 tcp|udp)。
+// 顺序: 拒绝命中 > 允许命中 > 默认封禁; 内网/回环/保留段/信任/已封禁直接放过。
+func portGuardCheck(srcIP string, dstPort int, proto string) {
+	rules := fwRulesFor(dstPort, proto)
+	if len(rules) == 0 {
 		return
 	}
 	pip := net.ParseIP(srcIP)
-	if pip == nil || pip.IsLoopback() || isPrivateIP(pip) {
+	if pip == nil {
 		return
 	}
-	if isTrusted(srcIP) || isGloballyBanned(srcIP) {
-		return
+	if ok, _ := bannable(srcIP); !ok {
+		return // 内网/回环/保留段/信任名单永远豁免
 	}
-	if isBannedFor(srcIP, dstPort) {
+	if isGloballyBanned(srcIP) || isBannedFor(srcIP, dstPort) {
 		return
 	}
 	geo := geoLookup(srcIP)
-	if guardLocationAllowed(rule.Locations, geo) {
+	if geo.Private {
 		return
 	}
-	prov := geo.Province + geo.City
-	if prov == "" {
-		prov = "未知归属地"
+	var denyRule *PortGuardRule
+	allowHit := false
+	for _, r := range rules {
+		if !fwSourceMatch(r.Source, pip, geo) {
+			continue
+		}
+		if r.Action == "deny" && denyRule == nil {
+			denyRule = r
+		}
+		if r.Action == "allow" {
+			allowHit = true
+		}
 	}
-	reason := "端口防护：仅允许" + guardDisplay(rule.Locations) + "，来源" + prov
-	_, fresh, err := applyScopedBan(srcIP, reason, "portguard", rule.BanHours, rule.Ports)
+	// 展示用归属地: 库查不到国家时记"归属地未知", 绝不静默当成某国;
+	// 查得到时用 geo.Text(已含" · ISP", 如 Bangladesh · Cloudflare)。
+	geoDisp := geo.Text
+	if geo.Country == "" {
+		geoDisp = "归属地未知"
+	}
+	if denyRule != nil {
+		reason := "防火墙拒绝：" + fwRuleDesc(denyRule) + "，来源" + geoDisp
+		ensureFWRule(denyRule)
+		_, fresh, err := applyRuleBan(srcIP, reason, "portguard", denyRule.BanHours, denyRule.ID, denyRule.ranges)
+		if err != nil || !fresh {
+			return
+		}
+		emit(Event{Type: "portguard_ban", IP: srcIP, Port: dstPort, Detail: reason}, settings.AlertPortGuardBan)
+		return
+	}
+	if allowHit {
+		return
+	}
+	// 默认封禁: 首个生效覆盖规则(创建顺序)提供时长与作用域
+	first := rules[0]
+	reason := "防火墙默认封禁：未命中允许规则（规则：" + fwRuleDesc(first) + "），来源" + geoDisp
+	ensureFWRule(first)
+	_, fresh, err := applyRuleBan(srcIP, reason, "portguard", first.BanHours, first.ID, first.ranges)
 	if err != nil || !fresh {
 		return
 	}
@@ -417,45 +1000,156 @@ func newPortGuardRuleID() string {
 	return "g" + hex.EncodeToString(b[:])
 }
 
-// parseGuardRuleInput 校验一条端口防护规则的输入(POST 新增与 PUT 编辑共用):
-// 端口表解析、省市归一化+合法性、去重、时长钳制。返回可直接落库的端口、省市、时长。
-func parseGuardRuleInput(portsText string, locs []GuardLocation, banHours int) (ports []int, out []GuardLocation, hours int, err error) {
-	ports, err = parsePortList(portsText)
+// geoCountryAllowed: 自定义位置的国家选项是否合法(库原字符串 + 港澳台)。
+func geoCountryAllowed(c string) bool {
+	if c == "香港" || c == "澳门" || c == "台湾" {
+		return true
+	}
+	for _, x := range geoCountries() {
+		if x == c {
+			return true
+		}
+	}
+	return false
+}
+
+// parseFWRuleInput 校验一条防火墙规则的输入(POST 新增与 PUT 编辑共用)。
+// 返回可直接落库的规则(已填充 ranges 与 cidrNet); 非相关字段会被清空
+// (如切到全部 IP 后旧 CIDR 不残留)。
+func parseFWRuleInput(portText, proto string, src FWSource, action string, banHours int) (*PortGuardRule, error) {
+	ranges, err := parsePortRanges(portText)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, err
 	}
-	if len(locs) == 0 {
-		return nil, nil, 0, fmt.Errorf("请至少选择一个省或市")
+	switch proto {
+	case "", "all":
+		proto = "all"
+	case "tcp", "udp":
+	default:
+		return nil, fmt.Errorf("通信协议不对")
 	}
-	for i := range locs {
-		locs[i].Name = normRegionName(locs[i].Name)
-		locs[i].Province = normRegionName(locs[i].Province)
-		if locs[i].Kind == "province" {
-			locs[i].Province = ""
+	switch action {
+	case "", "allow":
+		action = "allow"
+	case "deny":
+	default:
+		return nil, fmt.Errorf("动作不对")
+	}
+	switch src.Kind {
+	case "custom_ip":
+		src.CIDR = strings.TrimSpace(src.CIDR)
+		if src.CIDR == "" {
+			return nil, fmt.Errorf("请填写 IP 或 CIDR")
 		}
-		if !validGuardLocation(locs[i]) {
-			return nil, nil, 0, fmt.Errorf("白名单中含未知省市: %s", locs[i].Name)
+		n := parseCIDRNet(src.CIDR)
+		if n == nil {
+			return nil, fmt.Errorf("IP 或 CIDR 格式不对")
 		}
-	}
-	// 归一化后写回(去重: 同 kind+name+province 只留一条)
-	seen := map[string]bool{}
-	out = []GuardLocation{}
-	for _, l := range locs {
-		k := l.Kind + "|" + l.Name + "|" + l.Province
-		if seen[k] {
-			continue
+		src.cidrNet = n
+		src.Countries = nil
+		src.Locations = nil
+	case "all_v4", "all_v6", "cn_in", "cn_out", "all":
+		src.CIDR = ""
+		src.Countries = nil
+		src.Locations = nil
+	case "custom_loc":
+		src.CIDR = ""
+		if len(src.Countries) == 0 && len(src.Locations) == 0 {
+			return nil, fmt.Errorf("自定义位置请至少选一个国家或省市")
 		}
-		seen[k] = true
-		out = append(out, l)
+		seen := map[string]bool{}
+		uniq := []string{}
+		for _, c := range src.Countries {
+			c = strings.TrimSpace(c)
+			if c == "" || seen[c] {
+				continue
+			}
+			if !geoCountryAllowed(c) {
+				return nil, fmt.Errorf("未知国家: %s", c)
+			}
+			seen[c] = true
+			uniq = append(uniq, c)
+		}
+		src.Countries = uniq
+		locSeen := map[string]bool{}
+		locOut := []GuardLocation{}
+		for i := range src.Locations {
+			l := src.Locations[i]
+			l.Name = normRegionName(l.Name)
+			l.Province = normRegionName(l.Province)
+			if l.Kind == "province" {
+				l.Province = ""
+			}
+			if !validGuardLocation(l) {
+				return nil, fmt.Errorf("自定义位置中含未知省市: %s", l.Name)
+			}
+			k := l.Kind + "|" + l.Name + "|" + l.Province
+			if locSeen[k] {
+				continue
+			}
+			locSeen[k] = true
+			locOut = append(locOut, l)
+		}
+		src.Locations = locOut
+	default:
+		return nil, fmt.Errorf("来源范围不对")
 	}
-	hours = banHours
+	hours := banHours
 	if hours < 0 {
-		return nil, nil, 0, fmt.Errorf("封禁时长不能为负")
+		return nil, fmt.Errorf("封禁时长不能为负")
 	}
 	if hours > 8760 {
 		hours = 8760
 	}
-	return ports, out, hours, nil
+	return &PortGuardRule{PortText: portText, Proto: proto, Source: src, Action: action, BanHours: hours, ranges: ranges}, nil
+}
+
+// fwRuleDup: 与已有规则完全相同(端口范围+协议+来源+动作)即判重复(生效态不计)。
+func fwRuleDup(r *PortGuardRule, skipID string) bool {
+	pgMu.Lock()
+	defer pgMu.Unlock()
+	return fwRuleDupLocked(r, skipID)
+}
+
+// fwRuleDupLocked: 调用方已持 pgMu 时用。
+func fwRuleDupLocked(r *PortGuardRule, skipID string) bool {
+	for _, x := range pgRules {
+		if x.ID == skipID {
+			continue
+		}
+		if !rangesEqual(x.ranges, r.ranges) || x.Proto != r.Proto || x.Action != r.Action {
+			continue
+		}
+		if x.Source.Kind != r.Source.Kind || x.Source.CIDR != r.Source.CIDR {
+			continue
+		}
+		if len(x.Source.Countries) != len(r.Source.Countries) {
+			continue
+		}
+		match := true
+		for i, c := range x.Source.Countries {
+			if r.Source.Countries[i] != c {
+				match = false
+				break
+			}
+		}
+		if !match {
+			continue
+		}
+		if len(x.Source.Locations) != len(r.Source.Locations) {
+			continue
+		}
+		for i, l := range x.Source.Locations {
+			if r.Source.Locations[i] != l {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
 }
 
 func handlePortGuard(w http.ResponseWriter, r *http.Request) {
@@ -470,36 +1164,32 @@ func handlePortGuard(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"rules": out})
 	case "POST":
 		var in struct {
-			PortsText string          `json:"portsText"`
-			Locations []GuardLocation `json:"locations"`
-			BanHours  int             `json:"banHours"`
+			PortText string   `json:"portText"`
+			Proto    string   `json:"proto"`
+			Source   FWSource `json:"source"`
+			Action   string   `json:"action"`
+			BanHours int      `json:"banHours"`
 		}
 		if json.NewDecoder(r.Body).Decode(&in) != nil {
 			errJSON(w, 400, "请求无效")
 			return
 		}
-		ports, locs, hours, err := parseGuardRuleInput(in.PortsText, in.Locations, in.BanHours)
+		rule, err := parseFWRuleInput(in.PortText, in.Proto, in.Source, in.Action, in.BanHours)
 		if err != nil {
 			errJSON(w, 400, err.Error())
 			return
 		}
-		pgMu.Lock()
-		for _, r := range pgRules {
-			for _, p := range r.Ports {
-				for _, np := range ports {
-					if p == np {
-						pgMu.Unlock()
-						errJSON(w, 400, "端口 "+itoa(np)+" 已在另一条端口防护规则中")
-						return
-					}
-				}
-			}
+		if fwRuleDup(rule, "") {
+			errJSON(w, 400, "已存在相同规则")
+			return
 		}
-		rule := &PortGuardRule{ID: newPortGuardRuleID(), Ports: ports, Locations: locs, BanHours: hours, Enabled: true}
+		rule.ID = newPortGuardRuleID()
+		rule.Enabled = true
+		pgMu.Lock()
 		pgRules = append(pgRules, rule)
 		savePortGuardLocked()
 		pgMu.Unlock()
-		ensurePortGuardSets()
+		ensureFWRule(rule)
 		writeJSON(w, 200, rule)
 	default:
 		errJSON(w, 405, "method")
@@ -510,14 +1200,16 @@ func handlePortGuardItem(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/api/portguard/")
 	switch r.Method {
 	case "PUT":
-		// 开关切换只传 enabled；整条编辑传 portsText(+locations+banHours)，两者可同传。
+		// 开关切换只传 enabled；整条编辑传 portText(+proto+source+action+banHours)，两者可同传。
 		var in struct {
-			Enabled   *bool           `json:"enabled"`
-			PortsText *string         `json:"portsText"`
-			Locations []GuardLocation `json:"locations"`
-			BanHours  *int            `json:"banHours"`
+			Enabled  *bool     `json:"enabled"`
+			PortText *string   `json:"portText"`
+			Proto    *string   `json:"proto"`
+			Source   *FWSource `json:"source"`
+			Action   *string   `json:"action"`
+			BanHours *int      `json:"banHours"`
 		}
-		if json.NewDecoder(r.Body).Decode(&in) != nil || (in.Enabled == nil && in.PortsText == nil) {
+		if json.NewDecoder(r.Body).Decode(&in) != nil || (in.Enabled == nil && in.PortText == nil) {
 			errJSON(w, 400, "请求无效")
 			return
 		}
@@ -537,39 +1229,44 @@ func handlePortGuardItem(w http.ResponseWriter, r *http.Request) {
 		if in.Enabled != nil {
 			rule.Enabled = *in.Enabled
 		}
-		if in.PortsText != nil {
+		edited := false
+		if in.PortText != nil {
+			proto := rule.Proto
+			if in.Proto != nil {
+				proto = *in.Proto
+			}
+			src := rule.Source
+			if in.Source != nil {
+				src = *in.Source
+			}
+			action := rule.Action
+			if in.Action != nil {
+				action = *in.Action
+			}
 			hours := rule.BanHours
 			if in.BanHours != nil {
 				hours = *in.BanHours
 			}
-			ports, locs, hours2, err := parseGuardRuleInput(*in.PortsText, in.Locations, hours)
+			nr, err := parseFWRuleInput(*in.PortText, proto, src, action, hours)
 			if err != nil {
 				pgMu.Unlock()
 				errJSON(w, 400, err.Error())
 				return
 			}
-			for _, r := range pgRules {
-				if r.ID == id {
-					continue
-				}
-				for _, p := range r.Ports {
-					for _, np := range ports {
-						if p == np {
-							pgMu.Unlock()
-							errJSON(w, 400, "端口 "+itoa(np)+" 已在另一条端口防护规则中")
-							return
-						}
-					}
-				}
+			if fwRuleDupLocked(nr, id) {
+				pgMu.Unlock()
+				errJSON(w, 400, "已存在相同规则")
+				return
 			}
-			rule.Ports = ports
-			rule.Locations = locs
-			rule.BanHours = hours2
+			rule.PortText, rule.Proto, rule.Source, rule.Action, rule.BanHours, rule.ranges = nr.PortText, nr.Proto, nr.Source, nr.Action, nr.BanHours, nr.ranges
+			edited = true
 		}
 		savePortGuardLocked()
 		pgMu.Unlock()
-		if rule.Enabled {
-			ensurePortGuardSets()
+		if edited {
+			// 旧范围规则删掉重建, 集合成员保留, 已封禁随新规则走
+			fwDeleteRules(id)
+			ensureFWRule(rule)
 		}
 		writeJSON(w, 200, rule)
 	case "DELETE":
@@ -591,7 +1288,8 @@ func handlePortGuardItem(w http.ResponseWriter, r *http.Request) {
 		pgRules = kept
 		savePortGuardLocked()
 		pgMu.Unlock()
-		// 注意: 删除规则不自动解封其已封禁(封禁记录独立管理, 到期或 TG/应用解封)。
+		// 注意: 删除规则不自动解封其已封禁(封禁记录独立管理, 到期或 TG/应用解封);
+		// 集合与规则保留, 看门狗按记录里的范围对齐。
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	default:
 		errJSON(w, 405, "method")
@@ -604,4 +1302,12 @@ func handleGeoRegions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{"regions": chinaRegions})
+}
+
+func handleGeoCountries(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		errJSON(w, 405, "method")
+		return
+	}
+	writeJSON(w, 200, map[string]any{"countries": geoCountries(), "sar": []string{"香港", "澳门", "台湾"}})
 }

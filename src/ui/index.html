@@ -188,7 +188,7 @@ tr.trusted td{background:#f7f9fc;opacity:.72}
 #hpPresets{flex:1 1 100%;min-width:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 14px}
 #hpPresets label{display:flex;gap:6px;align-items:center;font-size:13.5px;white-space:nowrap}
 #hpPresets input[type=checkbox]{flex:0 0 auto;width:auto;min-width:0}
-/* 端口防护省市多选下拉 */
+/* 防火墙省市多选下拉 */
 .pgfield{flex:1;min-width:120px;border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:#fff;display:flex;flex-wrap:wrap;gap:6px;align-items:center;cursor:pointer;min-height:36px}
 .pgfield:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(37,99,235,.18)}
 .pgchip{display:inline-flex;gap:4px;align-items:center;background:#eef3ff;border:1px solid #d3e0ff;border-radius:999px;padding:2px 9px;font-size:12.5px}
@@ -264,6 +264,10 @@ body.auth #loginView{margin:auto}
 .scard .savebar,.panel .savebar{border-top:1px solid var(--line);margin-top:10px;padding-top:12px}
 /* 分组眉题: 防护/设置页内把相邻卡片归成一组, 只作视觉分组, 不改卡片顺序与 id */
 .grp-head{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--mut);padding:6px 4px 10px}
+.mtitle{color:var(--blue2);border-left:3px solid var(--blue2);padding-left:10px;font-size:15px;font-weight:700}
+.scard h3.mtitle{font-size:15px;padding-left:15px}
+.frow .fv input.in-mid{flex:0 0 143px;min-width:0;width:143px}
+#fwCountryList,#fwProvList,#fwCityList{max-height:260px;overflow:auto}
 /* 统一说明文字: 卡片内大段说明一律走 .hint, 不再用内联 padding/color 文字墙 */
 .scard>.hint,.panel>.hint{padding:2px 18px 0;color:var(--mut);font-size:12.5px;line-height:1.65}
 .scard>.hint.warn,.panel>.hint.warn{padding-top:4px;color:var(--red)}
@@ -376,17 +380,17 @@ body.auth #loginView{margin:auto}
   <section id="tab-ov">
     <div class="stats" id="cards"></div>
     <div class="panel" id="sessCard">
-      <div class="ph"><h2>当前登录会话</h2><span class="pcount" id="sessCount"></span><span class="hint">登录 IP · 登录时间 · 最后活跃</span><span class="sp"></span></div>
+      <div class="ph"><h2 class="mtitle">当前登录会话</h2><span class="pcount" id="sessCount"></span><span class="hint">登录 IP · 登录时间 · 最后活跃</span><span class="sp"></span></div>
       <div class="tblwrap"><table class="fixed" style="min-width:940px"><colgroup><col style="width:198px"><col><col style="width:190px"><col style="width:150px"><col style="width:110px"><col style="width:110px"></colgroup><thead><tr><th>登录 IP</th><th>归属地</th><th>登录时间</th><th>最后活跃</th><th>记住登录</th><th>会话</th></tr></thead><tbody id="sessBody"></tbody></table></div>
       <div class="empty" id="sessEmpty" style="display:none">当前没有登录会话</div>
     </div>
     <div class="panel">
-      <div class="ph"><span class="staric">★</span><h2>重点端口 · 实时连接</h2><span class="pcount" id="starCount"></span><span class="hint">加星标的端口 · 未信任在前</span><span class="sp"></span><span class="hint">排序</span><select class="sortsel" id="sortSelA"><option value="dur-desc">连接时长 · 久→新</option><option value="dur-asc">连接时长 · 新→久</option><option value="traf-desc">流量 · 大→小</option><option value="traf-asc">流量 · 小→大</option></select><span class="upd" id="ovTime"></span></div>
+      <div class="ph"><span class="staric">★</span><h2 class="mtitle">重点端口 · 实时连接</h2><span class="pcount" id="starCount"></span><span class="hint">加星标的端口 · 未信任在前</span><span class="sp"></span><span class="hint">排序</span><select class="sortsel" id="sortSelA"><option value="dur-desc">连接时长 · 久→新</option><option value="dur-asc">连接时长 · 新→久</option><option value="traf-desc">流量 · 大→小</option><option value="traf-asc">流量 · 小→大</option></select><span class="upd" id="ovTime"></span></div>
       <div class="tblwrap"><table class="fixed" style="min-width:940px"><colgroup><col style="width:248px"><col style="width:198px"><col><col style="width:104px"><col style="width:158px"><col style="width:64px"><col style="width:140px"></colgroup><thead><tr><th>监控端口</th><th>来源 IP</th><th>归属地</th><th>进程</th><th>流量（总）</th><th>已连接</th><th>操作</th></tr></thead><tbody id="connStarBody"></tbody></table></div>
       <div class="empty" id="connStarEmpty" style="display:none">当前没有重点端口的连接</div>
     </div>
     <div class="panel">
-      <div class="ph"><h2>其他端口 · 实时连接</h2><span class="pcount" id="otherCount"></span><span class="hint">未加星标的监控端口</span><span class="sp"></span><span class="hint">排序</span><select class="sortsel" id="sortSelB"><option value="dur-desc">连接时长 · 久→新</option><option value="dur-asc">连接时长 · 新→久</option><option value="traf-desc">流量 · 大→小</option><option value="traf-asc">流量 · 小→大</option></select><button class="btn sm" id="btnFoldOther">收起</button></div>
+      <div class="ph"><h2 class="mtitle">其他端口 · 实时连接</h2><span class="pcount" id="otherCount"></span><span class="hint">未加星标的监控端口</span><span class="sp"></span><span class="hint">排序</span><select class="sortsel" id="sortSelB"><option value="dur-desc">连接时长 · 久→新</option><option value="dur-asc">连接时长 · 新→久</option><option value="traf-desc">流量 · 大→小</option><option value="traf-asc">流量 · 小→大</option></select><button class="btn sm" id="btnFoldOther">收起</button></div>
       <div id="otherWrap">
       <div class="tblwrap"><table class="fixed" style="min-width:940px"><colgroup><col style="width:248px"><col style="width:198px"><col><col style="width:104px"><col style="width:158px"><col style="width:64px"><col style="width:140px"></colgroup><thead><tr><th>监控端口</th><th>来源 IP</th><th>归属地</th><th>进程</th><th>流量（总）</th><th>已连接</th><th>操作</th></tr></thead><tbody id="connBody"></tbody></table></div>
       <div class="empty" id="connEmpty" style="display:none">当前没有其他端口的连接</div>
@@ -396,7 +400,7 @@ body.auth #loginView{margin:auto}
 
   <section id="tab-ports" style="display:none">
     <div class="panel">
-      <div class="ph"><h2>监控端口</h2><span class="hint">彩色框 = 服务类型，后面灰字 = 备注；星标区置顶</span><span class="sp"></span>
+      <div class="ph"><h2 class="mtitle">监控端口</h2><span class="hint">彩色框 = 服务类型，后面灰字 = 备注；星标区置顶</span><span class="sp"></span>
         <button class="btn" id="btnScan">扫描添加</button>
         <button class="btn primary" id="btnAddPort">手动添加</button></div>
       <div id="portStarWrap" style="display:none;border:1px solid var(--line);border-radius:16px;margin:0 18px 12px">
@@ -410,7 +414,7 @@ body.auth #loginView{margin:auto}
 
   <section id="tab-events" style="display:none">
     <div class="panel">
-      <div class="ph"><h2>事件</h2><span class="sp"></span><input id="evQ" placeholder="搜索 IP / 详情" style="width:200px"></div>
+      <div class="ph"><h2 class="mtitle">事件</h2><span class="sp"></span><input id="evQ" placeholder="搜索 IP / 详情" style="width:200px"></div>
       <div style="padding:0 18px 12px"><div class="chips" id="evChips"></div></div>
       <div class="tblwrap"><table class="fixed" style="min-width:840px"><colgroup><col style="width:152px"><col style="width:104px"><col style="width:330px"><col></colgroup><thead><tr><th>时间</th><th>类型</th><th>IP / 归属地</th><th>详情</th></tr></thead><tbody id="evBody"></tbody></table></div>
       <div class="empty" id="evEmpty" style="display:none">暂无事件</div>
@@ -420,7 +424,7 @@ body.auth #loginView{margin:auto}
 
   <section id="tab-bans" style="display:none">
     <div class="scard">
-      <h3>信任名单</h3>
+      <h3 class="mtitle">信任名单</h3>
       <div class="hint">名单内 IP 不报警、不可拉黑；支持单个 IP 或 CIDR（如 192.168.1.0/24）</div>
       <textarea class="ta" id="sTrusted" placeholder="203.0.113.10" style="display:none"></textarea>
       <div id="trustList"></div>
@@ -429,7 +433,7 @@ body.auth #loginView{margin:auto}
       <div class="savebar"><button class="btn primary" data-save>保存设置</button><label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="chkTrustLAN"> 信任全部内网 IP</label><span class="hint" id="trustLanMsg" style="display:none"></span><span class="savedtip">已保存</span></div>
     </div>
     <div class="panel">
-      <div class="ph"><h2>黑名单记录</h2><span class="hint">记录永久保留 · 到期/解封只改状态 · 内网与信任名单不可拉黑</span><span class="hint" id="banBreakdown"></span><span class="sp"></span><input id="banIpSearch" class="short" placeholder="搜索 IP…"><select id="banStatusFilter" class="short"><option value="">全部状态</option><option value="active">生效中</option><option value="released">已解封</option><option value="expired">已过期</option></select><select id="banSrcFilter" class="short"><option value="">全部来源</option><option value="honeypot">蜜罐</option><option value="auto">自动</option><option value="manual">手动</option><option value="tg">TG</option></select><button class="btn primary" id="btnAddBan">手动拉黑</button></div>
+      <div class="ph"><h2 class="mtitle">黑名单记录</h2><span class="hint">记录永久保留 · 到期/解封只改状态 · 内网与信任名单不可拉黑</span><span class="hint" id="banBreakdown"></span><span class="sp"></span><input id="banIpSearch" class="short" placeholder="搜索 IP…"><select id="banStatusFilter" class="short"><option value="">全部状态</option><option value="active">生效中</option><option value="released">已解封</option><option value="expired">已过期</option></select><select id="banSrcFilter" class="short"><option value="">全部来源</option><option value="honeypot">蜜罐</option><option value="auto">自动</option><option value="manual">手动</option><option value="tg">TG</option></select><button class="btn primary" id="btnAddBan">手动拉黑</button></div>
       <div class="tblwrap"><table class="fixed" style="min-width:900px"><colgroup><col style="width:180px"><col><col style="width:200px"><col style="width:64px"><col style="width:80px"><col style="width:150px"><col style="width:84px"></colgroup><thead><tr><th>IP</th><th>归属地</th><th>原因</th><th>来源</th><th>状态</th><th>到期 / 解封</th><th>操作</th></tr></thead><tbody id="banBody"></tbody></table></div>
       <div class="empty" id="banEmpty" style="display:none">暂无拉黑记录</div>
       <div style="text-align:center;padding:10px 0 4px"><button class="btn" id="banExpand">展开</button></div>
@@ -443,40 +447,22 @@ body.auth #loginView{margin:auto}
         <div class="frow"><div class="fl">状态</div><div class="fv"><span class="mono" id="protRescueTx"></span><button class="btn primary" id="btnProtRestore">恢复防护</button></div></div>
       </div>
 
-      <div class="grp-head">建议与须知</div>
+      <div class="grp-head mtitle">建议与须知</div>
       <div class="scard">
-        <h3>安全建议</h3>
+        <h3 class="mtitle">安全建议</h3>
         <div class="hint">建议修改默认的 SSH 端口和面板端口，不要使用默认端口。</div>
       </div>
 
-      <div class="grp-head">端口防护</div>
+      <div class="grp-head mtitle">防火墙</div>
       <div class="scard">
-        <h3>端口防护 <span class="cbadge">按省市白名单</span></h3>
-        <div class="hint">给指定端口加省市白名单：只有白名单里的省或市能连，其他省一律在内核按端口封禁（不影响该 IP 的其他端口）。省份定位偶尔会跳，误封时 TG 报警里点「解除封禁」或在黑名单页解封；内网与信任名单永远豁免。删除规则不自动解封已封禁，到期或手动解封为止。</div>
+        <h3 class="mtitle">防火墙</h3>
+        <div class="hint">给指定端口加访问规则：命中拒绝规则的来源按规则端口封禁（不影响该 IP 的其他端口），命中允许规则的放行，多条命中时拒绝优先；无规则命中时按受防护端口默认封禁。端口支持单个、逗号分隔与范围（如 1-65535）。内网与信任名单永远豁免。删除规则不自动解封已封禁，到期或手动解封为止。</div>
         <div id="pgRuleList" style="padding:6px 18px 0"></div>
-        <div class="frow"><div class="fl">端口<div class="d">多个端口用英文逗号、中文逗号或斜杠分隔</div></div><div class="fv"><input id="pgPorts" placeholder="如 45167,3004"></div></div>
-        <div class="frow"><div class="fl">白名单省市<div class="d">左边选省、右边选市，都可多选；选了省则该省所有市都放行，选了市则只放行该市</div></div><div class="fv"><div class="pgpair">
-          <div class="pgwrap">
-            <div id="pgProvField" class="pgfield" tabindex="0"><span>选择省份…</span></div>
-            <div id="pgProvDrop" class="pgdrop" style="display:none">
-              <input id="pgProvSearch" class="pgsearch" placeholder="搜索省份…">
-              <div id="pgProvList"></div>
-            </div>
-          </div>
-          <div class="pgwrap">
-            <div id="pgCityField" class="pgfield" tabindex="0"><span>选择城市…</span></div>
-            <div id="pgCityDrop" class="pgdrop" style="display:none">
-              <input id="pgCitySearch" class="pgsearch" placeholder="搜索城市或省份，如 南京、江苏…">
-              <div id="pgCityList"></div>
-            </div>
-          </div>
-        </div></div></div>
-        <div class="frow"><div class="fl">封禁时长<div class="d">0 = 永久；留空 = 24 小时</div></div><div class="fv"><input type="number" id="pgHours" min="0" max="8760" placeholder="24"><span class="mono">小时</span></div></div>
-        <div class="savebar"><button class="btn primary" id="btnPgAdd">添加规则</button><button class="btn" id="btnPgCancel" style="display:none">取消修改</button><span class="savedtip">已保存</span></div>
+        <div class="savebar"><button class="btn primary" id="btnFwAdd">添加规则</button></div>
       </div>
 
       <div class="scard">
-        <h3>重点端口洪峰防护 <span class="cbadge">分布式爆破</span></h3>
+        <h3 class="mtitle">重点端口洪峰防护 <span class="cbadge">分布式爆破</span></h3>
         <div class="hint">防的是代理池分布式爆破：攻击者用成百上千个代理 IP、每个 IP 只试一两次，上面那种「单个 IP 失败 N 次」的阈值永远抓不到。开启后，同一个重点端口若在短时间内涌入大量不同来源 IP，将判定为洪峰，立即临时关闭该端口并通过 TG 升级报警。</div>
         <div class="frow"><div class="fl">启用洪峰防护<div class="d">只对重点（星标）端口生效</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sFldOn"><i></i></label></div></div>
         <div class="frow"><div class="fl">触发条件</div><div class="fv"><input type="number" id="sFldWin" min="1" max="60"><span class="mono">分钟内，同一重点端口出现</span><input type="number" id="sFldIPs" min="2"><span class="mono">个不同公网 IP 的新连接</span></div></div>
@@ -485,9 +471,9 @@ body.auth #loginView{margin:auto}
         <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
       </div>
 
-      <div class="grp-head">行为检测</div>
+      <div class="grp-head mtitle">行为检测</div>
       <div class="scard">
-        <h3>爆破自动拉黑</h3>
+        <h3 class="mtitle">爆破自动拉黑</h3>
         <div class="frow"><div class="fl">启用自动拉黑<div class="d">内网与信任名单豁免</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sAbOn"><i></i></label></div></div>
         <div class="frow"><div class="fl">触发条件</div><div class="fv"><input type="number" id="sAbWin" min="1"><span class="mono">分钟内 SSH 失败</span><input type="number" id="sAbThr" min="2"><span class="mono">次，自动拉黑</span></div></div>
         <div class="frow"><div class="fl">封禁时长</div><div class="fv"><span class="mono">自动递进：首次 1 小时、再次 24 小时、累犯永久（到期或解封后再次触发继续累进）</span></div></div>
@@ -495,7 +481,7 @@ body.auth #loginView{margin:auto}
       </div>
 
       <div class="scard">
-        <h3>扫描识别 <span class="cbadge">被动观察</span></h3>
+        <h3 class="mtitle">扫描识别 <span class="cbadge">被动观察</span></h3>
         <div class="hint">只看、不探：从本机连接与内核连接表里被动观察某 IP 在短时间内触达的不同 TCP 端口数，达阈值即判定为扫描。闭口试探（对方敲没开的端口）也能看见，因为它在内核连接表里留痕。采样间隔 1 秒；亚秒级全端口快扫理论上可能漏报。内网与信任名单豁免。</div>
         <div class="frow"><div class="fl">启用扫描识别<div class="d">默认关</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sScanOn"><i></i></label></div></div>
         <div class="frow"><div class="fl">触发条件</div><div class="fv"><input type="number" id="sScanWin" min="1"><span class="mono">分钟内，同一公网 IP 触达</span><input type="number" id="sScanThr" min="2"><span class="mono">个不同 TCP 端口</span></div></div>
@@ -505,7 +491,7 @@ body.auth #loginView{margin:auto}
       </div>
 
       <div class="scard">
-        <h3>蜜罐 <span class="cbadge">默认关</span></h3>
+        <h3 class="mtitle">蜜罐 <span class="cbadge">默认关</span></h3>
         <div class="hint">
           <div class="warn">⚠️ 谨慎开启</div>
           <div>1. <b>先改默认端口（重中之重）</b>：SSH 和 webui 必须已经改离默认端口（建议 50000 以上高位），改完同步改路由器转发和客户端收藏。没改之前，默认端口当蜜罐根本不成立——真服务就占在上面，校验会直接拒绝；而且真服务挂在默认端口上，等于天天站在批量扫描的枪口下。</div>
@@ -527,16 +513,16 @@ body.auth #loginView{margin:auto}
         <div class="savebar"><button class="btn primary" id="btnHpSave">保存蜜罐设置</button><span class="savedtip">已保存</span></div>
       </div>
 
-      <div class="grp-head">应急与情报</div>
+      <div class="grp-head mtitle">应急与情报</div>
       <div class="scard">
-        <h3>急救 <span class="cbadge">TG 超级密码</span></h3>
+        <h3 class="mtitle">急救 <span class="cbadge">TG 超级密码</span></h3>
         <div class="hint">在 Telegram 给机器人发送 /rescue 打开急救菜单：信任 IP、解封全部、关闭所有拦截（30 分钟后自动恢复）、恢复防护。破坏性动作（解封全部、关闭所有拦截）必须输对超级密码；日常拉黑、单个解封不走密码。内网 IP 永远不进黑名单，家里局域网永远是活路；应用挂了时 TG 也救不了，只能 SSH 上去改 bans.json 或清 nft 规则。</div>
         <div class="frow"><div class="fl">超级密码<div class="d">只存哈希不存明文；空 = 清除密码保护（之后 TG 破坏性急救会被拒绝，需先设密码）</div></div><div class="fv"><input id="rescuePw" type="password" placeholder="至少 6 位"><button class="btn" id="btnRescuePw">保存密码</button></div></div>
         <div class="frow"><div class="fl">急救状态</div><div class="fv"><span class="mono" id="rescueStatusTx">…</span></div></div>
       </div>
 
       <div class="scard">
-        <h3>威胁情报 <span class="cbadge">默认关 · 手动开启</span></h3>
+        <h3 class="mtitle">威胁情报 <span class="cbadge">默认关 · 手动开启</span></h3>
         <div class="hint">外部攻击名单单独分区：底层 nft 全端口封禁，不进入黑名单记录、不计入今日拉黑与黑名单总数。信任白名单优先于黑名单与情报名单，加入信任后照样能连。</div>
         <div class="frow"><div class="fl">启用威胁情报<div class="d">默认关；开启后立即拉取并生效；关闭立即清空情报集合</div></div><div class="fv"><label class="sw"><input type="checkbox" id="itOn"><i></i></label></div></div>
         <div class="frow"><div class="fl">名单直链<div class="d">默认 FireHOL level1，可改；免费、无需 Key；约一天一更</div></div><div class="fv"><input id="itPubUrl" style="width:100%"></div></div>
@@ -553,7 +539,7 @@ body.auth #loginView{margin:auto}
   <section id="tab-proxy" style="display:none">
     <div class="setgrid">
       <div class="panel">
-        <div class="ph"><h2>反代规则</h2><span class="hint">一条规则 = 一个域名 + 若干监听端口 + 证书 + 内网后端；添加即启用，规则自带启用/停用。精确域名优先于通配符（通配符只单层，如 *.example.com）；同端口不同域名靠域名分流；未匹配域名与直接 IP 访问一律拒绝；某端口绑定失败时在规则状态里报错，不会拖垮主应用与其他端口</span><span class="sp"></span><button class="btn" id="btnPxRetry">重试监听</button><button class="btn primary" id="btnPxAdd">新增规则</button></div>
+        <div class="ph"><h2 class="mtitle">反代规则</h2><span class="hint">一条规则 = 一个域名 + 若干监听端口 + 证书 + 内网后端；添加即启用，规则自带启用/停用。精确域名优先于通配符（通配符只单层，如 *.example.com）；同端口不同域名靠域名分流；未匹配域名与直接 IP 访问一律拒绝；某端口绑定失败时在规则状态里报错，不会拖垮主应用与其他端口</span><span class="sp"></span><button class="btn" id="btnPxRetry">重试监听</button><button class="btn primary" id="btnPxAdd">新增规则</button></div>
         <div class="tblwrap"><table class="fixed" style="min-width:900px"><colgroup><col style="width:190px"><col style="width:150px"><col style="width:120px"><col style="width:150px"><col style="width:110px"><col style="width:76px"><col style="width:150px"></colgroup><thead><tr><th>名称</th><th>监听</th><th>证书</th><th>后端</th><th>状态</th><th>启用</th><th>操作</th></tr></thead><tbody id="pxRuleBody"></tbody></table></div>
         <div class="empty" id="pxRuleEmpty" style="display:none">暂无规则，点「新增规则」添加。</div>
       </div>
@@ -564,7 +550,7 @@ body.auth #loginView{margin:auto}
   <section id="tab-cert" style="display:none">
     <div class="setgrid">
       <div class="scard">
-        <h3>证书</h3>
+        <h3 class="mtitle">证书</h3>
         <div class="hint">证书只有两个来源：在线申请（ACME）与手动上传，列表只显示元数据、不显示私钥。申请的证书按首域名分子目录存放，上传的证书存在数据目录的 certs 子目录；申请、上传、删除完成后列表自动刷新。下载为 zip（含证书与私钥，妥善保管）。</div>
         <div class="tblwrap"><table class="fixed" style="width:100%"><colgroup><col style="width:150px"><col style="width:220px"><col style="width:80px"><col style="width:150px"><col style="width:70px"><col></colgroup><thead><tr><th>名称</th><th>域名</th><th>状态</th><th>到期</th><th>来源</th><th>操作</th></tr></thead><tbody id="pxCertBody"></tbody></table></div>
         <div class="empty" id="pxCertEmpty" style="display:none">暂无证书，可在线申请或手动上传。</div>
@@ -575,24 +561,24 @@ body.auth #loginView{margin:auto}
   </section>
 
   <section id="tab-set" style="display:none">
-    <div class="grp-head">登录与面板</div>
+    <div class="grp-head mtitle">登录与面板</div>
     <div class="panel" style="margin-bottom:14px" id="totpCard">
-      <div class="ph"><h2>二次验证（2FA）</h2><span class="hint" id="totpState">…</span><span class="sp"></span><button class="btn" id="btnTotpSetup">开通 2FA</button></div>
+      <div class="ph"><h2 class="mtitle">二次验证（2FA）</h2><span class="hint" id="totpState">…</span><span class="sp"></span><button class="btn" id="btnTotpSetup">开通 2FA</button></div>
       <div id="totpDisableBox" style="display:none">
         <div class="frow"><div class="fl">当前密码</div><div class="fv"><input type="password" id="totpDisablePw" placeholder="确认身份用的当前密码"></div></div>
         <div class="savebar"><button class="btn" id="btnTotpDisable">关闭 2FA</button></div>
       </div>
     </div>
     <div class="panel" style="margin-bottom:14px">
-      <div class="ph"><h2>面板设置</h2><span class="hint">登录封禁、改密码、面板端口</span><span class="sp"></span><button class="btn primary" id="btnPanelSave">保存面板设置</button></div>
+      <div class="ph"><h2 class="mtitle">面板设置</h2><span class="hint">登录封禁、改密码、面板端口</span><span class="sp"></span><button class="btn primary" id="btnPanelSave">保存面板设置</button></div>
       <div class="frow"><div class="fl">登录封禁次数<div class="d">密码连续错几次封 IP（时长固定 7 天）</div></div><div class="fv"><input type="number" id="sPanelBan" min="1" max="100" style="width:90px"></div></div>
-      <div class="frow"><div class="fl">服务器名称<div class="d">TG 通知标题用；留空则使用系统主机名</div></div><div class="fv"><input id="sServerName" maxlength="32" placeholder="服务器名称"></div></div>
-      <div class="frow"><div class="fl">面板端口<div class="d">改动后写环境文件并重启面板，当前页会断开，请用新端口重新打开</div></div><div class="fv"><input type="number" id="sPanelPort" min="1" max="65535" style="width:110px"><button class="btn" id="btnPanelPortSave">保存并重启</button></div></div>
+      <div class="frow"><div class="fl">服务器名称<div class="d">TG 通知标题用；留空则使用系统主机名</div></div><div class="fv"><input id="sServerName" class="in-mid" maxlength="32" placeholder="服务器名称"></div></div>
+      <div class="frow"><div class="fl">面板端口<div class="d">改动后写环境文件并重启面板，当前页会断开，请用新端口重新打开</div></div><div class="fv"><input type="number" id="sPanelPort" class="in-mid" min="1" max="65535"><button class="btn" id="btnPanelPortSave">保存并重启</button></div></div>
       <div class="frow" id="pwChangeRow"><div class="fl">修改密码<div class="d">改密后其他登录全部失效，当前登录保留</div></div><div class="fv"><button class="btn" id="btnPanelPwChange">修改密码</button></div></div>
       <div class="sline" id="panelPortHint" style="margin-top:8px;display:none"></div>
     </div>
     <div class="panel" style="margin-bottom:14px" id="pairCard">
-      <div class="ph"><h2>生成配对码</h2><span class="hint">给新服务器加入本机（主服务器）用</span></div>
+      <div class="ph"><h2 class="mtitle">生成配对码</h2><span class="hint">给新服务器加入本机（主服务器）用</span></div>
       <div class="hint">配对码一次性、30 分钟有效、用完即废。把码填到新服务器首次打开面板的“连接到主服务器”里；节点加入后在下方待添加列表点确认，确认后首页出现该服务器卡片。</div>
       <div class="frow"><div class="fl">配对码<div class="d">点生成后显示，有效期 30 分钟</div></div><div class="fv"><button class="btn primary" id="btnPairGen">生成配对码</button></div></div>
       <div id="pairCodeBox" style="display:none">
@@ -606,9 +592,9 @@ body.auth #loginView{margin:auto}
       <div class="hint" id="pairPendingMsg" style="margin:0 0 10px"></div>
     </div>
     <div class="setgrid">
-      <div class="grp-head">通知</div>
+      <div class="grp-head mtitle">通知</div>
       <div class="scard" id="tgCard">
-        <h3>通知方式 <span class="cbadge">Telegram</span></h3>
+        <h3 class="mtitle">通知方式 <span class="cbadge">Telegram</span></h3>
         <div class="frow"><div class="fl">启用 TG 报警<div class="d">报警消息带一键拉黑按钮</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sTgOn"><i></i></label></div></div>
         <div class="frow"><div class="fl">Bot Token</div><div class="fv"><input id="sTgToken" type="password" placeholder="123456:ABC-..."></div></div>
         <div class="frow"><div class="fl">Chat ID<div class="d">只认这个会话的拉黑回调</div></div><div class="fv"><input id="sTgChat" placeholder="例如 123456789"></div></div>
@@ -617,7 +603,7 @@ body.auth #loginView{margin:auto}
       </div>
 
       <div class="scard" id="nodeTgCard" style="display:none">
-        <h3>节点 TG 通知 <span class="cbadge">群控</span></h3>
+        <h3 class="mtitle">节点 TG 通知 <span class="cbadge">群控</span></h3>
         <div class="frow"><div class="fl">通知模式<div class="d">默认走主服务器 bot 统一发；切独立后本节点用自己的 bot 发，主服务器不再替发</div></div><div class="fv"><div class="seg" id="ntSeg"><button type="button" data-mode="hub">走主服务器</button><button type="button" data-mode="independent">独立通知</button></div></div></div>
         <div class="frow" id="ntTokenRow"><div class="fl">独立 Bot Token<div class="d">仅独立模式用；只存本机 0600 文件，面板不回显明文</div></div><div class="fv"><input id="ntToken" type="password" placeholder="123456:ABC-..."></div></div>
         <div class="frow" id="ntChatRow"><div class="fl">独立 Chat ID<div class="d">只认这个会话的拉黑回调</div></div><div class="fv"><input id="ntChat" placeholder="例如 123456789"></div></div>
@@ -626,15 +612,15 @@ body.auth #loginView{margin:auto}
         <div class="savebar"><button class="btn primary" id="btnNtSave">保存节点 TG 设置</button></div>
       </div>
 
-      <div class="grp-head">报警与统计</div>
+      <div class="grp-head mtitle">报警与统计</div>
       <div class="scard">
-        <h3>报警项目</h3>
+        <h3 class="mtitle">报警项目</h3>
         <div id="alertRows"></div>
         <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
       </div>
 
       <div class="scard">
-        <h3>连接流量统计</h3>
+        <h3 class="mtitle">连接流量统计</h3>
         <div class="hint">每条连接的流量数字来自内核的连接字节计数（nf_conntrack_acct）。开启后，本应用会在启动时自动打开它，任何人装上就能用，不需要改系统设置；设备重启后应用也会自动重新打开。应用退出时会把自己打开的开关恢复原样；若这个开关原本就是开着的（别的软件打开的），应用不会动它。</div>
         <div class="frow"><div class="fl">启用流量统计<div class="d">流量列、实时速率与流量排序的数据源</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sAcctOn"><i></i></label><span class="mono" id="acctStatus"></span></div></div>
         <div class="frow"><div class="fl">累计账本<div class="d">每个对端的历次连接总量（悬停在流量上可见）：永久保留、只增不减，仅可在下方「数据清理」里手动清空</div></div><div class="fv"><span class="mono">永久</span></div></div>
@@ -643,23 +629,23 @@ body.auth #loginView{margin:auto}
       </div>
 
       <div class="scard">
-        <h3>日报与日志</h3>
+        <h3 class="mtitle">日报与日志</h3>
         <div class="frow"><div class="fl">TG 日报</div><div class="fv"><label class="sw"><input type="checkbox" id="sRepOn"><i></i></label><span class="mono">每天</span><input id="sRepTime" class="short" placeholder="09:00"><span class="mono">推送当日摘要（时:分）</span></div></div>
         <div class="frow"><div class="fl">事件日志保留</div><div class="fv"><input type="number" id="sKeep" min="1" max="365"><span class="mono">天，超期自动清理</span></div></div>
         <div class="frow"><div class="fl">新来源事件保留<div class="d">每个新 IP 当日首次出现留一条（量大价值低，单独保留期）</div></div><div class="fv"><input type="number" id="sSrcKeep" min="0" max="365"><span class="mono">天；填 0 = 只计数、不记录</span></div></div>
         <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
       </div>
 
-      <div class="grp-head">数据与维护</div>
+      <div class="grp-head mtitle">数据与维护</div>
       <div class="scard">
-        <h3>归属地库</h3>
+        <h3 class="mtitle">归属地库</h3>
         <div class="geoline"><span class="st">IPv4 库</span><span class="dt" id="geoV4Info">…</span><span style="flex:1"></span><span id="geoV4Btns"></span></div>
         <div class="geoline"><span class="st">IPv6 库</span><span class="dt" id="geoV6Info">…</span><span style="flex:1"></span><span id="geoV6Btns"></span></div>
         <div class="geoline" id="geoChkLine" style="display:none;padding-top:0"><span class="sline run" id="geoChkTx"></span></div>
       </div>
 
       <div class="scard">
-        <h3>数据清理</h3>
+        <h3 class="mtitle">数据清理</h3>
         <div class="frow"><div class="fl">清理范围<div class="d">清空后不可恢复</div></div><div class="fv">
           <button class="btn danger" data-clear="events">清空事件与统计</button>
           <button class="btn danger" data-clear="bans">清空黑名单</button>
@@ -668,16 +654,16 @@ body.auth #loginView{margin:auto}
       </div>
 
       <div class="scard">
-        <h3>备份与恢复</h3>
+        <h3 class="mtitle">备份与恢复</h3>
         <div class="hint">设置备份 = 全部配置（设置 + 端口 + 蜜罐），不含数据；数据备份 = 黑名单 + 统计 + 事件 + 流量账本。只恢复设置不会带回黑名单，要黑名单必须恢复数据。恢复前自动拍当前快照（data/snapshots，每种最新 5 份，可用同样入口导回）；恢复数据后立即重做 nft 对账。</div>
         <div class="frow"><div class="fl">备份设置<div class="d">一个 JSON 下载；含 TG 机器人 token，妥善保管、勿外传</div></div><div class="fv"><button class="btn" id="btnDlSettings">下载设置备份</button></div></div>
         <div class="frow"><div class="fl">备份数据<div class="d">一个 zip 下载，Windows 可直接打开看</div></div><div class="fv"><button class="btn" id="btnDlData">下载数据备份</button></div></div>
         <div class="frow"><div class="fl">恢复设置<div class="d">上传设置备份 JSON；版本不匹配会先警告</div></div><div class="fv"><input type="file" id="upSettings" accept=".json" style="display:none"><button class="btn" id="btnUpSettings">选择文件恢复</button></div></div>
         <div class="frow"><div class="fl">恢复数据<div class="d">上传数据备份 zip；黑名单随数据一起回来</div></div><div class="fv"><input type="file" id="upData" accept=".zip" style="display:none"><button class="btn" id="btnUpData">选择文件恢复</button></div></div>
       </div>
-      <div class="grp-head">版本</div>
+      <div class="grp-head mtitle">版本</div>
     <div class="panel" style="margin-bottom:14px" id="upCard">
-      <div class="ph"><h2>版本与升级</h2><span class="hint">升级会重启面板，重启后请重新登录</span></div>
+      <div class="ph"><h2 class="mtitle">版本与升级</h2><span class="hint">升级会重启面板，重启后请重新登录</span></div>
       <div class="frow"><div class="fl">当前版本</div><div class="fv"><span class="mono" id="upCur">…</span><button class="btn" id="btnUpCheck">检查更新</button></div></div>
       <div class="frow"><div class="fl">最新版本</div><div class="fv"><span class="mono" id="upLatest">—</span></div></div>
       <div class="hint" id="upMsg" style="margin:0 0 10px"></div>
@@ -811,7 +797,7 @@ function homeSetMeta(fp,m){
    节点卡另有移除管理。反馈只在弹窗内。 */
 function openCardMenu(fp){
   const isLocal=!fp;
-  openCModal('<h3>卡片设置</h3><div style="display:flex;flex-direction:column;gap:10px">'+
+  openCModal('<h3 class="mtitle">卡片设置</h3><div style="display:flex;flex-direction:column;gap:10px">'+
     '<button class="btn" id="cmMenuLoc">设置归属地</button>'+
     (isLocal?'':'<button class="btn danger" id="cmMenuRm">移除管理</button>')+
     '<button class="btn" id="cmMenuCancel">取消</button></div>');
@@ -835,9 +821,9 @@ function gsSectionHTML(group,title,desc,cfg){
    点底部“保存群控设置”才生效并在弹窗内反馈; 点“立即同步”先保存当前表单再同步;
    点关闭直接丢弃未保存改动(什么都没存过, 无需回滚)。反馈只在弹窗内, 不弹顶部提示。 */
 async function openGroupSyncModal(){
-  let cfg;try{cfg=await apiLocal('GET','api/group-sync/settings');}catch(e){openCModal('<h3>群控设置</h3><div class="sline fail">读取失败：'+esc(e.message)+'</div>');return;}
+  let cfg;try{cfg=await apiLocal('GET','api/group-sync/settings');}catch(e){openCModal('<h3 class="mtitle">群控设置</h3><div class="sline fail">读取失败：'+esc(e.message)+'</div>');return;}
   const bl=cfg.blacklist||{enabled:false,intervalMin:10}, wl=cfg.whitelist||{enabled:false,intervalMin:10};
-  openCModal('<h3>群控设置</h3><div style="display:flex;flex-direction:column;gap:12px">'+
+  openCModal('<h3 class="mtitle">群控设置</h3><div style="display:flex;flex-direction:column;gap:12px">'+
     gsSectionHTML('blacklist','共享黑名单','主服务器的黑名单为源，推向各节点；只新增与改状态，绝不删记录，本机条目不动。开启后新加入节点批准后立即自动同步一次。',bl)+
     gsSectionHTML('whitelist','共享白名单','主服务器的信任名单为源，推向各节点；只动共享标记的条目，本机条目不动。开启后新加入节点批准后立即自动同步一次。',wl)+
     '<div class="sline" id="gsSaveMsg" style="display:none"></div>'+
@@ -889,7 +875,7 @@ function openLocModal(fp){
   const isLocal=!fp;
   const cur=isLocal?localMeta:(homeServers.find(x=>x.fp===fp)||{});
   const auto=isLocal?(localMeta.country||''):((cur||{}).country||'');
-  openCModal('<h3>设置归属地</h3><div class="csub">国家/地区文本，如 美国、日本、香港；留空 = 自动解析'+(auto?('（当前自动：'+esc(auto)+'）'):'')+'。手动值优先于自动解析，并据此匹配国旗。</div>'+
+  openCModal('<h3 class="mtitle">设置归属地</h3><div class="csub">国家/地区文本，如 美国、日本、香港；留空 = 自动解析'+(auto?('（当前自动：'+esc(auto)+'）'):'')+'。手动值优先于自动解析，并据此匹配国旗。</div>'+
     '<div style="display:flex;flex-direction:column;gap:12px"><input id="cmLoc" placeholder="国家/地区，留空为自动" value="'+esc(cur.manualLocation||'')+'"><div class="sline fail" id="cmLocErr" style="display:none"></div>'+
     '<div style="display:flex;gap:10px"><button class="btn" id="cmLocCancel">取消</button><button class="btn primary" id="cmLocSave">保存</button></div></div>');
   $('#cmLocCancel').onclick=closeCModal;
@@ -901,7 +887,7 @@ function openLocModal(fp){
 }
 function openRemoveModal(fp){
   const s=homeServers.find(x=>x.fp===fp);if(!s)return;
-  openCModal('<h3>移除管理</h3><div class="csub">移除后 <b>'+esc(s.name)+'</b> 从首页消失，节点回到初始页面（设置密码独立用 / 绑定其他主服务器），需重新配对才能再次群控。确定移除吗？</div>'+
+  openCModal('<h3 class="mtitle">移除管理</h3><div class="csub">移除后 <b>'+esc(s.name)+'</b> 从首页消失，节点回到初始页面（设置密码独立用 / 绑定其他主服务器），需重新配对才能再次群控。确定移除吗？</div>'+
     '<div class="sline fail" id="cmRmErr" style="display:none"></div>'+
     '<div style="display:flex;gap:10px"><button class="btn" id="cmRmCancel">取消</button><button class="btn dangerfill" id="cmRmOk">确认移除</button></div>');
   $('#cmRmCancel').onclick=closeCModal;
@@ -1104,7 +1090,7 @@ async function loadPxAcmeCFToken(){
   }catch(e){}
 }
 function pxAcmeModal(){
-  openCModal('<h3>在线申请（ACME）</h3><div class="csub">到期前 30 天自动续期。自动：80 空闲走 HTTP-01，80 被占用走 DNS-01；nginx 代答：经 nginx 代答 HTTP-01，不占 80 也不用 Token；新域名走常驻代答块，已有 nginx 站点的域名申请时临时改写、用后还原；DNS-01 需要 Cloudflare API Token（需对应域名的 DNS 编辑权限），Token 只存服务器本地，续期继续用它。</div>'+
+  openCModal('<h3 class="mtitle">在线申请（ACME）</h3><div class="csub">到期前 30 天自动续期。自动：80 空闲走 HTTP-01，80 被占用走 DNS-01；nginx 代答：经 nginx 代答 HTTP-01，不占 80 也不用 Token；新域名走常驻代答块，已有 nginx 站点的域名申请时临时改写、用后还原；DNS-01 需要 Cloudflare API Token（需对应域名的 DNS 编辑权限），Token 只存服务器本地，续期继续用它。</div>'+
   '<div class="fld"><label>域名（一行一个，首域名决定证书存放目录）</label><textarea id="pxAcmeDomains" rows="3" placeholder="一行一个域名，如 example.com"></textarea></div>'+
   '<div class="fld"><label>挑战方式</label><select id="pxAcmeMethod"><option value="auto">自动</option><option value="http-01">HTTP-01</option><option value="dns-01">DNS-01（Cloudflare）</option><option value="nginx">nginx 代答</option></select></div>'+
   '<div class="fld"><label>Cloudflare API Token（仅 DNS-01 需要）</label><input id="pxAcmeCFToken" type="password" placeholder="Cloudflare API Token"></div>'+
@@ -1290,7 +1276,7 @@ function pxRuleModal(rule){
   if(isNew&&!rule.backend)backBoxHost='http://127.0.0.1';
   else{const sm=String(rule.backend||'').match(/^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//);if(sm&&bp.host.indexOf('://')<0)backBoxHost=sm[1]+'://'+bp.host;else if(!sm&&bp.port&&bp.host.indexOf('://')<0)backBoxHost='http://'+bp.host;}
   const certOpts=(pxData.certs||[]).map(c=>'<option value="'+esc(c.id)+'"'+(c.id===rule.cert?' selected':'')+'>'+esc(c.name)+(c.source==='upload'?'（上传）':'（ACME）')+' · 到期 '+esc(c.notAfter)+'</option>').join('')+'<option value="auto"'+(rule.cert==='auto'?' selected':'')+'>自动选择（按域名匹配）</option>';
-  openCModal('<h3>'+(isNew?'新增反代规则':'编辑反代规则')+'</h3><div class="csub">只代理到内网已有应用；一条规则 = 一个域名 + 若干监听端口 + 证书 + 上游服务器。通配符只支持 *.example.com 单层；上游格式为 http://IP:端口（https 后端不支持）；入站端口 1-65535，不填则默认 443 HTTPS。</div>'+
+  openCModal('<h3 class="mtitle">'+(isNew?'新增反代规则':'编辑反代规则')+'</h3><div class="csub">只代理到内网已有应用；一条规则 = 一个域名 + 若干监听端口 + 证书 + 上游服务器。通配符只支持 *.example.com 单层；上游格式为 http://IP:端口（https 后端不支持）；入站端口 1-65535，不填则默认 443 HTTPS。</div>'+
   '<div class="fld"><label>域名</label><div style="display:flex;gap:8px;align-items:center"><span class="cbadge">*</span><input id="cmDom" value="'+esc(rule.domain)+'" placeholder="www.example.com，支持通配符 *" style="flex:1"></div></div>'+
   '<div class="fld"><label>端口</label><div id="cmListenRows"></div><button class="btn sm" id="cmListenAdd" type="button">+ 添加一个监听端口</button></div>'+
   '<div class="fld"><label>证书</label><select id="cmCert">'+certOpts+'</select><div class="hint">仅 HTTPS 监听使用，HTTP 监听忽略此项；默认已按域名自动挑好，下拉里所有证书都能选，不按域名限制。</div></div>'+
@@ -1369,7 +1355,7 @@ function pxRuleModal(rule){
   };
 }
 function pxDelModal(id,dom){
-  openCModal('<h3>删除反代规则</h3><div class="csub">确认删除入站 '+esc(dom)+' 的反代规则？删除后该入站立即不再反代。</div>'+
+  openCModal('<h3 class="mtitle">删除反代规则</h3><div class="csub">确认删除入站 '+esc(dom)+' 的反代规则？删除后该入站立即不再反代。</div>'+
   '<div class="fld"><div class="hint" id="cmDelErr" style="color:var(--red);min-height:18px"></div></div>'+
   '<div class="cfoot"><button class="btn" id="cmCancel">取消</button><button class="btn dangerfill" id="cmOk">确认删除</button></div>');
   $('#cmCancel').onclick=closeCModal;
@@ -1383,7 +1369,7 @@ function pxDelModal(id,dom){
 $('#btnPxRetry').onclick=async()=>{try{pxData=await api('POST','api/proxy/retry');toast('已重试');renderProxy()}catch(e){toast(e.message)}};
 $('#btnPxAdd').onclick=()=>pxRuleModal(null);
 function pxCertModal(){
-  openCModal('<h3>添加证书</h3>'+
+  openCModal('<h3 class="mtitle">添加证书</h3>'+
   '<div class="fld"><label>证书名称</label><input id="cmCertName" placeholder="名称，如 nas"><div class="hint">名称只支持字母、数字、. _ -；证书与私钥必须成对。</div></div>'+
   '<div class="fld"><label>证书</label><textarea id="cmCertCrt" rows="4" placeholder="粘贴证书内容，或点下面按钮上传文件"></textarea><button class="btn sm" id="cmCertCrtUp" type="button">点击上传证书文件 (.crt)</button><input type="file" id="cmCertCrtFile" accept=".crt,.pem" style="display:none"></div>'+
   '<div class="fld"><label>私钥</label><textarea id="cmCertKey" rows="4" placeholder="粘贴私钥内容，或点下面按钮上传文件"></textarea><button class="btn sm" id="cmCertKeyUp" type="button">点击上传私钥文件 (.key)</button><input type="file" id="cmCertKeyFile" accept=".key,.pem" style="display:none"></div>'+
@@ -1433,7 +1419,7 @@ function pxCertEditModal(c){
     '<div class="fld"><label>证书</label><textarea id="cmCertEditCrt" rows="4" placeholder="粘贴新证书内容"></textarea></div>'+
     '<div class="fld"><label>私钥</label><textarea id="cmCertEditKey" rows="4" placeholder="粘贴新私钥内容"></textarea></div>';
   }
-  openCModal('<h3>编辑证书</h3><div class="csub">'+esc(c.name)+'（'+(isAcme?'ACME':'上传')+'）</div>'+body+
+  openCModal('<h3 class="mtitle">编辑证书</h3><div class="csub">'+esc(c.name)+'（'+(isAcme?'ACME':'上传')+'）</div>'+body+
   '<div class="fld"><div class="hint" id="cmCertEditErr" style="color:var(--red);min-height:18px"></div></div>'+
   '<div class="cfoot"><button class="btn" id="cmCancel">取消</button><button class="btn primary" id="cmOk">保存</button></div>');
   $('#cmCancel').onclick=closeCModal;
@@ -1459,7 +1445,7 @@ function pxCertViewModal(c){
   const sans=[...(c.dnsNames||[]),...(c.ips||[])].map(esc).join('，')||'—';
   const stTxt=c.status==='revoked'?'<span style="color:var(--red);font-weight:600">已吊销</span>':(c.status==='expired'?'<span style="color:var(--red);font-weight:600">已过期</span>':'<span style="color:var(--green);font-weight:600">有效</span>');
   const row=(k,v)=>'<div class="fld"><label>'+k+'</label><div class="mono" style="word-break:break-all">'+v+'</div></div>';
-  openCModal('<h3>证书详情</h3>'+
+  openCModal('<h3 class="mtitle">证书详情</h3>'+
     row('名称',esc(c.name))+row('域名',sans)+row('签发者',esc(c.issuer||'—'))+row('主题',esc(c.subject||'—'))+
     row('有效期',esc(c.notBefore||'—')+' ~ '+esc(c.notAfter))+row('序列号',esc(c.serial||'—'))+
     row('SHA256 指纹',esc(c.fingerprint||'—'))+row('来源',c.source==='upload'?'上传':'ACME')+row('状态',stTxt)+
@@ -1519,7 +1505,7 @@ function bindPxRowEvents(){
   });
   $$('#pxCertBody [data-px-certdel]').forEach(b=>b.onclick=()=>{
     const c=(pxData.certs||[]).find(x=>x.id===b.dataset.pxCertdel);
-    openCModal('<h3>删除证书</h3><div class="csub">确认删除上传的证书 '+(c?esc(c.name):'')+'？删除后引用它的规则下次保存时会因证书不存在而报错，需先改规则。</div>'+
+    openCModal('<h3 class="mtitle">删除证书</h3><div class="csub">确认删除上传的证书 '+(c?esc(c.name):'')+'？删除后引用它的规则下次保存时会因证书不存在而报错，需先改规则。</div>'+
     '<div class="fld"><div class="hint" id="cmCertDelErr" style="color:var(--red);min-height:18px"></div></div>'+
     '<div class="cfoot"><button class="btn" id="cmCancel">取消</button><button class="btn dangerfill" id="cmOk">确认删除</button></div>');
     $('#cmCancel').onclick=closeCModal;
@@ -1628,7 +1614,7 @@ async function loadOverview(){
   $('#sessEmpty').style.display=sess.length?'none':'';
   bindConnOps($('#tab-ov'));
 }
-/* 防护页: 急救状态 + 蜜罐 + 端口防护 */
+/* 防护页: 急救状态 + 蜜罐 + 防火墙 */
 async function loadProtection(){
   loadSettings();
   loadHoneypot();
@@ -1758,91 +1744,125 @@ async function hpSave(confirm){
   }catch(e){toast(e.message);loadHoneypot();}
 }
 $('#btnHpSave').onclick=()=>hpSave(false);
-/* 端口防护(第 9 项): 省市搜索多选 + 规则管理 */
-let pgRegions=[],pgSelected=[];
+/* 防火墙: 规则管理 + 添加/编辑对话框 */
+let pgRegions=[],fwCountries=[],fwSAR=['香港','澳门','台湾'];
 async function loadPgRegions(){
   if(pgRegions.length)return;
   try{const r=await api('GET','api/geo/regions');pgRegions=r.regions||[]}catch(e){}
 }
+async function loadFwCountries(){
+  if(fwCountries.length)return;
+  try{const r=await api('GET','api/geo/countries');fwCountries=r.countries||[];if(r.sar)fwSAR=r.sar}catch(e){}
+}
 function pgLocKey(l){return l.kind+'|'+l.name+'|'+(l.province||'')}
 function pgChipHtml(l){return '<span class="pgchip" data-k="'+pgLocKey(l)+'">'+l.display+'<i>×</i></span>'}
-function renderPgFields(){
-  const pf=$('#pgProvField'),cf=$('#pgCityField');
-  const provs=pgSelected.filter(l=>l.kind==='province');
-  const cities=pgSelected.filter(l=>l.kind==='city');
-  pf.innerHTML=provs.length?provs.map(pgChipHtml).join(''):'<span>选择省份…</span>';
-  cf.innerHTML=cities.length?cities.map(pgChipHtml).join(''):'<span>选择城市…</span>';
-  [pf,cf].forEach(f=>f.querySelectorAll('.pgchip').forEach(c=>c.onclick=ev=>{ev.stopPropagation();pgSelected=pgSelected.filter(x=>pgLocKey(x)!==c.dataset.k);renderPgFields();renderPgProvList();renderPgCityList();}));
-}
-function pgRowHtml(r,sel){
-  const k=pgLocKey(r);
-  return '<label class="pgrow"><input type="checkbox" data-k="'+k+'"'+(sel.has(k)?' checked':'')+'><span>'+r.display+'</span></label>';
-}
-function pgBindList(list){
-  const sel=new Set(pgSelected.map(pgLocKey));
-  list.querySelectorAll('input').forEach(cb=>cb.onchange=()=>{
-    const r=pgRegions.find(x=>pgLocKey(x)===cb.dataset.k);if(!r)return;
-    if(cb.checked){if(!sel.has(cb.dataset.k))pgSelected.push(r)}else{pgSelected=pgSelected.filter(x=>pgLocKey(x)!==cb.dataset.k)}
-    renderPgFields();
-  });
-}
-function renderPgProvList(){
-  const q=($('#pgProvSearch').value||'').trim();
-  const list=$('#pgProvList');
-  const sel=new Set(pgSelected.map(pgLocKey));
-  const rows=pgRegions.filter(r=>r.kind==='province'&&(!q||r.display.indexOf(q)>=0||r.name.indexOf(q)>=0));
-  list.innerHTML=rows.map(r=>pgRowHtml(r,sel)).join('')||'<div class="pgrow">没有匹配的省份</div>';
-  pgBindList(list);
-}
-function renderPgCityList(){
-  const q=($('#pgCitySearch').value||'').trim();
-  const list=$('#pgCityList');
-  const sel=new Set(pgSelected.map(pgLocKey));
-  let html='';
-  if(!q){
-    const provs=new Set(pgSelected.filter(l=>l.kind==='province').map(l=>l.name));
-    if(provs.size){
-      const rows=pgRegions.filter(r=>r.kind==='city'&&provs.has(r.province));
-      html=rows.map(r=>pgRowHtml(r,sel)).join('')||'<div class="pgrow">该省暂无城市数据</div>';
-    }else{html='<div class="pgrow" style="color:var(--mut)">先选省份可直接列出该省各市，或输入关键词搜索城市，如 南京、江苏</div>';}
-  }
-  else{
-    const rows=pgRegions.filter(r=>r.kind==='city'&&(r.display.indexOf(q)>=0||r.name.indexOf(q)>=0||(r.province||'').indexOf(q)>=0));
-    html=rows.map(r=>pgRowHtml(r,sel)).join('')||'<div class="pgrow">没有匹配的城市</div>';
-  }
-  list.innerHTML=html;
-  pgBindList(list);
-}
-async function pgToggleDrop(which){
-  await loadPgRegions();
-  const pd=$('#pgProvDrop'),cd=$('#pgCityDrop');
-  const target=which==='prov'?pd:cd,other=which==='prov'?cd:pd;
-  const show=target.style.display==='none';
-  other.style.display='none';
-  target.style.display=show?'':'none';
-  if(show){if(which==='prov'){renderPgProvList();$('#pgProvSearch').focus()}else{renderPgCityList();$('#pgCitySearch').focus()}}
-}
-$('#pgProvField').onclick=()=>pgToggleDrop('prov');
-$('#pgCityField').onclick=()=>pgToggleDrop('city');
-$('#pgProvSearch').oninput=renderPgProvList;
-$('#pgCitySearch').oninput=renderPgCityList;
-document.addEventListener('click',ev=>{
-  const pf=$('#pgProvField'),pd=$('#pgProvDrop'),cf=$('#pgCityField'),cd=$('#pgCityDrop');
-  if(pf&&pd&&!pf.contains(ev.target)&&!pd.contains(ev.target))pd.style.display='none';
-  if(cf&&cd&&!cf.contains(ev.target)&&!cd.contains(ev.target))cd.style.display='none';
-});
 function pgSelFromLocs(locs){
   return (locs||[]).map(l=>{
     const f=pgRegions.find(x=>x.kind===l.kind&&x.name===l.name&&((l.kind!=='city')||x.province===l.province));
     return f?{kind:f.kind,name:f.name,province:f.province||'',display:f.display}:{kind:l.kind,name:l.name,province:l.province||'',display:l.name};
   });
 }
-let pgRulesShown=[];
-let pgEditingId=null;
-function pgResetForm(){
-  $('#pgPorts').value='';$('#pgHours').value='';pgSelected=[];renderPgFields();
-  pgEditingId=null;$('#btnPgAdd').textContent='添加规则';$('#btnPgCancel').style.display='none';
+// 对话框选择态(国家字符串 + 省市条目)
+let fwSelCountries=[],fwSelLocs=[];
+function fwCountryChip(c){return '<span class="pgchip" data-c="'+esc(c)+'">'+esc(c)+'<i>×</i></span>'}
+function renderFwCountryField(){
+  const f=$('#fwCountryField');if(!f)return;
+  f.innerHTML=fwSelCountries.length?fwSelCountries.map(fwCountryChip).join(''):'<span>选择国家…</span>';
+  f.querySelectorAll('.pgchip').forEach(c=>c.onclick=ev=>{ev.stopPropagation();fwSelCountries=fwSelCountries.filter(x=>x!==c.dataset.c);renderFwCountryField();renderFwCountryList();});
 }
+function renderFwLocFields(){
+  const pf=$('#fwProvField'),cf=$('#fwCityField');if(!pf)return;
+  const provs=fwSelLocs.filter(l=>l.kind==='province');
+  const cities=fwSelLocs.filter(l=>l.kind==='city');
+  pf.innerHTML=provs.length?provs.map(pgChipHtml).join(''):'<span>选择省份…</span>';
+  cf.innerHTML=cities.length?cities.map(pgChipHtml).join(''):'<span>选择城市…</span>';
+  [pf,cf].forEach(fd=>fd.querySelectorAll('.pgchip').forEach(c=>c.onclick=ev=>{ev.stopPropagation();fwSelLocs=fwSelLocs.filter(x=>pgLocKey(x)!==c.dataset.k);renderFwLocFields();renderFwProvList();renderFwCityList();}));
+}
+function fwBindList(list,after){
+  list.querySelectorAll('input').forEach(cb=>cb.onchange=()=>{
+    if(cb.dataset.c!==undefined){
+      if(cb.checked){if(!fwSelCountries.includes(cb.dataset.c))fwSelCountries.push(cb.dataset.c)}else{fwSelCountries=fwSelCountries.filter(x=>x!==cb.dataset.c)}
+      renderFwCountryField();
+    }else{
+      const r=pgRegions.find(x=>pgLocKey(x)===cb.dataset.k);if(!r)return;
+      const sel=new Set(fwSelLocs.map(pgLocKey));
+      if(cb.checked){if(!sel.has(cb.dataset.k))fwSelLocs.push(r)}else{fwSelLocs=fwSelLocs.filter(x=>pgLocKey(x)!==cb.dataset.k)}
+      renderFwLocFields();
+    }
+    if(after)after();
+  });
+}
+function fwRowHtml(label,checked,keyAttr){
+  return '<label class="pgrow"><input type="checkbox" '+keyAttr+(checked?' checked':'')+'><span>'+label+'</span></label>';
+}
+function renderFwCountryList(){
+  const q=($('#fwCountrySearch').value||'').trim();const list=$('#fwCountryList');if(!list)return;
+  const sel=new Set(fwSelCountries);
+  const all=[...fwSAR,...fwCountries]; // 港澳台置顶(国家级选项), 再接库原国家字符串
+  const rows=all.filter(c=>!q||c.indexOf(q)>=0);
+  list.innerHTML=rows.map(c=>fwRowHtml(esc(c),sel.has(c),'data-c="'+esc(c)+'"')).join('')||'<div class="pgrow">没有匹配的国家</div>';
+  fwBindList(list);
+}
+function renderFwProvList(){
+  const q=($('#fwProvSearch').value||'').trim();const list=$('#fwProvList');if(!list)return;
+  const sel=new Set(fwSelLocs.map(pgLocKey));
+  const rows=pgRegions.filter(r=>r.kind==='province'&&(!q||r.display.indexOf(q)>=0||r.name.indexOf(q)>=0));
+  list.innerHTML=rows.map(r=>fwRowHtml(r.display,sel.has(pgLocKey(r)),'data-k="'+pgLocKey(r)+'"')).join('')||'<div class="pgrow">没有匹配的省份</div>';
+  fwBindList(list,renderFwCityList);
+}
+function renderFwCityList(){
+  const q=($('#fwCitySearch').value||'').trim();const list=$('#fwCityList');if(!list)return;
+  const sel=new Set(fwSelLocs.map(pgLocKey));
+  let html='';
+  if(!q){
+    const provs=new Set(fwSelLocs.filter(l=>l.kind==='province').map(l=>l.name));
+    if(provs.size){
+      const rows=pgRegions.filter(r=>r.kind==='city'&&provs.has(r.province));
+      html=rows.map(r=>fwRowHtml(r.display,sel.has(pgLocKey(r)),'data-k="'+pgLocKey(r)+'"')).join('')||'<div class="pgrow">该省暂无城市数据</div>';
+    }else{html='<div class="pgrow" style="color:var(--mut)">先选省份可直接列出该省各市，或输入关键词搜索城市，如 南京、江苏</div>';}
+  }else{
+    const rows=pgRegions.filter(r=>r.kind==='city'&&(r.display.indexOf(q)>=0||r.name.indexOf(q)>=0||(r.province||'').indexOf(q)>=0));
+    html=rows.map(r=>fwRowHtml(r.display,sel.has(pgLocKey(r)),'data-k="'+pgLocKey(r)+'"')).join('')||'<div class="pgrow">没有匹配的城市</div>';
+  }
+  list.innerHTML=html;
+  fwBindList(list);
+}
+function fwToggleDrop(which){
+  const drops={country:'#fwCountryDrop',prov:'#fwProvDrop',city:'#fwCityDrop'};
+  for(const k in drops){const d=$(drops[k]);if(d&&k!==which)d.style.display='none'}
+  const t=$(drops[which]);if(!t)return;
+  const show=t.style.display==='none';
+  t.style.display=show?'':'none';
+  if(show){
+    if(which==='country'){renderFwCountryList();$('#fwCountrySearch').focus()}
+    else if(which==='prov'){renderFwProvList();$('#fwProvSearch').focus()}
+    else{renderFwCityList();$('#fwCitySearch').focus()}
+  }
+}
+document.addEventListener('click',ev=>{
+  const pairs=[['#fwCountryField','#fwCountryDrop'],['#fwProvField','#fwProvDrop'],['#fwCityField','#fwCityDrop']];
+  for(const [f,d] of pairs){const fe=$(f),de=$(d);if(fe&&de&&!fe.contains(ev.target)&&!de.contains(ev.target))de.style.display='none'}
+});
+function fwSourceSummary(src){
+  if(!src)return '';
+  switch(src.kind){
+    case 'custom_ip':return src.cidr||'';
+    case 'all_v4':return '全部 IPv4';
+    case 'all_v6':return '全部 IPv6';
+    case 'cn_in':return '中国大陆境内';
+    case 'cn_out':return '中国大陆境外';
+    case 'all':return '全部 IP';
+    case 'custom_loc':{
+      const parts=[...(src.countries||[])];
+      const d=pgSelFromLocs(src.locations).map(l=>l.display).join('、');
+      if(d)parts.push(d);
+      return parts.join('、')||'自定义位置';
+    }
+  }
+  return '';
+}
+function fwProtoLabel(p){return p==='tcp'?'TCP':p==='udp'?'UDP':'全部协议'}
+let pgRulesShown=[];
 async function loadPortGuard(){
   await loadPgRegions();
   let rules=[];
@@ -1852,40 +1872,92 @@ async function loadPortGuard(){
   if(!el)return;
   if(!rules.length){el.innerHTML='<div class="geoline"><span class="dt">暂无规则</span></div>';return}
   el.innerHTML=rules.map(r=>{
-    const locs=pgSelFromLocs(r.locations).map(l=>l.display).join('、');
-    return '<div class="pgcard"><div class="geoline"><span class="st">端口 '+r.ports.join('、')+'</span><span class="dt">仅 '+locs+'</span><span class="dt">'+(r.banHours>0?('封 '+r.banHours+' 小时'):'永久封禁')+'</span><span style="flex:1"></span><label class="sw"><input type="checkbox" data-pg="'+r.id+'"'+(r.enabled?' checked':'')+'><i></i></label><button class="btn sm" data-pgedit="'+r.id+'">编辑</button><button class="btn sm" data-pgdel="'+r.id+'">删除</button></div></div>';
+    let mid,actions;
+    if(r.source){
+      const portTx=(r.portText||'').trim()==='1-65535'?'全部端口':(r.portText||'');
+      mid='<span class="st">端口 '+esc(portTx)+'</span><span class="dt">'+fwProtoLabel(r.proto)+'</span><span class="dt">'+esc(fwSourceSummary(r.source))+'</span><span class="dt"'+(r.action==='deny'?' style="color:var(--red)"':'')+'>'+(r.action==='deny'?'拒绝':'允许')+'</span><span class="dt">'+(r.banHours>0?('封 '+r.banHours+' 小时'):'永久封禁')+'</span>';
+      actions='<button class="btn sm" data-fwedit="'+r.id+'">编辑</button>';
+    }else{
+      // 旧格式(混用版本节点视图): 只读展示, 无编辑(编辑需新版后端)
+      const locs=pgSelFromLocs(r.locations).map(l=>l.display).join('、');
+      mid='<span class="st">端口 '+(r.ports||[]).join('、')+'</span><span class="dt">仅 '+locs+'</span><span class="dt">'+(r.banHours>0?('封 '+r.banHours+' 小时'):'永久封禁')+'</span>';
+      actions='';
+    }
+    return '<div class="pgcard"><div class="geoline">'+mid+'<span style="flex:1"></span><label class="sw"><input type="checkbox" data-pg="'+r.id+'"'+(r.enabled?' checked':'')+'><i></i></label>'+actions+'<button class="btn sm" data-pgdel="'+r.id+'">删除</button></div></div>';
   }).join('');
   el.querySelectorAll('[data-pg]').forEach(cb=>cb.onchange=async()=>{try{await api('PUT','api/portguard/'+cb.dataset.pg,{enabled:cb.checked});toast(cb.checked?'规则已启用':'规则已停用')}catch(e){toast(e.message);cb.checked=!cb.checked}});
-  el.querySelectorAll('[data-pgedit]').forEach(b=>b.onclick=async()=>{
-    await loadPgRegions();
-    const r=pgRulesShown.find(x=>x.id===b.dataset.pgedit);if(!r)return;
-    pgEditingId=r.id;
-    $('#pgPorts').value=r.ports.join(',');
-    $('#pgHours').value=String(r.banHours);
-    pgSelected=pgSelFromLocs(r.locations);renderPgFields();
-    $('#btnPgAdd').textContent='保存修改';$('#btnPgCancel').style.display='';
-  });
-  el.querySelectorAll('[data-pgdel]').forEach(b=>b.onclick=async()=>{try{await api('DELETE','api/portguard/'+b.dataset.pgdel);toast('规则已删除');if(pgEditingId===b.dataset.pgdel)pgResetForm();loadPortGuard()}catch(e){toast(e.message)}});
+  el.querySelectorAll('[data-fwedit]').forEach(b=>b.onclick=()=>openFwDialog(pgRulesShown.find(x=>x.id===b.dataset.fwedit)));
+  el.querySelectorAll('[data-pgdel]').forEach(b=>b.onclick=async()=>{try{await api('DELETE','api/portguard/'+b.dataset.pgdel);toast('规则已删除');loadPortGuard()}catch(e){toast(e.message)}});
 }
-$('#btnPgCancel').onclick=pgResetForm;
-$('#btnPgAdd').onclick=async()=>{
-  await loadPgRegions();
-  const portsText=$('#pgPorts').value.trim();
-  if(!portsText)return toast('请填写端口');
-  if(!pgSelected.length)return toast('请至少选择一个省或市');
-  const hv=$('#pgHours').value.trim();
-  const banHours=hv==='' ? 24 : +hv;
-  if(banHours<0||banHours>8760)return toast('封禁时长须在 0-8760 小时之间（0 = 永久）');
-  try{
-    if(pgEditingId){
-      await api('PUT','api/portguard/'+pgEditingId,{portsText,locations:pgSelected.map(l=>({kind:l.kind,name:l.name,province:l.province||''})),banHours});
-      pgResetForm();toast('规则已修改');loadPortGuard();
-    }else{
-      await api('POST','api/portguard',{portsText,locations:pgSelected.map(l=>({kind:l.kind,name:l.name,province:l.province||''})),banHours});
-      pgResetForm();toast('规则已添加');loadPortGuard();
+async function openFwDialog(rule){
+  await loadPgRegions();await loadFwCountries();
+  const isNew=!rule;
+  fwSelCountries=rule&&rule.source&&rule.source.kind==='custom_loc'?[...(rule.source.countries||[])]:[];
+  fwSelLocs=rule&&rule.source&&rule.source.kind==='custom_loc'?pgSelFromLocs(rule.source.locations):[];
+  const srcKind=rule&&rule.source?rule.source.kind:'custom_loc';
+  const srcCidr=rule&&rule.source?rule.source.cidr||'':'';
+  const html='<h3 class="mtitle">'+(isNew?'添加规则':'编辑规则')+'</h3><div class="csub">端口被任一生效规则覆盖即受防护；多条命中时拒绝优先于允许；无规则命中时按受防护端口默认封禁；内网、回环与信任名单永远豁免。</div>'+
+  '<div class="fld"><label>网络连接</label><select id="fwNet"><option value="all">全部（所有网卡入站连接）</option></select><div class="hint">规则适用于全部网卡的入站连接</div></div>'+
+  '<div class="fld"><label>通信协议</label><select id="fwProto"><option value="all">全部</option><option value="tcp">TCP</option><option value="udp">UDP</option></select></div>'+
+  '<div class="fld"><label>端口</label><input id="fwPorts" placeholder="如 80,443 或 8000-8010" value="'+esc(rule?rule.portText||'':'')+'"><div class="hint">单个、逗号分隔、或范围（如 1-65535）</div></div>'+
+  '<div class="fld"><label>来源范围</label><select id="fwSrcKind"><option value="custom_ip">自定义 IP</option><option value="all_v4">全部 IPv4</option><option value="all_v6">全部 IPv6</option><option value="cn_in">中国大陆境内</option><option value="cn_out">中国大陆境外</option><option value="custom_loc">自定义位置</option><option value="all">全部 IP</option></select><div class="hint">中国大陆境内 = 国家是中国且省份不在香港、澳门、台湾；境外模式下港澳台可访问；自定义位置的“中国”不含港澳台，港澳台请单独选</div></div>'+
+  '<div class="fld" id="fwIpRow"><label>IP 或 CIDR</label><input id="fwCidr" placeholder="如 0.0.0.0/0 或 8.8.8.8" value="'+esc(srcCidr)+'"></div>'+
+  '<div id="fwLocRow">'+
+  '<div class="fld"><label>国家（多选，港澳台置顶）</label><div class="pgwrap"><div id="fwCountryField" class="pgfield" tabindex="0"><span>选择国家…</span></div><div id="fwCountryDrop" class="pgdrop" style="display:none"><input id="fwCountrySearch" class="pgsearch" placeholder="搜索国家…"><div id="fwCountryList"></div></div></div></div>'+
+  '<div class="fld"><label>省市自治区（多选，沿用省份选择器）</label><div class="pgpair"><div class="pgwrap"><div id="fwProvField" class="pgfield" tabindex="0"><span>选择省份…</span></div><div id="fwProvDrop" class="pgdrop" style="display:none"><input id="fwProvSearch" class="pgsearch" placeholder="搜索省份…"><div id="fwProvList"></div></div></div>'+
+  '<div class="pgwrap"><div id="fwCityField" class="pgfield" tabindex="0"><span>选择城市…</span></div><div id="fwCityDrop" class="pgdrop" style="display:none"><input id="fwCitySearch" class="pgsearch" placeholder="搜索城市或省份，如 南京、江苏…"><div id="fwCityList"></div></div></div></div></div>'+
+  '</div>'+
+  '<div class="fld"><label>动作</label><div><label style="margin-right:16px"><input type="radio" name="fwAction" value="allow"'+(rule&&rule.action==='deny'?'':' checked')+'> 允许</label><label><input type="radio" name="fwAction" value="deny"'+(rule&&rule.action==='deny'?' checked':'')+'> 拒绝</label></div></div>'+
+  '<div class="fld"><label>状态</label><div><label style="margin-right:16px"><input type="radio" name="fwEnabled" value="1"'+(rule&&!rule.enabled?'':' checked')+'> 生效</label><label><input type="radio" name="fwEnabled" value="0"'+(rule&&!rule.enabled?' checked':'')+'> 禁用</label></div></div>'+
+  '<div class="fld"><label>封禁时长</label><input type="number" id="fwHours" min="0" max="8760" placeholder="24" value="'+(rule?String(rule.banHours):'')+'"><div class="hint">小时；0 = 永久，留空 = 24 小时</div></div>'+
+  '<div class="sline fail" id="fwErr" style="display:none"></div>'+
+  '<div class="cfoot"><button class="btn" id="fwCancel">取消</button><button class="btn primary" id="fwOk">'+(isNew?'添加':'保存')+'</button></div>';
+  openCModal(html);
+  $('#fwProto').value=rule?rule.proto||'all':'all';
+  $('#fwSrcKind').value=srcKind;
+  const fwSyncSrcRow=()=>{const k=$('#fwSrcKind').value;$('#fwIpRow').style.display=k==='custom_ip'?'':'none';$('#fwLocRow').style.display=k==='custom_loc'?'':'none';};
+  fwSyncSrcRow();
+  $('#fwSrcKind').onchange=fwSyncSrcRow;
+  $('#fwCountryField').onclick=()=>fwToggleDrop('country');
+  $('#fwProvField').onclick=()=>fwToggleDrop('prov');
+  $('#fwCityField').onclick=()=>fwToggleDrop('city');
+  $('#fwCountrySearch').oninput=renderFwCountryList;
+  $('#fwProvSearch').oninput=renderFwProvList;
+  $('#fwCitySearch').oninput=renderFwCityList;
+  renderFwCountryField();renderFwLocFields();
+  $('#fwCancel').onclick=closeCModal;
+  $('#fwOk').onclick=async()=>{
+    const errEl=$('#fwErr');
+    const fail=m=>{errEl.style.display='';errEl.textContent=m};
+    const portText=$('#fwPorts').value.trim();
+    if(!portText)return fail('请填写端口');
+    const proto=$('#fwProto').value;
+    const kind=$('#fwSrcKind').value;
+    const src={kind};
+    if(kind==='custom_ip'){
+      src.cidr=$('#fwCidr').value.trim();
+      if(!src.cidr)return fail('请填写 IP 或 CIDR');
+    }else if(kind==='custom_loc'){
+      src.countries=[...fwSelCountries];
+      src.locations=fwSelLocs.map(l=>({kind:l.kind,name:l.name,province:l.province||''}));
+      if(!src.countries.length&&!src.locations.length)return fail('自定义位置请至少选一个国家或省市');
     }
-  }catch(e){toast(e.message)}
-};
+    const action=document.querySelector('input[name="fwAction"]:checked').value;
+    const enabled=document.querySelector('input[name="fwEnabled"]:checked').value==='1';
+    const hv=$('#fwHours').value.trim();
+    const banHours=hv==='' ? 24 : +hv;
+    if(!(banHours>=0&&banHours<=8760))return fail('封禁时长须在 0-8760 小时之间（0 = 永久）');
+    try{
+      if(isNew){
+        await api('POST','api/portguard',{portText,proto,source:src,action,banHours});
+      }else{
+        await api('PUT','api/portguard/'+rule.id,{portText,proto,source:src,action,banHours,enabled});
+      }
+      closeCModal();toast(isNew?'规则已添加':'规则已修改');loadPortGuard();
+    }catch(e){fail(e.message)}
+  };
+}
+$('#btnFwAdd').onclick=()=>openFwDialog(null);
 $('#hpOn').onchange=()=>{
   if(!$('#hpOn').checked)return;
   openPop($('#hpOn'),'<div class="pt">⚠️ 谨慎开启蜜罐</div><div class="pw" style="white-space:normal;font-size:12.5px;line-height:1.7">1. 先改默认端口（重中之重）：SSH 和 webui 必须已改离默认端口（建议 50000 以上高位）。<br>2. 必须在软路由上把蜜罐端口转发到 NAS 本机，否则 0 命中不是坏了，是没转发；蜜罐别走雷池。<br>3. 蜜罐端口绝不能是真服务端口（分层校验会拦截）。<br>4. 蜜罐不提供真实服务，也不仿真登录页面；数据只记录、不执行。<br>5. 批量扫描量很大，报警量上涨是正常的。<br>6. 建议先只开 1～2 个试效果，不要一次全开。</div>'+
@@ -2040,7 +2112,7 @@ $('#btnScan').onclick=async e=>{
 /* ---------- 事件 ---------- */
 const EVTYPES=[['','全部'],['ssh_login','SSH 登录'],['ssh_fail','SSH 失败'],['ui_login','UI 登录'],['new_conn','新连接'],['new_src','新来源'],['new_listener','新监听'],['autoban','自动拉黑'],['port_flood','端口洪峰'],['ban','拉黑'],['unban','解除拉黑']];
 const EVCOLOR={ssh_login:['#e8f5ee','#1d7a4c'],ssh_fail:['#fdeeee','#c0392b'],ui_login:['#eaf0fe','#2456c8'],new_conn:['#e6f7fa','#0e7490'],new_src:['#f0f9ff','#0369a1'],new_listener:['#fdf3e3','#b45309'],autoban:['#fdeeee','#c0392b'],port_flood:['#fdeeee','#c0392b'],port_scan:['#fdf3e3','#b45309'],honeypot_hit:['#fdf3e3','#b45309'],honeypot_ban:['#fdeeee','#c0392b'],honeypot_status:['#f0f9ff','#0369a1'],ban:['#f1f5f9','#475569'],unban:['#eef6ee','#3f7d4e']};
-const EVLAB={ssh_login:'SSH 登录',ssh_fail:'SSH 失败',ui_login:'UI 登录',new_conn:'新连接',new_src:'新来源',new_listener:'新监听',autoban:'自动拉黑',port_flood:'端口洪峰',port_scan:'端口扫描',honeypot_hit:'蜜罐命中',honeypot_ban:'蜜罐封禁',honeypot_status:'蜜罐状态',portguard_ban:'端口防护封禁',ban:'拉黑',unban:'解除拉黑'};
+const EVLAB={ssh_login:'SSH 登录',ssh_fail:'SSH 失败',ui_login:'UI 登录',new_conn:'新连接',new_src:'新来源',new_listener:'新监听',autoban:'自动拉黑',port_flood:'端口洪峰',port_scan:'端口扫描',honeypot_hit:'蜜罐命中',honeypot_ban:'蜜罐封禁',honeypot_status:'蜜罐状态',portguard_ban:'防火墙封禁',ban:'拉黑',unban:'解除拉黑'};
 let evType='',evShown=0,evTotal=0;
 function evRow(ev){const c=EVCOLOR[ev.type]||EVCOLOR.ban;
   return '<tr><td class="mono">'+fmtTs(ev.ts)+'</td><td><span class="evtag" style="background:'+c[0]+';color:'+c[1]+'">'+(EVLAB[ev.type]||ev.type)+'</span></td>'+
@@ -2115,7 +2187,8 @@ async function loadBans(){
     const st=STM[b.status]||STM.active;
     const when=b.status==='released'?(b.releasedAt?fmtTs(b.releasedAt*1000):'—'):(b.until>0?fmtTs(b.until*1000):'永久');
     const dim=b.status==='active'?'':' style="opacity:.55"';
-    const scope=(b.ports&&b.ports.length)?'（仅端口 '+b.ports.join('、')+'）':'';
+    const fmtRanges=rs=>{if(!rs||!rs.length)return '';if(rs.length===1&&rs[0][0]===1&&rs[0][1]===65535)return '全部端口';return rs.map(r=>r[0]===r[1]?String(r[0]):r[0]+'-'+r[1]).join('、')};
+    const scope=(b.ports&&b.ports.length)?'（仅端口 '+b.ports.join('、')+'）':((b.scopes&&b.scopes.length)?'（规则端口 '+b.scopes.map(s=>fmtRanges(s.ranges)).join('；')+'）':'');
     return '<tr'+dim+'><td><span class="ipcell">'+esc(b.ip)+'</span></td><td class="geocell mono" title="'+esc(b.geo||'')+'">'+esc(b.geo||'')+'</td><td>'+esc(b.reason||'')+esc(scope)+'</td><td class="mono">'+esc(b.source||'')+'</td>'+
      '<td><span class="tag" style="color:'+st[1]+';border-color:'+st[1]+'">'+st[0]+'</span></td><td class="mono">'+when+'</td>'+
      '<td>'+(b.status==='active'?'<button class="btn sm" data-unban="'+esc(b.ip)+'">解封</button>':'')+'</td></tr>'}).join('');
@@ -2150,7 +2223,7 @@ const ALERTROWS=[
  ['sAlUi','alertUiLogin','面板登录成功','有人登录面板就推送'],
  ['sAlConn','alertNewConnStar','重点端口新连接','同一 IP 同一端口每天最多推 1 条（重复只记事件）'],
  ['sAlFlood','alertPortFlood','重点端口洪峰','触发洪峰防护、端口被临时关闭时推送（分布式爆破）'],
- ['sAlPgBan','alertPortGuardBan','端口防护封禁','白名单外 IP 被端口防护封禁时推送（带解除封禁按钮）'],
+ ['sAlPgBan','alertPortGuardBan','防火墙封禁','白名单外 IP 被防火墙封禁时推送（带解除封禁按钮）'],
  ['sAlHpHit','alertHoneypotHit','蜜罐命中报警','蜜罐端口被命中、触发封禁时推送；同一 IP 10 分钟内命中只报一次'],
  ['sAlLis','alertNewListener','新监听端口出现','新端口持续出现后推送'],
  ['sAlMute','alertMuteInternal','内网访问不通知','开启后内网来源只记录、不推送（默认关）']];
@@ -2752,7 +2825,7 @@ $('#btnTotpSetup').onclick=async()=>{
   }catch(e){toast(e.message)}
 };
 function openTotpModal(r){
-  openCModal('<h3>开通二次验证（2FA）</h3><div class="csub">用验证器 App 扫码，或手动输入密钥；然后输入一次动态码开通。开通后会给出 10 个一次性恢复码，请妥善保存（只显示一次）。开通后换 IP 或换设备才需再次输动态码，同 IP 同设备凭密码直接登。</div>'+
+  openCModal('<h3 class="mtitle">开通二次验证（2FA）</h3><div class="csub">用验证器 App 扫码，或手动输入密钥；然后输入一次动态码开通。开通后会给出 10 个一次性恢复码，请妥善保存（只显示一次）。开通后换 IP 或换设备才需再次输动态码，同 IP 同设备凭密码直接登。</div>'+
   '<div style="text-align:center;margin-bottom:12px"><img id="cmTotpQR" src="'+esc(r.qr||'')+'" style="width:200px;height:200px;border:1px solid var(--line);border-radius:12px"></div>'+
   '<div class="fld"><label>手动密钥（可复制）</label><div style="display:flex;gap:8px"><input id="cmTotpSecret" readonly value="'+esc(r.secret||'')+'" style="flex:1"><button class="btn" id="cmTotpCopy">复制</button><button class="btn" id="cmTotpRefresh">换一个</button></div><div class="hint">每次打开与每次刷新都会重新随机生成，不是固定默认值</div></div>'+
   '<div class="fld"><label>动态码</label><input id="cmTotpCode" placeholder="6 位动态码" autocomplete="one-time-code"></div>'+
@@ -2806,7 +2879,7 @@ $('#btnPanelSave').onclick=async()=>{
   catch(e){toast(e.message)}
 };
 $('#btnPanelPwChange').onclick=()=>{
-  openCModal('<h3>修改密码</h3><div class="csub">改密后其他登录全部失效，当前登录保留。新密码 12 位起，含大写、小写、数字、符号。</div>'+
+  openCModal('<h3 class="mtitle">修改密码</h3><div class="csub">改密后其他登录全部失效，当前登录保留。新密码 12 位起，含大写、小写、数字、符号。</div>'+
   '<div class="fld"><label>当前密码</label><input type="password" id="cmPwCur" autocomplete="current-password"></div>'+
   '<div class="fld"><label>新密码</label><input type="password" id="cmPwNew" autocomplete="new-password"></div>'+
   '<div class="fld"><label>再次输入新密码</label><input type="password" id="cmPwNew2" autocomplete="new-password"></div>'+

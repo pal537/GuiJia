@@ -101,22 +101,22 @@ func TestUIUnifyGroups(t *testing.T) {
 	html := unifyHTML(t)
 	unifyMust(t, html,
 		".grp-head{",
-		`<div class="grp-head">建议与须知</div>`,
-		`<div class="grp-head">端口防护</div>`,
-		`<div class="grp-head">行为检测</div>`,
-		`<div class="grp-head">应急与情报</div>`,
-		`<div class="grp-head">登录与面板</div>`,
-		`<div class="grp-head">通知</div>`,
-		`<div class="grp-head">报警与统计</div>`,
-		`<div class="grp-head">数据与维护</div>`,
-		`<div class="grp-head">版本</div>`,
+		`<div class="grp-head mtitle">建议与须知</div>`,
+		`<div class="grp-head mtitle">防火墙</div>`,
+		`<div class="grp-head mtitle">行为检测</div>`,
+		`<div class="grp-head mtitle">应急与情报</div>`,
+		`<div class="grp-head mtitle">登录与面板</div>`,
+		`<div class="grp-head mtitle">通知</div>`,
+		`<div class="grp-head mtitle">报警与统计</div>`,
+		`<div class="grp-head mtitle">数据与维护</div>`,
+		`<div class="grp-head mtitle">版本</div>`,
 		`.scard .savebar,.panel .savebar{border-top:1px solid var(--line)`,
 	)
 	// 分组眉题不得打乱防护卡顺序(与 TestProtCardOrder 同口径)。
 	sec := html[strings.Index(html, `<section id="tab-prot"`):]
 	sec = sec[:strings.Index(sec, `<section id="tab-proxy"`)]
-	for _, h3 := range []string{"安全建议", "端口防护 ", "重点端口洪峰防护 ", "爆破自动拉黑", "扫描识别 ", "蜜罐 ", "急救 ", "威胁情报 "} {
-		if !strings.Contains(sec, "<h3>"+h3) {
+	for _, h3 := range []string{"安全建议", "防火墙", "重点端口洪峰防护 ", "爆破自动拉黑", "扫描识别 ", "蜜罐 ", "急救 ", "威胁情报 "} {
+		if !strings.Contains(sec, `<h3 class="mtitle">`+h3) {
 			t.Errorf("防护页应有卡片 %q", h3)
 		}
 	}

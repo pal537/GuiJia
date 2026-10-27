@@ -129,7 +129,8 @@ func init() {
 		"192.175.48.0/24", "198.18.0.0/15", "198.51.100.0/24",
 		"203.0.113.0/24", "224.0.0.0/4", "240.0.0.0/4",
 		"::/128", "::1/128", "64:ff9b::/96", "100::/64",
-		"2001:db8::/32", "fc00::/7", "fe80::/10",
+		"2001::/32", "2001:2::/48", "2001:10::/28",
+		"2001:db8::/32", "fc00::/7", "fe80::/10", "ff00::/8",
 	} {
 		if _, n, err := net.ParseCIDR(c); err == nil {
 			intelReservedNets = append(intelReservedNets, n)
@@ -137,9 +138,33 @@ func init() {
 	}
 }
 
-// intelOverlapsReserved: 候选条目(已归一化的 CIDR 或裸 IP)是否与
-// 任一保留段重叠。双向判定: 候选网段地址落在保留段内, 或候选网段
-// 包含保留段地址(超网如 126.0.0.0/7 含 127/8 也必须滤掉)。
+// isDocRange: 文档示例段(写进 RFC 的测试地址, 公网不可达, 全库测试
+// 固件都用它)。bannable 特意放行, 否则 203.0.113.x 的测试固件全灭;
+// 生产入站来源不可能是文档段, 放行不影响真实防护。情报名单过滤
+// (intelOverlapsReserved)不走这条例外, 文档段仍不进情报集合。
+func isDocRange(ip net.IP) bool {
+	for _, c := range []string{"192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/32"} {
+		if _, n, err := net.ParseCIDR(c); err == nil && n.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// isReservedIP: 该 IP 是否落在任一 IANA 特殊用途段(文档段除外)。
+// 供 bannable 守门: 保留段永远不封禁, 不依赖 Go 的 IsPrivate() 是否
+// 含 100.64/10 这类边界(实测 100.64.0.1 在旧守门下可封, 已补)。
+func isReservedIP(ip net.IP) bool {
+	if ip == nil || isDocRange(ip) {
+		return false
+	}
+	for _, r := range intelReservedNets {
+		if r.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
 func intelOverlapsReserved(ln string) bool {
 	if strings.Contains(ln, "/") {
 		_, n, err := net.ParseCIDR(ln)

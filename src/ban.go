@@ -12,7 +12,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -27,9 +26,31 @@ type Ban struct {
 	Status     string `json:"status"`               // active|expired|released, 见下方常量
 	ReleasedAt int64  `json:"releasedAt,omitempty"` // 解封时间(状态变 released 时记)
 	Offenses   int    `json:"offenses,omitempty"`   // 自动封禁累计次数(递进阶梯用, 手动/TG 不碰)
-	// Ports 作用域(端口防护用): 为空 = 全局封禁(全部端口); 非空 = 仅封这些端口。
+	// Ports 作用域(旧端口防护遗留): 为空 = 全局封禁(全部端口); 非空 = 仅封这些端口。
 	// 一 IP 仍只一条记录, 全局与按端口互斥: 全局生效时按端口记录不再单独存在。
 	Ports []int `json:"ports,omitempty"`
+	// Scopes 作用域(防火墙规则用): 每条 = 一条规则下的端口范围。
+	// Ports 为空且 Scopes 非空 = 仅封这些规则的端口(不是全局)。
+	// 旧记录只有 Ports, 新记录只有 Scopes, 两者可并存(旧记录后来又被新规则封)。
+	Scopes []BanScope `json:"scopes,omitempty"`
+}
+
+// BanScope: 一条防火墙规则在某封禁记录上的作用域。Ranges 是该规则
+// 封禁时(或编辑后, 以最新规则为准)的端口范围; 规则删除后 Ranges 仍
+// 在记录里, 内核对齐不依赖规则存在, 删除规则不自动解封。
+type BanScope struct {
+	RuleID string   `json:"ruleId"`
+	Ranges [][2]int `json:"ranges"`
+}
+
+// scopeCovers: 该作用域是否覆盖指定端口。
+func (s BanScope) covers(port int) bool {
+	for _, r := range s.Ranges {
+		if port >= r[0] && port <= r[1] {
+			return true
+		}
+	}
+	return false
 }
 
 // 黑名单记录状态(PAPA 2026-10-24 硬规矩): 记录永不丢失, 到期/解封只改状态;
@@ -176,6 +197,7 @@ func ensureSetAndRule() bool {
 	}
 	fwLinkOK = ok
 	ensurePortGuardSets()
+	ensureFWSets()
 	syncTrustedSets() // 信任名单进内核集合, 看门狗每分钟跑一次即自愈漂移
 	return ok
 }
@@ -485,6 +507,12 @@ func upsertBanLocked(ip, reason, source string, hours int) *Ban {
 		}
 		b.Ports = nil
 	}
+	if len(b.Scopes) > 0 {
+		for _, s := range b.Scopes {
+			fwDelElement(ip, s.RuleID)
+		}
+		b.Scopes = nil
+	}
 	b.Reason, b.Source, b.CreatedAt = reason, source, now.Unix()
 	b.Status, b.ReleasedAt, b.Until = BanActive, 0, 0
 	if hours > 0 {
@@ -495,10 +523,13 @@ func upsertBanLocked(ip, reason, source string, hours int) *Ban {
 	return b
 }
 
-// upsertScopedBanLocked 按端口封禁(端口防护用, 调用方须持有 banMu)。
-// 返回 (记录, 是否新封): 已全局生效的 IP 直接返回旧记录、不重复封(全局更广)。
-// 已按端口生效的合并端口并集; 未生效的复活为按端口记录。只改状态与封禁字段。
-func upsertScopedBanLocked(ip, reason, source string, hours int, ports []int) (*Ban, bool) {
+// upsertRuleBanLocked 按防火墙规则封禁(调用方须持有 banMu)。
+// 返回 (记录, 是否新封): 已全局生效的 IP 直接返回旧记录、不重复封
+// (全局更广)。同一规则已生效则只刷新时长与原因, 不重复事件;
+// 同一 IP 被另一规则封则追加 Scopes(多规则并存, 不新开记录)。
+// 只改状态与封禁字段。ranges 是规则当时的端口范围(存入记录, 规则
+// 删除后仍可对齐, 删除规则不自动解封)。
+func upsertRuleBanLocked(ip, reason, source string, hours int, ruleID string, ranges [][2]int) (*Ban, bool) {
 	now := time.Now()
 	var b *Ban
 	for _, x := range bans {
@@ -509,45 +540,43 @@ func upsertScopedBanLocked(ip, reason, source string, hours int, ports []int) (*
 	}
 	if b != nil {
 		normBanStatus(b, now.Unix())
-		if b.enforced(now.Unix()) && len(b.Ports) == 0 {
-			return b, false // 已全局封禁, 按端口无需再封
+		if b.enforced(now.Unix()) && len(b.Ports) == 0 && len(b.Scopes) == 0 {
+			return b, false // 已全局封禁, 规则封禁无需再封
 		}
 	}
 	if b == nil {
 		b = &Ban{IP: ip}
 		bans = append([]*Ban{b}, bans...)
 	}
-	merged := map[int]bool{}
-	for _, p := range b.Ports {
-		merged[p] = true
+	fresh := true
+	for i, s := range b.Scopes {
+		if s.RuleID == ruleID {
+			// 同规则已在记录里: 刷新范围与时长, 不算新封(避免重复事件/TG)
+			b.Scopes[i].Ranges = append([][2]int{}, ranges...)
+			fresh = false
+			break
+		}
 	}
-	for _, p := range ports {
-		merged[p] = true
+	if fresh {
+		b.Scopes = append(b.Scopes, BanScope{RuleID: ruleID, Ranges: append([][2]int{}, ranges...)})
 	}
-	b.Ports = nil
-	for p := range merged {
-		b.Ports = append(b.Ports, p)
-	}
-	sort.Ints(b.Ports)
 	b.Reason, b.Source, b.CreatedAt = reason, source, now.Unix()
 	b.Status, b.ReleasedAt, b.Until = BanActive, 0, 0
 	if hours > 0 {
 		b.Until = now.Add(time.Duration(hours) * time.Hour).Unix()
 	}
-	for _, p := range b.Ports {
-		pgAddElement(ip, p, banKernelTimeout(b, now.Unix()))
-	}
+	fwAddElement(ip, ruleID, banKernelTimeout(b, now.Unix()))
 	saveBans()
-	return b, true
+	return b, fresh
 }
 
-func applyScopedBan(ip, reason, source string, hours int, ports []int) (*Ban, bool, error) {
+func applyRuleBan(ip, reason, source string, hours int, ruleID string, ranges [][2]int) (*Ban, bool, error) {
 	if ok, why := bannable(ip); !ok {
 		return nil, false, fmt.Errorf("%s", why)
 	}
 	banMu.Lock()
 	defer banMu.Unlock()
-	b, fresh := upsertScopedBanLocked(ip, reason, source, hours, ports)
+	b, fresh := upsertRuleBanLocked(ip, reason, source, hours, ruleID, ranges)
 	return b, fresh, nil
 }
 
@@ -608,11 +637,13 @@ func releaseBan(ip string) bool {
 			b.ReleasedAt = now
 			saveBans()
 			if was {
-				if len(ports) > 0 {
-					for _, p := range ports {
-						pgDelElement(ip, p)
-					}
-				} else {
+				for _, p := range ports {
+					pgDelElement(ip, p)
+				}
+				for _, s := range b.Scopes {
+					fwDelElement(ip, s.RuleID)
+				}
+				if len(ports) == 0 && len(b.Scopes) == 0 {
 					nftDelElement(ip)
 				}
 			}
@@ -693,11 +724,12 @@ func isBanned(ip string) bool {
 	return false
 }
 
-// isGloballyBanned 该 IP 是否被全局封禁(全部端口)。按端口封禁不算全局,
-// 因此自动拉黑/蜜罐/扫描的全局封禁判定必须用它, 不能用 isBanned。
+// isGloballyBanned 该 IP 是否被全局封禁(全部端口)。按端口/按规则封禁
+// 不算全局, 因此自动拉黑/蜜罐/扫描的全局封禁判定必须用它, 不能用 isBanned。
+// 注意: Ports 为空但 Scopes 非空是规则作用域, 不是全局, 必须同时判空。
 func isGloballyBanned(ip string) bool {
 	for _, b := range activeBans() {
-		if b.IP == ip && len(b.Ports) == 0 {
+		if b.IP == ip && len(b.Ports) == 0 && len(b.Scopes) == 0 {
 			return true
 		}
 	}
@@ -705,16 +737,22 @@ func isGloballyBanned(ip string) bool {
 }
 
 // isBannedFor 该 IP 是否在指定端口上被封禁(全局封禁覆盖全部端口)。
+// 旧 Ports 记录与新 Scopes 记录都判: 任一覆盖即算封禁。
 func isBannedFor(ip string, port int) bool {
 	for _, b := range activeBans() {
 		if b.IP != ip {
 			continue
 		}
-		if len(b.Ports) == 0 {
+		if len(b.Ports) == 0 && len(b.Scopes) == 0 {
 			return true
 		}
 		for _, p := range b.Ports {
 			if p == port {
+				return true
+			}
+		}
+		for _, s := range b.Scopes {
+			if s.covers(port) {
 				return true
 			}
 		}
@@ -800,4 +838,5 @@ func reconcileBans() {
 		}
 	}
 	reconcilePortGuard()
+	reconcileFirewall()
 }

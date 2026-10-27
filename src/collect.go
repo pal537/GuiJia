@@ -177,8 +177,8 @@ func ctConns(eff map[int]bool) []Conn {
 	if err != nil {
 		return nil
 	}
-	// 生效端口 = 清单/监听(入参) ∪ 范围覆盖(位图, 不展开)
-	has := func(p int) bool { return eff[p] || rangeCovered(p) }
+	// 生效端口 = 清单/监听(入参) ∪ 范围覆盖(位图, 不展开) ∪ 防火墙规则覆盖
+	has := func(p int, proto string) bool { return eff[p] || rangeCovered(p) || fwCoversPort(p, proto) }
 	locals := localIPSet()
 	out := []Conn{}
 	agg := map[string]*Conn{} // 同一对端在同一端口可能有多条流(不同源端口), 字节按对端聚合
@@ -249,12 +249,12 @@ func ctConns(eff map[int]bool) []Conn {
 		var peerPort, wport int
 		inbound := false
 		switch {
-		case locals[dstIP] && has(dport):
+		case locals[dstIP] && has(dport, proto):
 			peer, peerPort, wport = srcIP, sport, dport // 入站: 对端 -> 本机端口(终结或转发给容器)
 			inbound = true
-		case locals[srcIP] && has(sport):
+		case locals[srcIP] && has(sport, proto):
 			peer, peerPort, wport = dstIP, dport, sport // 外连: 本机以监听端口为源端口连出
-		case has(sport):
+		case has(sport, proto):
 			// 本机容器(桥接网络, 源 IP 是容器内网 IP)以服务端口为源端口外连
 			if pip := net.ParseIP(srcIP); pip != nil && isPrivateIP(pip) {
 				peer, peerPort, wport = dstIP, dport, sport
@@ -378,17 +378,9 @@ func effPorts() (map[int]*PortWatch, map[int]string) {
 		}
 		eff[port] = &PortWatch{Port: port, Proto: "tcp", Name: proc, Source: "scan", Kind: guessKind(port, proc)}
 	}
-	// 端口防护的端口必须可见(防护优先于忽略): 未监听/被忽略的防护端口也纳入,
-	// 否则采集循环看不到它, 防护无从触发。
-	for port := range guardPorts() {
-		if eff[port] == nil {
-			name := "端口防护"
-			if proc := lst[port]; proc != "" {
-				name = proc
-			}
-			eff[port] = &PortWatch{Port: port, Proto: "tcp", Name: name, Source: "portguard", Kind: "other"}
-		}
-	}
+	// 防火墙覆盖的端口不再展开进 eff(1-65535 会爆炸): 采集层用
+	// fwCoversPort() 查范围覆盖, 未监听/被忽略的防护端口照样可见
+	// (见 ctConns 的 has 与 handle 的合成条目)。
 	return eff, lst
 }
 
@@ -407,6 +399,12 @@ func sampleConns() {
 			// 范围覆盖的端口不在 eff 表里(范围不展开): 查位图合成条目
 			if rp := lookupPort(c.DstPort); rp != nil {
 				pw, ok = rp, true
+			}
+		}
+		if !ok {
+			// 防火墙覆盖的端口不在 eff 表里: 合成条目, 让防火墙检查跑起来
+			if fwCoversPort(c.DstPort, c.Proto) {
+				pw, ok = &PortWatch{Port: c.DstPort, Proto: c.Proto, Name: "防火墙", Source: "firewall", Kind: "other"}, true
 			}
 		}
 		if !ok {
@@ -433,8 +431,9 @@ func sampleConns() {
 		if exists {
 			return
 		}
-		// 端口防护(第 9 项): 新连接先过省市白名单, 白名单外按端口封禁
-		portGuardCheck(c.SrcIP, c.DstPort)
+		// 防火墙: 新连接先过规则, 拒绝命中按规则端口封禁、允许命中放行、
+		// 无命中按受防护端口默认封禁(拒绝优先于允许)
+		portGuardCheck(c.SrcIP, c.DstPort, c.Proto)
 		// 扫描识别(第 5 项): 新 TCP 连接先喂给扫描跟踪
 		if c.Proto == "tcp" {
 			scanObserve(c.SrcIP, c.DstPort, now)

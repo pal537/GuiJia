@@ -440,7 +440,7 @@ func handleBans(w http.ResponseWriter, r *http.Request) {
 			out = append(out, map[string]any{
 				"ip": b.IP, "until": b.Until, "reason": b.Reason,
 				"source": b.Source, "createdAt": b.CreatedAt, "geo": geoLookup(b.IP).Text,
-				"status": b.Status, "releasedAt": b.ReleasedAt, "ports": b.Ports,
+				"status": b.Status, "releasedAt": b.ReleasedAt, "ports": b.Ports, "scopes": b.Scopes,
 			})
 		}
 		writeJSON(w, 200, out)

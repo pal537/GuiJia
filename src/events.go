@@ -144,7 +144,7 @@ type DayStats struct {
 	SSHLogins    int            `json:"sshLogins"`
 	SSHFails     int            `json:"sshFails"`
 	UILogins     int            `json:"uiLogins"`
-	Bans         int            `json:"bans"`         // 今日拉黑次数 = 今日封禁动作数：手动、TG、面板爆破、SSH 爆破、扫描、蜜罐、端口防护的成功封禁各计 1 次
+	Bans         int            `json:"bans"`         // 今日拉黑次数 = 今日封禁动作数：手动、TG、面板爆破、SSH 爆破、扫描、蜜罐、防火墙的成功封禁各计 1 次
 	HoneypotBans int            `json:"honeypotBans"` // 今日蜜罐封禁：今日拉黑里的蜜罐明细（已含在 Bans 总数里，明细 ≤ 总数）
 	Sources      map[string]int `json:"sources"`      // 来源IP -> 当日新连接对数
 }
@@ -203,7 +203,7 @@ func statsOnEvent(ev Event) {
 		ds.UILogins++
 	case "ban", "autoban", "portguard_ban":
 		// 今日拉黑 = 今日全部封禁动作数：手动、TG、面板爆破、SSH 爆破、
-		// 扫描、端口防护的成功封禁各计 1 次；解封（unban）不计。
+		// 扫描、防火墙的成功封禁各计 1 次；解封（unban）不计。
 		ds.Bans++
 	case "honeypot_ban":
 		// 蜜罐封禁同时计入总数与明细（明细 ≤ 总数）；蜜罐 handler 不再

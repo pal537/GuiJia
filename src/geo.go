@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -109,6 +110,7 @@ func geoLoadV4Embedded() {
 		geoMu.Lock()
 		geoV4 = r
 		geoMu.Unlock()
+		geoCountriesInvalidate()
 	}
 }
 
@@ -129,6 +131,7 @@ func geoLoadV4File(path string) bool {
 	geoMu.Lock()
 	geoV4 = r
 	geoMu.Unlock()
+	geoCountriesInvalidate()
 	return true
 }
 
@@ -157,6 +160,7 @@ func geoLoadV6(path string) bool {
 	geoMu.Lock()
 	geoV6 = r
 	geoMu.Unlock()
+	geoCountriesInvalidate()
 	return true
 }
 
@@ -255,4 +259,79 @@ func geoCacheStore(ip string, g GeoInfo) {
 	}
 	geoCache[ip] = g
 	geoCacheMu.Unlock()
+}
+
+// ---------- 国家枚举(防火墙自定义位置的国家多选数据源) ----------
+
+var (
+	geoCountriesCache []string
+	geoCountriesMu    sync.Mutex
+)
+
+func geoCountriesInvalidate() {
+	geoCountriesMu.Lock()
+	geoCountriesCache = nil
+	geoCountriesMu.Unlock()
+}
+
+// geoCountries: 库里全部国家字符串(去重排序, 排除 "0"、空与 Reserved)。
+// v4 内嵌库必有; v6 库已下载时一并枚举。结果缓存, 换库时失效。
+// 港澳台在库里是省份不是国家, 不在此列, 前端另加三个国家级选项。
+func geoCountries() []string {
+	geoMu.RLock()
+	r4, r6 := geoV4, geoV6
+	geoMu.RUnlock()
+	if r4 == nil {
+		geoLoadV4Embedded()
+		geoMu.RLock()
+		r4, r6 = geoV4, geoV6
+		geoMu.RUnlock()
+	}
+	geoCountriesMu.Lock()
+	defer geoCountriesMu.Unlock()
+	if geoCountriesCache != nil {
+		return geoCountriesCache
+	}
+	set := map[string]bool{}
+	geoWalkCountries(r4, set)
+	geoWalkCountries(r6, set)
+	list := []string{}
+	for c := range set {
+		list = append(list, c)
+	}
+	sort.Strings(list)
+	geoCountriesCache = list
+	return list
+}
+
+func geoWalkCountries(r *xdbReader, set map[string]bool) {
+	if r == nil {
+		return
+	}
+	for idx := 0; idx < 65536; idx++ {
+		vo := r.headerLen + idx*8
+		if vo+8 > len(r.data) {
+			continue
+		}
+		sPtr := binary.LittleEndian.Uint32(r.data[vo:])
+		ePtr := binary.LittleEndian.Uint32(r.data[vo+4:])
+		if sPtr >= ePtr {
+			continue
+		}
+		for off := int(sPtr); off+r.segLen <= int(ePtr); off += r.segLen {
+			seg := r.data[off : off+r.segLen]
+			dlen := int(binary.LittleEndian.Uint16(seg[r.ipLen*2:]))
+			dptr := int(binary.LittleEndian.Uint32(seg[r.ipLen*2+2:]))
+			if dptr+dlen > len(r.data) {
+				continue
+			}
+			raw := string(r.data[dptr : dptr+dlen])
+			if i := strings.IndexByte(raw, '|'); i >= 0 {
+				c := raw[:i]
+				if c != "" && c != "0" && c != "Reserved" {
+					set[c] = true
+				}
+			}
+		}
+	}
 }

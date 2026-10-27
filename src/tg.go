@@ -21,7 +21,7 @@ type tgMsg struct {
 	text    string
 	ip      string // 非空时附拉黑按钮
 	banOK   bool
-	unbanOK bool // 非空时附解封按钮(端口防护封禁用: 只解封, 不加信任)
+	unbanOK bool // 非空时附解封按钮(防火墙封禁用: 只解封, 不加信任)
 }
 
 var tgQueue = make(chan tgMsg, 100)
@@ -200,7 +200,7 @@ func eventTitle(t string) string {
 	case "honeypot_status":
 		return "蜜罐状态"
 	case "portguard_ban":
-		return "端口防护封禁"
+		return "防火墙封禁"
 	}
 	return t
 }

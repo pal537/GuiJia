@@ -187,28 +187,28 @@ func TestModalNoToast(t *testing.T) {
 	}
 }
 
-// TestProtCardOrder: 防护页端口防护卡置顶到五项防护最前面（洪峰之前），
-// 安全建议与急救等其他卡位置不动。
+// TestProtCardOrder: 防护页防火墙卡置顶到五项防护最前面（洪峰之前），
+// 安全建议与急救等其他卡位置不动。组标题一律走共享类 mtitle。
 func TestProtCardOrder(t *testing.T) {
 	html := string(indexHTML)
 	sec := html[strings.Index(html, `<section id="tab-prot"`):]
 	sec = sec[:strings.Index(sec, `<section id="tab-proxy"`)]
 	idx := func(h3 string) int {
-		i := strings.Index(sec, "<h3>"+h3)
+		i := strings.Index(sec, `<h3 class="mtitle">`+h3)
 		if i < 0 {
 			t.Fatalf("防护页应有卡片 %q", h3)
 		}
 		return i
 	}
 	safe := idx("安全建议")
-	pg := idx("端口防护 ")
+	pg := idx("防火墙")
 	flood := idx("重点端口洪峰防护 ")
 	autoban := idx("爆破自动拉黑")
 	scan := idx("扫描识别 ")
 	honey := idx("蜜罐 ")
 	rescue := idx("急救 ")
 	if !(safe < pg && pg < flood && flood < autoban && autoban < scan && scan < honey && honey < rescue) {
-		t.Errorf("防护页卡顺序应为 安全建议 < 端口防护 < 洪峰 < 爆破 < 扫描 < 蜜罐 < 急救，实际下标 %d %d %d %d %d %d %d",
+		t.Errorf("防护页卡顺序应为 安全建议 < 防火墙 < 洪峰 < 爆破 < 扫描 < 蜜罐 < 急救，实际下标 %d %d %d %d %d %d %d",
 			safe, pg, flood, autoban, scan, honey, rescue)
 	}
 }

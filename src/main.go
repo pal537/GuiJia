@@ -373,6 +373,13 @@ func bannable(ip string) (bool, string) {
 	if isPrivateIP(pip) {
 		return false, "内网/回环地址不可拉黑"
 	}
+	// 保留段(100.64/10 CGNAT、198.18/15 基准测试、240/4 未来用、
+	// 224/4 组播、ff00::/8 组播等)永远不封禁: 公网不可达的地址不
+	// 可能是真实入站来源, 封了只会误伤本机/运营商段。文档段除外
+	// (见 isDocRange, 测试固件用)。
+	if isReservedIP(pip) {
+		return false, "保留地址段不可拉黑"
+	}
 	if isTrusted(ip) {
 		return false, "该 IP 在信任名单中"
 	}
@@ -531,6 +538,7 @@ func main() {
 	mux.HandleFunc("/api/portguard", handlePortGuard)
 	mux.HandleFunc("/api/portguard/", handlePortGuardItem)
 	mux.HandleFunc("/api/geo/regions", handleGeoRegions)
+	mux.HandleFunc("/api/geo/countries", handleGeoCountries)
 	mux.HandleFunc("/api/geo/check/status", handleGeoCheckStatus)
 	mux.HandleFunc("/api/settings", handleSettings)
 	mux.HandleFunc("/api/data/clear", handleDataClear)
