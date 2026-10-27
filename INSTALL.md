@@ -59,11 +59,10 @@ journalctl -u guijia -f
 
 ## 方式三: Docker 安装
 
-要求: 已装 Docker 与 docker compose 插件, root 跑容器。
+要求: 已装 git、Docker 与 docker compose 插件, root(或 docker 组)跑容器。仓库目前没有发布 Docker Hub 镜像, 所以 Docker 方式是本地构建, 一条命令拉仓库 + 构建 + 启动:
 
 ```bash
-cd guijia
-docker compose up -d
+git clone https://github.com/pal537/GuiJia.git && cd GuiJia && docker compose up -d --build
 ```
 
 compose 说明(host 网络 + NET_ADMIN 是必需的, 见 docker-compose.yml 内注释):

@@ -119,13 +119,33 @@ systemctl restart guijia
 
 装完必验：`sha256sum /usr/local/bin/guijia` 与 releases 一致，`systemctl is-active guijia` 为 active，面板本地 `curl http://127.0.0.1:59188/login` 为 200。
 
-### Docker 方式
+### Docker 方式（一键命令）
+
+前置：已装 git、Docker 与 compose 插件，root（或 docker 组）运行。仓库目前没有发布 Docker Hub 镜像，所以 Docker 方式是本地构建，一条命令拉仓库 + 构建 + 启动：
 
 ```bash
-docker compose up -d
+git clone https://github.com/pal537/GuiJia.git && cd GuiJia && docker compose up -d --build
 ```
 
-host 网络 + NET_ADMIN 是必需的；不要与 systemd 双跑（同一台机上双跑会抢端口与 nft 表）。Docker 方式细节见 `INSTALL.md`。
+这条命令会：克隆仓库 → 本地多阶段构建镜像（golang 构建，标准库 only）→ host 网络 + NET_ADMIN 启动容器。装完打开 `http://服务器IP:59188`，设管理员密码后二选一（独立用 / 进群控），与 systemd 方式一致。
+
+可配（`docker compose up -d` 前传环境变量）：
+
+```bash
+GUIJIA_PORT=59188 GUIJIA_DATA_DIR=/srv/guijia docker compose up -d --build
+```
+
+默认数据在仓库目录下的 `guijia-data`；端口默认 59188（host 网络下即宿主机端口）。
+
+管理（在 GuiJia 目录下执行）：
+
+```bash
+docker compose logs -f
+docker restart guijia
+docker compose down
+```
+
+注意：不要与 systemd 双跑（同一台机上双跑会抢端口与 nft 表）。Docker 方式下宿主机 SSH 日志探测与蜜罐容器探测受限（容器默认读容器内 `/var/log`，未挂 docker.sock），细节见 `INSTALL.md`。
 
 ### 注意
 
