@@ -517,26 +517,38 @@ func normalizeTrustEntry(t string) (string, bool) {
 
 // 信任条目很少, flush 窗口可忽略; 失败只记日志, 看门狗下一轮 ensure
 // 会重建集合与规则, 下一次信任变更或设置保存会重新同步。
-// syncTrustedSets 把设置里的信任名单同步进内核集合(flush 后重写)。
-func syncTrustedSets() {
-	if dryBan {
-		return
-	}
+// trustSetLists 内核信任集合的条目来源: 设置名单 + (勾选“信任全部内网 IP”时)
+// 四段标准私网范围, 归一化后去重(第 6 项: 标志位隐式信任, 绝不写进列表)。
+func trustSetLists() (v4, v6 []string) {
 	mu.Lock()
 	list := append([]string{}, settings.TrustedIPs...)
+	trustLAN := settings.TrustLAN
 	mu.Unlock()
-	var v4, v6 []string
+	if trustLAN {
+		list = append(list, stdPrivateCIDRs...)
+	}
+	seen := map[string]bool{}
 	for _, t := range list {
 		nt, ok := normalizeTrustEntry(t)
-		if !ok {
+		if !ok || seen[nt] {
 			continue
 		}
+		seen[nt] = true
 		if strings.Contains(nt, ":") {
 			v6 = append(v6, nt)
 		} else {
 			v4 = append(v4, nt)
 		}
 	}
+	return v4, v6
+}
+
+// syncTrustedSets 把设置里的信任名单同步进内核集合(flush 后重写)。
+func syncTrustedSets() {
+	if dryBan {
+		return
+	}
+	v4, v6 := trustSetLists()
 	ensureTrustedSetsAndRules()
 	for _, job := range []struct {
 		set string

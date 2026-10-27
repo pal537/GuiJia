@@ -11,6 +11,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -167,6 +168,10 @@ func groupSyncPayloadFor(group string) map[string]any {
 
 // syncGroupToNode 推一组名单给一台节点(经内部命令通道)。
 // 返回 (成功与否, 详情): 节点离线/通道异常都算失败, 不抛错给调用方。
+// 超时语义(第 2 项): 同步命令给 90 秒结果等待(大名单落内核可能超过默认
+// 20 秒); 90 秒仍超时不直接判失败, 先读节点共享状态核实——已应用则报
+// 成功, 未应用则利用幂等(按 IP 去重)安全重试一次、再核实一次, 仍未应用
+// 才报失败。状态行只报核实后的结果, 不把“慢”报成“失败”。
 func syncGroupToNode(group, fp string) (bool, string) {
 	// whitelist 组只发白名单、blacklist 组只发黑名单(节点侧另一组留空即不动)。
 	var body map[string]any
@@ -176,21 +181,44 @@ func syncGroupToNode(group, fp string) (bool, string) {
 		body = map[string]any{"blacklist": groupSyncPayloadFor(group)["blacklist"]}
 	}
 	bb, _ := json.Marshal(body)
-	status, respBody, errKind := hubCallNodeInternal(fp, "POST", "api/sync/apply-lists", bb, true)
-	if errKind != "" {
-		switch errKind {
-		case "offline":
-			return false, "节点离线"
-		case "nochan":
-			return false, "节点未建立命令通道"
-		case "timeout":
-			return false, "节点响应超时"
-		default:
-			return false, errKind
+	if ok, detail, needVerify := syncGroupAttempt(group, fp, bb); needVerify {
+		if applied, _ := verifyGroupSyncApplied(group, fp, body); applied {
+			return true, "已应用（超时后核实）"
 		}
+		if ok2, detail2, needVerify2 := syncGroupAttempt(group, fp, bb); needVerify2 {
+			if applied, _ := verifyGroupSyncApplied(group, fp, body); applied {
+				return true, "已应用（超时后核实）"
+			}
+			return false, "节点响应超时"
+		} else if ok2 {
+			return true, detail2
+		} else {
+			return false, detail2
+		}
+	} else if ok {
+		return true, detail
+	} else {
+		return false, detail
+	}
+}
+
+// syncResultWait 同步命令结果等待(默认 90 秒, 单测可调小模拟慢节点)。
+var syncResultWait = 90 * time.Second
+
+// verifyResultWait 核实读结果等待(默认 30 秒, 单测可调小)。
+var verifyResultWait = 30 * time.Second
+
+// syncGroupAttempt 发一次同步命令: 返回 (成功, 详情, 是否超时需核实)。
+func syncGroupAttempt(group, fp string, bb []byte) (bool, string, bool) {
+	status, respBody, errKind := hubCallNodeInternalTimeout(fp, "POST", "api/sync/apply-lists", bb, true, syncResultWait)
+	if errKind != "" {
+		if errKind == "timeout" {
+			return false, "", true
+		}
+		return false, proxyErrMessage(fp, errKind), false
 	}
 	if status < 200 || status >= 300 {
-		return false, fmt.Sprintf("节点返回 %d", status)
+		return false, fmt.Sprintf("节点返回 %d", status), false
 	}
 	var v struct {
 		Blacklist map[string]int `json:"blacklist"`
@@ -198,9 +226,124 @@ func syncGroupToNode(group, fp string) (bool, string) {
 	}
 	_ = json.Unmarshal(respBody, &v)
 	if group == "whitelist" {
-		return true, fmt.Sprintf("新增 %d, 移除 %d, 跳过 %d", v.Whitelist["added"], v.Whitelist["removed"], v.Whitelist["skipped"])
+		return true, fmt.Sprintf("新增 %d, 移除 %d, 跳过 %d", v.Whitelist["added"], v.Whitelist["removed"], v.Whitelist["skipped"]), false
 	}
-	return true, fmt.Sprintf("新增 %d, 更新 %d, 跳过 %d", v.Blacklist["added"], v.Blacklist["updated"], v.Blacklist["skipped"])
+	return true, fmt.Sprintf("新增 %d, 更新 %d, 跳过 %d", v.Blacklist["added"], v.Blacklist["updated"], v.Blacklist["skipped"]), false
+}
+
+// sharedStateResp 节点共享状态快照(超时后核实读的返回体)。
+type sharedStateResp struct {
+	Blacklist []sharedStateBan `json:"blacklist"`
+	Whitelist []string         `json:"whitelist"`
+	// 核实黑名单时复算节点视角的 bannable 跳过用: 节点完整信任名单与 LAN 标志。
+	Trust    []string `json:"trust"`
+	TrustLAN bool     `json:"trustLan"`
+}
+
+// sharedStateBan 节点侧一条共享黑名单的生效状态(enforced=当前是否在内核生效)。
+type sharedStateBan struct {
+	IP       string `json:"ip"`
+	Enforced bool   `json:"enforced"`
+}
+
+// verifyGroupSyncApplied 超时后核实: 读一次节点共享状态, 比对本次发送的组是否已收敛。
+// 返回 (已应用, 核实失败原因): 核实读本身失败时原因非空(调用方直接报核实失败,
+// 不把“不知道”说成“失败”); 核实读成功但未收敛时原因空(调用方可安全重试)。
+// 黑名单收敛语义: 发 active 的须在节点生效, 发 released/expired 的须不在节点生效
+// (节点对从未有过的 released/expired 不建记录, 缺席即等效于未生效)。
+// 白名单收敛语义: 节点 shared 标记集合须与发送集合相等(节点侧按 shared 标记收敛)。
+func verifyGroupSyncApplied(group, fp string, body map[string]any) (bool, string) {
+	status, respBody, errKind := hubCallNodeInternalTimeout(fp, "GET", "api/sync/shared-state", nil, true, verifyResultWait)
+	if errKind != "" || status < 200 || status >= 300 {
+		return false, "节点响应超时（核实失败）"
+	}
+	var st sharedStateResp
+	if json.Unmarshal(respBody, &st) != nil {
+		return false, "节点响应超时（核实失败）"
+	}
+	return groupSyncVerifyState(group, body, st), ""
+}
+
+// groupSyncVerifyState 纯比对: 发送组是否已在节点共享状态里收敛(供单测与核实共用)。
+func groupSyncVerifyState(group string, body map[string]any, st sharedStateResp) bool {
+	if group == "whitelist" {
+		want, _ := body["whitelist"].([]string)
+		wantSet := map[string]bool{}
+		for _, ip := range want {
+			wantSet[ip] = true
+		}
+		if len(st.Whitelist) != len(wantSet) {
+			return false
+		}
+		for _, ip := range st.Whitelist {
+			if !wantSet[ip] {
+				return false
+			}
+		}
+		return true
+	}
+	entries, _ := body["blacklist"].([]map[string]any)
+	nodeEnforced := map[string]bool{}
+	for _, b := range st.Blacklist {
+		nodeEnforced[b.IP] = b.Enforced
+	}
+	for _, e := range entries {
+		ip, _ := e["ip"].(string)
+		stt, _ := e["status"].(string)
+		if ip == "" {
+			continue
+		}
+		if stt == "active" {
+			// 节点视角的合法跳过(内网/回环、节点本地信任、非法格式):
+			// 应用侧会跳过这些条目, 核实同样跳过, 不算未应用。
+			if nodeWouldSkipActive(ip, st) {
+				continue
+			}
+			if !nodeEnforced[ip] {
+				return false
+			}
+		} else if stt == "released" || stt == "expired" {
+			if nodeEnforced[ip] {
+				return false
+			}
+		}
+		// 未知状态: 应用侧跳过, 核实同样跳过。
+	}
+	return true
+}
+
+// nodeWouldSkipActive 节点视角的 bannable 跳过: 与节点应用侧的预过滤一致
+// (内网/回环不可拉黑、信任名单不可拉黑、非法格式跳过)。
+func nodeWouldSkipActive(ip string, st sharedStateResp) bool {
+	pip := net.ParseIP(strings.TrimSpace(ip))
+	if pip == nil {
+		return true
+	}
+	if isPrivateIP(pip) {
+		return true
+	}
+	return ipInTrustList(ip, st.Trust, st.TrustLAN)
+}
+
+// ipInTrustList IP 是否在给定信任名单里(精确匹配或 CIDR 包含; trustLAN 时
+// 四段标准私网范围同样算信任)。纯函数, 供核实与单测用。
+func ipInTrustList(ip string, list []string, trustLAN bool) bool {
+	if trustLAN && isStdPrivateIP(ip) {
+		return true
+	}
+	for _, t := range list {
+		if t == ip {
+			return true
+		}
+		if strings.Contains(t, "/") {
+			if _, n, err := net.ParseCIDR(t); err == nil {
+				if pip := net.ParseIP(ip); pip != nil && n.Contains(pip) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // syncGroupToAllOnline 推一组名单给全部在线节点, 返回 (成功数, 总数, 明细)。

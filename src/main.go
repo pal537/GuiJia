@@ -111,6 +111,7 @@ type Settings struct {
 	TrafficAcct       bool     `json:"trafficAcct"`         // 每连接流量统计: 应用自动打开内核字节计数, 默认开
 	LedgerKeepDays    int      `json:"ledgerKeepDays"`      // 流量每日明细保留天数, 默认7; 0=永久保留(永久累计不受此设置影响)
 	TrustedIPs        []string `json:"trustedIps"`          // 信任名单: 不报警、不可拉黑
+	TrustLAN          bool     `json:"trustLan"`            // 信任全部内网 IP: 四段标准私网范围隐式信任, 绝不写进列表(第 6 项)
 	RescuePassHash    string   `json:"rescuePassHash"`      // 急救超级密码哈希(GET 时剥离, 永不外泄; 只能由专用接口改)
 	AuthLogPath       string   `json:"authLogPath"`         // SSH 日志路径: 为空 = 自动识别 auth.log/secure
 	PanelBanThreshold int      `json:"panelBanThreshold"`   // 面板防爆破阈值: 连续错几次封 IP, 默认 5(可调, 时长固定 7 天)
@@ -313,9 +314,40 @@ func findPort(port int) *PortWatch {
 	return nil
 }
 
+// stdPrivateCIDRs 信任全部内网 IP 的四段标准私网范围(与旧按钮填入的四段一致)。
+var stdPrivateCIDRs = []string{"192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12", "fc00::/7"}
+
+var stdPrivateNets = func() []*net.IPNet {
+	var out []*net.IPNet
+	for _, c := range stdPrivateCIDRs {
+		if _, n, err := net.ParseCIDR(c); err == nil {
+			out = append(out, n)
+		}
+	}
+	return out
+}()
+
+// isStdPrivateIP 是否落在四段标准私网范围(解析失败一律不算)。
+func isStdPrivateIP(ip string) bool {
+	pip := net.ParseIP(ip)
+	if pip == nil {
+		return false
+	}
+	for _, n := range stdPrivateNets {
+		if n.Contains(pip) {
+			return true
+		}
+	}
+	return false
+}
+
 func isTrusted(ip string) bool {
 	mu.Lock()
 	defer mu.Unlock()
+	// 信任全部内网 IP(第 6 项): 勾选后标准私网段隐式信任, 列表里有没有都不影响。
+	if settings.TrustLAN && isStdPrivateIP(ip) {
+		return true
+	}
 	for _, t := range settings.TrustedIPs {
 		if t == ip {
 			return true
@@ -540,10 +572,12 @@ func main() {
 	mux.HandleFunc("/api/nodes/location", handleNodeLocation)
 	mux.HandleFunc("/api/nodes/upgrade-push-status", handleNodeUpgradePushStatus)
 	mux.HandleFunc("/api/nodes/backup-download", handleNodeBackupDownload)
+	mux.HandleFunc("/api/nodes/tg-test", handleNodeTGTest)
 	mux.HandleFunc("/api/group-sync/settings", handleGroupSyncSettings)
 	mux.HandleFunc("/api/group-sync/now", handleGroupSyncNow)
 	mux.HandleFunc("/api/backup/export", handleBackupExport)
 	mux.HandleFunc("/api/sync/apply-lists", handleSyncApplyLists)
+	mux.HandleFunc("/api/sync/shared-state", handleSyncSharedState)
 	mux.HandleFunc("/api/local-info", handleLocalInfo)
 	mux.HandleFunc("/api/nodes/hello", linkLimit(handleNodeHello))
 	mux.HandleFunc("/api/nodes/challenge", linkLimit(handleNodeChallenge))

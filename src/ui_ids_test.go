@@ -63,7 +63,7 @@ func TestUIIDs(t *testing.T) {
 		"sessCard",              // 总览当前登录会话卡片(节点视图隐藏)
 		"ntTokenRow",            // 节点 TG 独立 Token 行(仅独立模式显示)
 		"ntChatRow",             // 节点 TG 独立 Chat ID 行(仅独立模式显示)
-		"ntTestRow",             // 节点 TG 连通性测试行(仅独立模式显示)
+		"ntTestRow",             // 节点 TG 连通性测试行(两种模式都显示, 走主服务器时经主服务器 bot 发)
 		"ntApplyModeVisibility", // 节点 TG 模式显隐函数
 		"btnPairGoHome",         // 批准成功后配对卡内“去首页”按钮
 		"已添加 ",                  // 批准成功提示文案

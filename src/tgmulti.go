@@ -341,6 +341,75 @@ func handleNodeTGModeTest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
+// handleNodeTGTest 走主服务器模式的节点连通性测试(第 4 项): 面板直接调主服务器
+// 本机接口(不走代理链路, 路径 /api/nodes/tg-test), 经主服务器 bot 发、标题带
+// 节点名; 主服务器未配 TG 时明确报错, 不谎称已发送。10 秒节流与独立测试一致。
+func handleNodeTGTest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	var in struct {
+		Fingerprint string `json:"fingerprint"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil || !validFingerprint(in.Fingerprint) {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	fp := strings.ToLower(in.Fingerprint)
+	hubMu.Lock()
+	s := findHubServer(fp)
+	name := ""
+	if s != nil {
+		name = s.Name
+	}
+	hubMu.Unlock()
+	if s == nil {
+		errJSON(w, 404, "没有该节点")
+		return
+	}
+	token, chat := tgActiveToken(), tgActiveChatID()
+	if token == "" || chat == "" {
+		errJSON(w, 400, "主服务器未配置 Telegram")
+		return
+	}
+	cid, err := strconv.ParseInt(chat, 10, 64)
+	if err != nil {
+		errJSON(w, 400, "主服务器 Chat ID 格式不对")
+		return
+	}
+	if name == "" {
+		name = fp[:8]
+	}
+	tgTestMu.Lock()
+	if time.Since(tgTestLast) < 10*time.Second {
+		tgTestMu.Unlock()
+		errJSON(w, 429, tgRateMsg)
+		return
+	}
+	tgTestLast = time.Now()
+	tgTestMu.Unlock()
+	out, err := tgAPICall(token, "sendMessage", map[string]any{
+		"chat_id": cid, "text": "【" + name + "】连通性测试：主服务器 bot 投递正常。",
+		"disable_web_page_preview": true,
+	}, 15*time.Second)
+	if err != nil {
+		errJSON(w, 400, "连接 Telegram 失败: "+err.Error())
+		return
+	}
+	if out != nil {
+		if ok, _ := out["ok"].(bool); !ok {
+			if d, _ := out["description"].(string); d != "" {
+				errJSON(w, 400, "Telegram 返回: "+d)
+				return
+			}
+			errJSON(w, 400, "Telegram 返回失败")
+			return
+		}
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
 // tgModeTestSend 独立通知连通性测试(走 tgAPICall, 单测可 mock)。
 func tgModeTestSend(token, chatID string) string {
 	if token == "" || chatID == "" {

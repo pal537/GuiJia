@@ -196,12 +196,58 @@ func applySharedTrust(hubList []string) (added, removed, skipped int, changed bo
 }
 
 // handleSyncApplyLists 节点侧群控同步落地接口: 只认内部头, 其余一律 403。
-// 路径 /api/sync/apply-lists 在面板代理放行集内, 但面板代理的命令不带
-// 内部头, 故面板用户调它只会拿到 403, 无法伪造同步。
+// handleSyncSharedState 超时后核实读(第 2 项): 返回节点当前共享状态,
+// 与 apply-lists 同 guard(只认 X-Guijia-Internal 头, 面板代理调它只会 403)。
+// 黑名单只含 Source=="shared" 的记录(enforced=当前是否在内核生效);
+// 白名单只含 shared 标记且仍在信任名单里的条目; 另带节点完整信任名单与
+// LAN 标志, 供主服务器核实黑名单时复算节点视角的 bannable 跳过。
+func handleSyncSharedState(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		errJSON(w, 405, "method")
+		return
+	}
+	if r.Header.Get("X-Guijia-Internal") != "1" {
+		errJSON(w, 403, "仅主服务器内部同步可调用")
+		return
+	}
+	now := time.Now().Unix()
+	banMu.Lock()
+	bl := []sharedStateBan{}
+	for _, b := range bans {
+		if b == nil || b.Source != "shared" {
+			continue
+		}
+		bl = append(bl, sharedStateBan{IP: b.IP, Enforced: b.enforced(now)})
+	}
+	banMu.Unlock()
+	sl := loadSharedLists()
+	mu.Lock()
+	shared := []string{}
+	marked := map[string]bool{}
+	for _, t := range sl.SharedTrust {
+		marked[t] = true
+	}
+	for _, t := range settings.TrustedIPs {
+		if marked[t] {
+			shared = append(shared, t)
+		}
+	}
+	resp := sharedStateResp{
+		Blacklist: bl,
+		Whitelist: shared,
+		Trust:     append([]string{}, settings.TrustedIPs...),
+		TrustLAN:  settings.TrustLAN,
+	}
+	mu.Unlock()
+	writeJSON(w, 200, resp)
+}
+
 // 关键语义: 只应用请求里出现的组, 缺席的组绝不动——主服务器按组单发
 // (一次只推黑名单或只推白名单), 若把缺席组当空列表收敛, 单组同步会
 // 清空另一组的共享状态(双机实测抓到的真 bug: 黑名单同步后白名单被
 // 清空, 靠 5 分钟 ticker 重推才恢复, 绝不能依赖这种自愈)。
+// 路径 /api/sync/apply-lists 在面板代理放行集内, 但面板代理的命令不带
+// 内部头, 故面板用户调它只会拿到 403, 无法伪造同步。
 func handleSyncApplyLists(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		errJSON(w, 405, "method")

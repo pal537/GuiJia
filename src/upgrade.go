@@ -830,6 +830,15 @@ const pushGraceSec = 120
 // pushTimeoutSec 推送超时: 5 分钟未到目标版即判失败。
 const pushTimeoutSec = 300
 
+// nodePushUpgrading 该节点是否有进行中的推送升级任务(重启窗口内,
+// 供代理报错文案区分“可能正在重启”, 第 4 项)。
+func nodePushUpgrading(fp string) bool {
+	pushMu.Lock()
+	defer pushMu.Unlock()
+	j := pushJobs[fp]
+	return j != nil && j.State == "upgrading"
+}
+
 func pushJobPublic(j *pushJob) map[string]any {
 	return map[string]any{
 		"fingerprint": j.Fingerprint, "name": j.Name, "state": j.State,

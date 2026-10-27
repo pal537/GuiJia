@@ -987,11 +987,56 @@ func hubCallNode(fp, method, path string, body json.RawMessage) (int, []byte, st
 	return hubCallNodeInternal(fp, method, path, body, false)
 }
 
-// hubCallNodeInternal 命令通道通用发送: internal=true 时跳过面板代理放行
+// hubCallNodeTimeout 读类调用: 结果等待可加长(代理读默认 45 秒), 供超时重试用。
+func hubCallNodeTimeout(fp, method, path string, body json.RawMessage, resultWait time.Duration) (int, []byte, string) {
+	return hubCallNodeInternalTimeout(fp, method, path, body, false, resultWait)
+}
+
+// proxyErrMessage 命令通道失败文案(第 4 项): 区分离线、重启中与超时, 不再一律写响应超时。
+// 节点刚推送升级重启中(任务 upgrading)或刚还在线却无命令通道(可能正在重启)时, 明确说可能正在重启。
+func proxyErrMessage(fp, kind string) string {
+	switch kind {
+	case "notfound":
+		return "没有该节点"
+	case "offline":
+		return "节点离线"
+	case "nochan":
+		if nodePushUpgrading(fp) {
+			return "节点可能正在重启（刚推送升级），请稍后再试"
+		}
+		hubMu.Lock()
+		s := findHubServer(fp)
+		last := int64(0)
+		if s != nil {
+			last = s.LastSeen
+		}
+		hubMu.Unlock()
+		if last > 0 && time.Now().Unix()-last <= 120 {
+			return "节点可能正在重启，请稍后再试"
+		}
+		return "节点未建立命令通道"
+	case "timeout":
+		if nodePushUpgrading(fp) {
+			return "节点可能正在重启（刚推送升级），请稍后再试"
+		}
+		return "节点响应超时"
+	default:
+		return kind
+	}
+}
+
+// hubCallNodeInternal 命令通道通用发送: 默认 20 秒结果等待。
+func hubCallNodeInternal(fp, method, path string, body json.RawMessage, internal bool) (int, []byte, string) {
+	return hubCallNodeInternalTimeout(fp, method, path, body, internal, 20*time.Second)
+}
+
+// hubCallNodeInternalTimeout 命令通道通用发送: internal=true 时跳过面板代理放行
 // 集检查(只给主服务器内部命令用, 如群控同步; 面板代理一律走 false)。
 // 内部命令执行时节点侧打 X-Guijia-Internal 头, 内部接口只认该头,
 // 面板用户无法伪造(代理入口不接受 internal 字段)。
-func hubCallNodeInternal(fp, method, path string, body json.RawMessage, internal bool) (int, []byte, string) {
+// resultWait 为节点回结果的最长等待: 同步大名单用 90 秒, 代理读用 45 秒,
+// 其余默认 20 秒。超时后调用方自行核实或重试, 本函数只报告 timeout。
+func hubCallNodeInternalTimeout(fp, method, path string, body json.RawMessage, internal bool, resultWait time.Duration) (int, []byte, string) {
 	if !internal && !isProxyablePath(path) {
 		return 403, []byte(`{"error":"该接口不允许跨节点调用"}`), ""
 	}
@@ -1048,7 +1093,7 @@ func hubCallNodeInternal(fp, method, path string, body json.RawMessage, internal
 			res.Status = 502
 		}
 		return res.Status, res.Body, ""
-	case <-time.After(20 * time.Second):
+	case <-time.After(resultWait):
 		cleanup()
 		return 504, nil, "timeout"
 	}
@@ -1185,15 +1230,18 @@ func handleNodeProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status, respBody, errKind := hubCallNode(fp, in.Method, in.Path, in.Body)
+	if errKind == "timeout" && in.Method == "GET" {
+		// 读类调用幂等: 超时先给更长等待重试一次(节点可能正忙或刚重启,
+		// 重试拿到结果即算成功, 不再把“慢”报成“失败”)。
+		status, respBody, errKind = hubCallNodeTimeout(fp, in.Method, in.Path, in.Body, 45*time.Second)
+	}
 	switch errKind {
-	case "notfound":
-		errJSON(w, 404, "没有该节点")
-	case "offline":
-		errJSON(w, 502, "节点离线")
-	case "nochan":
-		errJSON(w, 502, "节点未建立命令通道")
-	case "timeout":
-		errJSON(w, 504, "节点响应超时")
+	case "notfound", "offline", "nochan", "timeout":
+		code := 502
+		if errKind == "timeout" {
+			code = 504
+		}
+		errJSON(w, code, proxyErrMessage(fp, errKind))
 	default:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(status)
