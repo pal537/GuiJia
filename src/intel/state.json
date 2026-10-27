@@ -1,0 +1,14 @@
+{
+  "enabled": false,
+  "source": "",
+  "publicUrl": "",
+  "crowdsecListId": "",
+  "updatesPerDay": 0,
+  "countV4": 0,
+  "countV6": 0,
+  "lastFetchUnix": 0,
+  "nextFetchUnix": 1793084535,
+  "status": "failed",
+  "lastError": "Get \"\": unsupported protocol scheme \"\"",
+  "failCount": 1
+}

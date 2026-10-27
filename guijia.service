@@ -1,0 +1,19 @@
+# 龟甲安全防护 Linux 通用版 systemd 单元(Debian/Ubuntu, root 运行)。
+# 由 install.sh 安装到 /etc/systemd/system/guijia.service。
+[Unit]
+Description=Guijia 安全防护
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/guijia
+Restart=on-failure
+RestartSec=5
+# 端口与数据目录由 install.sh 写进 /etc/default/guijia; 文件缺失时应用用默认值
+# (GUIJIA_PORT=59188, GUIJIA_DATA_DIR=/var/lib/guijia)。
+EnvironmentFile=-/etc/default/guijia
+
+[Install]
+WantedBy=multi-user.target

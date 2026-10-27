@@ -1,0 +1,834 @@
+package main
+
+// 主服务器侧: 节点登记、配对码、待添加审批、节点身份鉴权(第一期)。
+// - 只有独立面板能当主服务器; 被群控节点上 /api/nodes/* 一律被中间件 403。
+// - 配对码: 登录后生成, 一次性, 30 分钟有效, 用完即废。
+// - 审批: 待添加 -> 服务器登记; token 不在审批时明文落盘, 节点凭私钥签名
+//   换 token(首次 auth 时签发, 只存 SHA-256; 丢了重签即换新)。
+// - 节点后续调用凭 X-Node-Fingerprint + X-Node-Token; token 只存哈希,
+//   指纹 = 公钥 SHA-256, 换密钥 = 新节点, 须重新配对。
+
+import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"net/http"
+	"os"
+	"strings"
+	"sync"
+	"time"
+)
+
+// ---------- 登记数据(servers.json, 0600) ----------
+
+type hubServer struct {
+	Fingerprint string `json:"fingerprint"`
+	PubKey      string `json:"pubKey"` // base64, 验签用; 不向面板接口外泄
+	Name        string `json:"name"`
+	Status      string `json:"status"` // online | offline
+	LastSeen    int64  `json:"lastSeen"`
+	Version     string `json:"version"`
+	TGMode      string `json:"tgMode"` // hub | independent
+	TokenHash   string `json:"tokenHash"`
+	CreatedAt   int64  `json:"createdAt"`
+}
+
+type hubPendingEntry struct {
+	Fingerprint string `json:"fingerprint"`
+	PubKey      string `json:"pubKey"`
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	FirstSeen   int64  `json:"firstSeen"`
+}
+
+var (
+	hubMu      sync.Mutex
+	hubServers []*hubServer
+	hubPending []*hubPendingEntry
+)
+
+func loadServers() {
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	hubServers = nil
+	hubPending = nil
+	if b, err := os.ReadFile(serversFile); err == nil {
+		var wrap struct {
+			Servers []*hubServer       `json:"servers"`
+			Pending []*hubPendingEntry `json:"pending"`
+		}
+		if json.Unmarshal(b, &wrap) == nil {
+			hubServers = wrap.Servers
+			hubPending = wrap.Pending
+		}
+	}
+	if hubServers == nil {
+		hubServers = []*hubServer{}
+	}
+	if hubPending == nil {
+		hubPending = []*hubPendingEntry{}
+	}
+}
+
+// saveServersLocked 调用方须持有 hubMu, 文件 0600。
+func saveServersLocked() {
+	b, _ := json.MarshalIndent(map[string]any{"servers": hubServers, "pending": hubPending}, "", "  ")
+	os.WriteFile(serversFile, b, 0600)
+}
+
+func findHubServer(fp string) *hubServer {
+	for _, s := range hubServers {
+		if s != nil && s.Fingerprint == fp {
+			return s
+		}
+	}
+	return nil
+}
+
+func findHubPending(fp string) *hubPendingEntry {
+	for _, p := range hubPending {
+		if p != nil && p.Fingerprint == fp {
+			return p
+		}
+	}
+	return nil
+}
+
+func hubServerPublic(s *hubServer) map[string]any {
+	st := "offline"
+	if hubNodeOnline(s) {
+		st = "online"
+	}
+	return map[string]any{
+		"fingerprint": s.Fingerprint, "name": s.Name, "status": st,
+		"lastSeen": s.LastSeen, "version": s.Version, "tgMode": s.TGMode,
+		"createdAt": s.CreatedAt,
+	}
+}
+
+func hubPendingPublic(p *hubPendingEntry) map[string]any {
+	return map[string]any{
+		"fingerprint": p.Fingerprint, "name": p.Name, "version": p.Version,
+		"firstSeen": p.FirstSeen,
+	}
+}
+
+// ---------- 配对码(内存态, 一次性 30 分钟) ----------
+
+type pairingCode struct {
+	code      string
+	expiresAt int64
+	used      bool
+}
+
+var (
+	codeMu sync.Mutex
+	codes  = map[string]*pairingCode{}
+)
+
+const pairingAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+
+func newPairingCode() (string, int64) {
+	var b [12]byte
+	rand.Read(b[:])
+	var sb strings.Builder
+	for _, v := range b {
+		sb.WriteByte(pairingAlphabet[int(v)%len(pairingAlphabet)])
+	}
+	exp := time.Now().Add(30 * time.Minute).Unix()
+	codeMu.Lock()
+	codes[sb.String()] = &pairingCode{code: sb.String(), expiresAt: exp}
+	codeMu.Unlock()
+	return sb.String(), exp
+}
+
+// consumePairingCode 校验并核销(一次性); 失败原因返回 false。
+func consumePairingCode(code string) bool {
+	codeMu.Lock()
+	defer codeMu.Unlock()
+	c, ok := codes[code]
+	if !ok || c.used || time.Now().Unix() > c.expiresAt {
+		return false
+	}
+	c.used = true
+	return true
+}
+
+// ---------- 挑战(内存态, 一次性 5 分钟) ----------
+
+type nodeChallenge struct {
+	nonce     string
+	expiresAt int64
+}
+
+var (
+	chalMu sync.Mutex
+	chals  = map[string]*nodeChallenge{}
+)
+
+func newChallenge(fp string) string {
+	var b [32]byte
+	rand.Read(b[:])
+	nonce := hex.EncodeToString(b[:])
+	chalMu.Lock()
+	chals[fp] = &nodeChallenge{nonce: nonce, expiresAt: time.Now().Add(5 * time.Minute).Unix()}
+	chalMu.Unlock()
+	return nonce
+}
+
+func consumeChallenge(fp, nonce string) bool {
+	chalMu.Lock()
+	defer chalMu.Unlock()
+	c, ok := chals[fp]
+	if !ok || c.nonce != nonce || time.Now().Unix() > c.expiresAt {
+		return false
+	}
+	delete(chals, fp)
+	return true
+}
+
+// ---------- 指纹与 token ----------
+
+func validFingerprint(fp string) bool {
+	if len(fp) != 64 {
+		return false
+	}
+	for _, c := range fp {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F') {
+			return false
+		}
+	}
+	return true
+}
+
+func fingerprintOfPub(pubB64 string) (string, bool) {
+	pub, err := base64.StdEncoding.DecodeString(pubB64)
+	if err != nil || len(pub) != ed25519.PublicKeySize {
+		return "", false
+	}
+	sum := sha256.Sum256(pub)
+	return hex.EncodeToString(sum[:]), true
+}
+
+func hashToken(tok string) string {
+	sum := sha256.Sum256([]byte(tok))
+	return hex.EncodeToString(sum[:])
+}
+
+func newNodeToken() string {
+	var b [32]byte
+	rand.Read(b[:])
+	return hex.EncodeToString(b[:])
+}
+
+// nodeAuth 校验节点后续调用: 指纹 + token(与存量哈希比对)。
+func nodeAuth(r *http.Request) *hubServer {
+	fp := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Node-Fingerprint")))
+	tok := strings.TrimSpace(r.Header.Get("X-Node-Token"))
+	if fp == "" || tok == "" {
+		return nil
+	}
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	s := findHubServer(fp)
+	if s == nil || s.TokenHash == "" || s.TokenHash != hashToken(tok) {
+		return nil
+	}
+	return s
+}
+
+// ---------- 主服务器面板接口(登录鉴权由中间件负责) ----------
+
+func handlePairingCode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	code, exp := newPairingCode()
+	writeJSON(w, 200, map[string]any{"code": code, "expiresAt": exp})
+}
+
+func handleNodeServers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		errJSON(w, 405, "method")
+		return
+	}
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	servers := []map[string]any{}
+	for _, s := range hubServers {
+		if s != nil {
+			servers = append(servers, hubServerPublic(s))
+		}
+	}
+	pending := []map[string]any{}
+	for _, p := range hubPending {
+		if p != nil {
+			pending = append(pending, hubPendingPublic(p))
+		}
+	}
+	writeJSON(w, 200, map[string]any{"servers": servers, "pending": pending})
+}
+
+func handleNodeApprove(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	var in struct {
+		Fingerprint string `json:"fingerprint"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil || !validFingerprint(in.Fingerprint) {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	fp := strings.ToLower(in.Fingerprint)
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	if findHubServer(fp) != nil {
+		errJSON(w, 400, "该节点已登记")
+		return
+	}
+	p := findHubPending(fp)
+	if p == nil {
+		errJSON(w, 404, "待添加中没有该节点")
+		return
+	}
+	now := time.Now().Unix()
+	s := &hubServer{
+		Fingerprint: fp, PubKey: p.PubKey, Name: p.Name, Status: "offline",
+		Version: p.Version, TGMode: "hub", CreatedAt: now,
+	}
+	hubServers = append(hubServers, s)
+	for i, q := range hubPending {
+		if q != nil && q.Fingerprint == fp {
+			hubPending = append(hubPending[:i], hubPending[i+1:]...)
+			break
+		}
+	}
+	saveServersLocked()
+	writeJSON(w, 200, map[string]any{"ok": true, "server": hubServerPublic(s)})
+}
+
+func handleNodeReject(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	var in struct {
+		Fingerprint string `json:"fingerprint"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil || !validFingerprint(in.Fingerprint) {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	fp := strings.ToLower(in.Fingerprint)
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	for i, p := range hubPending {
+		if p != nil && p.Fingerprint == fp {
+			hubPending = append(hubPending[:i], hubPending[i+1:]...)
+			saveServersLocked()
+			writeJSON(w, 200, map[string]bool{"ok": true})
+			return
+		}
+	}
+	errJSON(w, 404, "待添加中没有该节点")
+}
+
+func handleNodeRemove(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	var in struct {
+		Fingerprint string `json:"fingerprint"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil || !validFingerprint(in.Fingerprint) {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	fp := strings.ToLower(in.Fingerprint)
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	for i, s := range hubServers {
+		if s != nil && s.Fingerprint == fp {
+			hubServers = append(hubServers[:i], hubServers[i+1:]...)
+			saveServersLocked()
+			writeJSON(w, 200, map[string]bool{"ok": true})
+			return
+		}
+	}
+	errJSON(w, 404, "没有该节点")
+}
+
+// ---------- 节点接入接口(公开, 节点无面板 session) ----------
+
+// handleNodeHello 节点首次报到: 已登记 -> 走挑战; 未登记 -> 凭配对码进待添加。
+func handleNodeHello(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	var in struct {
+		Fingerprint string `json:"fingerprint"`
+		PubKey      string `json:"pubKey"`
+		Name        string `json:"name"`
+		Version     string `json:"version"`
+		Code        string `json:"code"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	fp := strings.ToLower(strings.TrimSpace(in.Fingerprint))
+	if !validFingerprint(fp) {
+		errJSON(w, 400, "指纹无效")
+		return
+	}
+	want, ok := fingerprintOfPub(in.PubKey)
+	if !ok || want != fp {
+		errJSON(w, 400, "公钥与指纹不符")
+		return
+	}
+	name := normalizeServerName(in.Name)
+	if name == "" {
+		name = fp[:12]
+	}
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	if findHubServer(fp) != nil {
+		writeJSON(w, 200, map[string]any{"status": "approved"})
+		return
+	}
+	if p := findHubPending(fp); p != nil {
+		p.Name = name
+		p.Version = in.Version
+		p.PubKey = in.PubKey
+		saveServersLocked()
+		writeJSON(w, 200, map[string]any{"status": "pending"})
+		return
+	}
+	if !consumePairingCode(strings.TrimSpace(in.Code)) {
+		errJSON(w, 403, "配对码无效或已过期")
+		return
+	}
+	hubPending = append(hubPending, &hubPendingEntry{
+		Fingerprint: fp, PubKey: in.PubKey, Name: name, Version: in.Version,
+		FirstSeen: time.Now().Unix(),
+	})
+	saveServersLocked()
+	writeJSON(w, 200, map[string]any{"status": "pending"})
+}
+
+func handleNodeChallenge(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	var in struct {
+		Fingerprint string `json:"fingerprint"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil || !validFingerprint(in.Fingerprint) {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	fp := strings.ToLower(in.Fingerprint)
+	hubMu.Lock()
+	approved := findHubServer(fp) != nil
+	hubMu.Unlock()
+	if !approved {
+		errJSON(w, 403, "节点未获批准")
+		return
+	}
+	writeJSON(w, 200, map[string]any{"nonce": newChallenge(fp)})
+}
+
+// handleNodeAuth 节点凭私钥签名换 token: 验签通过即签发(丢了重签即换新)。
+func handleNodeAuth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	var in struct {
+		Fingerprint string `json:"fingerprint"`
+		Nonce       string `json:"nonce"`
+		Signature   string `json:"signature"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil || !validFingerprint(in.Fingerprint) {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	fp := strings.ToLower(in.Fingerprint)
+	hubMu.Lock()
+	s := findHubServer(fp)
+	hubMu.Unlock()
+	if s == nil {
+		errJSON(w, 403, "节点未获批准")
+		return
+	}
+	if !consumeChallenge(fp, in.Nonce) {
+		errJSON(w, 403, "挑战无效或已过期")
+		return
+	}
+	pub, err := base64.StdEncoding.DecodeString(s.PubKey)
+	sig, err2 := base64.StdEncoding.DecodeString(in.Signature)
+	if err != nil || err2 != nil || len(pub) != ed25519.PublicKeySize ||
+		!ed25519.Verify(ed25519.PublicKey(pub), []byte(in.Nonce), sig) {
+		errJSON(w, 401, "签名验证失败")
+		return
+	}
+	tok := newNodeToken()
+	hubMu.Lock()
+	s.TokenHash = hashToken(tok)
+	s.Status = "online"
+	s.LastSeen = time.Now().Unix()
+	saveServersLocked()
+	hubMu.Unlock()
+	writeJSON(w, 200, map[string]any{
+		"token": tok, "hubName": nodeDisplayName(), "hubId": settings.ServerID,
+	})
+}
+
+// handleNodePing 节点心跳(凭 token): 刷新在线状态与最后在线。
+func handleNodePing(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	s := nodeAuth(r)
+	if s == nil {
+		errJSON(w, 401, "节点鉴权失败")
+		return
+	}
+	var in struct {
+		Version string `json:"version"`
+		TGMode  string `json:"tgMode"`
+	}
+	json.NewDecoder(r.Body).Decode(&in)
+	hubMu.Lock()
+	s.Status = "online"
+	s.LastSeen = time.Now().Unix()
+	if in.Version != "" {
+		s.Version = in.Version
+	}
+	// 节点上报的 TG 模式即事实来源(节点自己决定事件走哪条路), 主服务器只做镜像。
+	if in.TGMode == "hub" || in.TGMode == "independent" {
+		s.TGMode = in.TGMode
+	}
+	saveServersLocked()
+	hubMu.Unlock()
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+// ---------- link 端点限流(只限流, 永不封禁) ----------
+
+// 每 IP 每分钟失败上限; 超限只回 429, 绝不进 nft 封禁。
+const linkFailLimit = 20
+
+type ipFailWindow struct {
+	count int
+	start int64
+}
+
+var (
+	limMu   sync.Mutex
+	limFail = map[string]*ipFailWindow{}
+)
+
+func linkFailLimited(ip string) bool {
+	if ip == "" {
+		return false
+	}
+	now := time.Now().Unix()
+	limMu.Lock()
+	defer limMu.Unlock()
+	w, ok := limFail[ip]
+	if !ok || now-w.start >= 60 {
+		limFail[ip] = &ipFailWindow{count: 0, start: now}
+		return false
+	}
+	return w.count >= linkFailLimit
+}
+
+func noteLinkFail(ip string) {
+	if ip == "" {
+		return
+	}
+	now := time.Now().Unix()
+	limMu.Lock()
+	defer limMu.Unlock()
+	w, ok := limFail[ip]
+	if !ok || now-w.start >= 60 {
+		limFail[ip] = &ipFailWindow{count: 1, start: now}
+		return
+	}
+	w.count++
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
+// linkLimit 包装节点接入端点: 失败计数超限回 429, 成功清零窗口;
+// 只限流, 不调任何封禁逻辑。
+func linkLimit(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ip := realIP(r)
+		if linkFailLimited(ip) {
+			errJSON(w, 429, "请求过于频繁")
+			return
+		}
+		rec := &statusRecorder{ResponseWriter: w, status: 200}
+		next(rec, r)
+		if rec.status >= 400 {
+			noteLinkFail(ip)
+		}
+	}
+}
+
+// ---------- 命令通道(长轮询, 标准库) ----------
+
+type hubCommand struct {
+	ID     string          `json:"id"`
+	Method string          `json:"method"`
+	Path   string          `json:"path"`
+	Body   json.RawMessage `json:"body,omitempty"`
+}
+
+type hubCmdResult struct {
+	Status int             `json:"status"`
+	Body   json.RawMessage `json:"body"`
+}
+
+// 同一节点同一时间最多一个 poll 在等; 新 poll 顶掉旧的。
+var (
+	cmdMu      sync.Mutex
+	cmdWaiters = map[string]chan hubCommand{}
+	cmdResults = map[string]chan hubCmdResult{}
+)
+
+// hubNodeOnline 在线判定: 90 秒内有 ping 或 poll 即在线, 否则离线
+// (不靠后台扫表, 状态由最后在线时间实时算出)。
+func hubNodeOnline(s *hubServer) bool {
+	if s == nil || s.LastSeen <= 0 {
+		return false
+	}
+	return time.Now().Unix()-s.LastSeen <= 90
+}
+
+// isProxyablePath 只放行管理类 API; 节点/鉴权/模式接口一律不放行。
+func isProxyablePath(p string) bool {
+	if i := strings.Index(p, "?"); i >= 0 {
+		p = p[:i]
+	}
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p // 前端常发无斜杠的 api/overview, 归一化后再判断
+	}
+	if !strings.HasPrefix(p, "/api/") {
+		return false
+	}
+	for _, pre := range []string{"/api/nodes/", "/api/auth/", "/api/setup/", "/api/node/"} {
+		if strings.HasPrefix(p, pre) {
+			return false
+		}
+	}
+	return true
+}
+
+func newCmdID() string {
+	var b [16]byte
+	rand.Read(b[:])
+	return hex.EncodeToString(b[:])
+}
+
+// linkPollHold 节点 poll 在主服务器的 hold 上限(默认 25 秒, 测试可调小)。
+var linkPollHold = 25 * time.Second
+
+// handleNodePoll 节点取命令: 主服务器 hold 最长 linkPollHold, 有命令即回, 否则 204。
+func handleNodePoll(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	s := nodeAuth(r)
+	if s == nil {
+		errJSON(w, 401, "节点鉴权失败")
+		return
+	}
+	hubMu.Lock()
+	s.Status = "online"
+	s.LastSeen = time.Now().Unix()
+	saveServersLocked()
+	hubMu.Unlock()
+	wch := make(chan hubCommand, 1)
+	cmdMu.Lock()
+	cmdWaiters[s.Fingerprint] = wch
+	cmdMu.Unlock()
+	select {
+	case cmd := <-wch:
+		writeJSON(w, 200, cmd)
+	case <-time.After(linkPollHold):
+		w.WriteHeader(204)
+	}
+	cmdMu.Lock()
+	if cur := cmdWaiters[s.Fingerprint]; cur == wch {
+		delete(cmdWaiters, s.Fingerprint)
+	}
+	cmdMu.Unlock()
+}
+
+// handleNodeResult 节点回结果: 投递给等待中的代理请求, 无等待者则丢弃。
+func handleNodeResult(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	if nodeAuth(r) == nil {
+		errJSON(w, 401, "节点鉴权失败")
+		return
+	}
+	var in struct {
+		ID     string          `json:"id"`
+		Status int             `json:"status"`
+		Body   json.RawMessage `json:"body"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil || in.ID == "" {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	cmdMu.Lock()
+	ch, ok := cmdResults[in.ID]
+	if ok {
+		delete(cmdResults, in.ID)
+	}
+	cmdMu.Unlock()
+	if ok {
+		select {
+		case ch <- hubCmdResult{Status: in.Status, Body: in.Body}:
+		default:
+		}
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+// hubCallNode 经命令通道调节点管理接口(面板代理与 TG 回调路由共用)。
+// 返回 (状态码, Body, 错误种): 错误种 ""=已拿到节点响应(按状态码处理),
+// "notfound"=无此节点, "offline"=节点离线, "nochan"=未建立命令通道,
+// "timeout"=节点响应超时。调用方按场景映射 HTTP 状态或提示文案。
+func hubCallNode(fp, method, path string, body json.RawMessage) (int, []byte, string) {
+	if !isProxyablePath(path) {
+		return 403, []byte(`{"error":"该接口不允许跨节点调用"}`), ""
+	}
+	hubMu.Lock()
+	s := findHubServer(fp)
+	online := hubNodeOnline(s)
+	hubMu.Unlock()
+	if s == nil {
+		return 404, nil, "notfound"
+	}
+	if !online {
+		return 502, nil, "offline"
+	}
+	cmdMu.Lock()
+	wch, ok := cmdWaiters[fp]
+	cmdMu.Unlock()
+	if !ok {
+		// 节点处理完一条命令会立刻再 poll, 并发请求等一等而不是直接 502。
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			time.Sleep(100 * time.Millisecond)
+			cmdMu.Lock()
+			wch, ok = cmdWaiters[fp]
+			cmdMu.Unlock()
+			if ok {
+				break
+			}
+		}
+	}
+	if !ok {
+		return 502, nil, "nochan"
+	}
+	id := newCmdID()
+	resCh := make(chan hubCmdResult, 1)
+	cmdMu.Lock()
+	cmdResults[id] = resCh
+	cmdMu.Unlock()
+	cleanup := func() {
+		cmdMu.Lock()
+		if ch, ok := cmdResults[id]; ok && ch == resCh {
+			delete(cmdResults, id)
+		}
+		cmdMu.Unlock()
+	}
+	select {
+	case wch <- hubCommand{ID: id, Method: method, Path: path, Body: body}:
+	case <-time.After(10 * time.Second):
+		cleanup()
+		return 504, nil, "timeout"
+	}
+	select {
+	case res := <-resCh:
+		if res.Status < 100 || res.Status > 599 {
+			res.Status = 502
+		}
+		return res.Status, res.Body, ""
+	case <-time.After(20 * time.Second):
+		cleanup()
+		return 504, nil, "timeout"
+	}
+}
+
+// handleNodeProxy 面板登录后转发管理请求给节点, 节点原样状态 + Body 回传。
+func handleNodeProxy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
+	var in struct {
+		Fingerprint string          `json:"fingerprint"`
+		Method      string          `json:"method"`
+		Path        string          `json:"path"`
+		Body        json.RawMessage `json:"body"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil || !validFingerprint(in.Fingerprint) {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	fp := strings.ToLower(in.Fingerprint)
+	switch in.Method {
+	case "GET", "POST", "PUT", "DELETE":
+	default:
+		errJSON(w, 400, "不支持的方法")
+		return
+	}
+	if !isProxyablePath(in.Path) {
+		errJSON(w, 403, "该接口不允许跨节点调用")
+		return
+	}
+	status, respBody, errKind := hubCallNode(fp, in.Method, in.Path, in.Body)
+	switch errKind {
+	case "notfound":
+		errJSON(w, 404, "没有该节点")
+	case "offline":
+		errJSON(w, 502, "节点离线")
+	case "nochan":
+		errJSON(w, 502, "节点未建立命令通道")
+	case "timeout":
+		errJSON(w, 504, "节点响应超时")
+	default:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(status)
+		w.Write(respBody)
+	}
+}

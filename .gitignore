@@ -1,0 +1,7 @@
+# GuiJia：本地构建产物与发布 staging，绝不进仓库
+# - dist/：release 资产上传 staging（由推送步骤从干净源码重打）
+# - src/guijia：本地 go build 产物
+# - guijia-arm64-*：历史本地构建包（20261026/20261027），一律不推
+/dist/
+/src/guijia
+/guijia-arm64-*

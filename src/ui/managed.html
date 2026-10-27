@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>龟甲安全防护 · 被群控节点</title>
+<style>
+body{margin:0;background:#f4f5f7;color:#222;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif}
+.card{max-width:520px;margin:80px auto;background:#fff;border-radius:16px;padding:32px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+h1{font-size:20px;margin:0 0 8px}
+.sub{color:#666;font-size:14px;margin-bottom:24px}
+.row{display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid #eee;font-size:14px}
+.row b{font-weight:600}
+.ok{color:#1a7f37}.warn{color:#9a6700}.bad{color:#cf222e}
+.note{margin-top:24px;font-size:13px;color:#666;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>本机已被主服务器群控</h1>
+<div class="sub">管理操作请去主服务器面板，本页只显示状态。</div>
+<div class="row"><span>本机</span><b id="fName">…</b></div>
+<div class="row"><span>主服务器</span><b id="fHub">…</b></div>
+<div class="row"><span>防护引擎</span><b class="ok" id="fEngine">运行中</b></div>
+<div class="row"><span>与主服务器连接</span><b id="fLink">…</b></div>
+<div class="row"><span>最后联系</span><b id="fLast">…</b></div>
+<div class="row"><span>节点指纹</span><b id="fFp">…</b></div>
+<div class="note" id="fNote"></div>
+</div>
+<script>
+async function load(){
+  try{
+    const r=await fetch('/api/node/status');
+    const s=await r.json();
+    document.getElementById('fName').textContent=s.serverName+' ('+s.serverId+')';
+    document.getElementById('fHub').textContent=(s.hubName||s.hubUrl||'—');
+    const link=document.getElementById('fLink');
+    const map={connected:['已连接','ok'],joining:['等待主服务器确认','warn'],pending:['等待主服务器确认','warn'],disconnected:['已断开','bad'],idle:['未连接','bad']};
+    const v=map[s.linkState]||['未知','warn'];
+    link.textContent=v[0]; link.className=v[1];
+    document.getElementById('fLast').textContent=s.lastContact?new Date(s.lastContact*1000).toLocaleString():'—';
+    document.getElementById('fFp').textContent=s.fingerprint||'—';
+    document.getElementById('fNote').textContent=s.lastError?('最近错误：'+s.lastError):'脱离群控请在主服务器面板移除本节点；主服务器彻底不可用时，可在节点本机用命令行脱离。';
+  }catch(e){
+    document.getElementById('fLink').textContent='状态读取失败';
+  }
+}
+load(); setInterval(load,10000);
+</script>
+</body>
+</html>
