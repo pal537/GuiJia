@@ -481,13 +481,6 @@ body.auth #loginView{margin:auto}
       <div class="frow"><div class="fl">修改密码<div class="d">改密后其他登录全部失效，当前登录保留</div></div><div class="fv"><button class="btn" id="btnPanelPwChange">修改密码</button></div></div>
       <div class="hint" id="panelPortHint" style="margin-top:8px"></div>
     </div>
-    <div class="panel" style="margin-bottom:14px" id="upCard">
-      <div class="ph"><h2>版本与升级</h2><span class="hint" id="upCur">…</span><span class="sp"></span><button class="btn" id="btnUpCheck">检查更新</button></div>
-      <div class="frow"><div class="fl">最新版本<div class="d">点“检查更新”从 GitHub releases 查询；升级会重启面板，重启后请重新登录</div></div><div class="fv"><span class="mono" id="upLatest">—</span></div></div>
-      <div class="frow" id="upApplyRow" style="display:none"><div class="fl">升级<div class="d">先验 SHA256（不过不装），升级前备份当前版本，失败自动回滚</div></div><div class="fv"><button class="btn primary" id="btnUpApply">升级到 <span id="upTarget"></span></button></div></div>
-      <div class="frow" id="upPushRow"><div class="fl">推送到全部在线节点<div class="d">主服务器点一下，全部在线节点各自下载升级；失败只报该节点，不影响其他节点</div></div><div class="fv"><button class="btn" id="btnUpPushAll">推送升级到全部节点</button></div></div>
-      <div class="hint" id="upMsg" style="margin-top:8px"></div>
-    </div>
     <div class="setgrid">
       <div class="scard">
         <h3>通知方式 <span class="cbadge">Telegram</span></h3>
@@ -556,6 +549,17 @@ body.auth #loginView{margin:auto}
         <div class="frow"><div class="fl">恢复设置<div class="d">上传设置备份 JSON；版本不匹配会先警告</div></div><div class="fv"><input type="file" id="upSettings" accept=".json" style="display:none"><button class="btn" id="btnUpSettings">选择文件恢复</button></div></div>
         <div class="frow"><div class="fl">恢复数据<div class="d">上传数据备份 zip；黑名单随数据一起回来</div></div><div class="fv"><input type="file" id="upData" accept=".zip" style="display:none"><button class="btn" id="btnUpData">选择文件恢复</button></div></div>
       </div>
+    <div class="panel" style="margin-bottom:14px" id="upCard">
+      <div class="ph"><h2>版本与升级</h2><span class="hint">升级会重启面板，重启后请重新登录</span></div>
+      <div class="frow"><div class="fl">当前版本</div><div class="fv"><span class="mono" id="upCur">…</span><button class="btn" id="btnUpCheck">检查更新</button></div></div>
+      <div class="frow"><div class="fl">最新版本</div><div class="fv"><span class="mono" id="upLatest">—</span></div></div>
+      <div class="hint" id="upMsg" style="margin:0 18px 10px"></div>
+      <div id="upPushSec">
+        <div style="border-top:1px solid var(--line);margin:6px 0 0"></div>
+        <div class="frow"><div class="fl">推送到全部在线节点<div class="d">在线节点各自下载升级；单个失败不影响其他节点</div></div><div class="fv"><button class="btn" id="btnUpPushAll">推送升级到全部节点</button></div></div>
+        <div class="hint" id="upPushMsg" style="margin:0 18px 10px"></div>
+      </div>
+    </div>
       <div style="text-align:center;color:var(--mut);font-size:12.5px;padding:16px 18px 6px">当前版本 <span id="verNum">…</span></div>
     </div>
   </section>
@@ -1793,47 +1797,80 @@ async function loadSettings(){
   loadNodeTg();
   loadUpCard();
 }
-/* 版本与升级: 当前视图的服务器(本机或节点)走 api() 代理; 推送全部节点只在本机视图用 apiLocal */
+/* 版本与升级: 当前视图的服务器(本机或节点)走 api() 代理; 推送全部节点只在本机视图用 apiLocal。
+   检查按钮状态机: 检查更新 → 正在检查…(禁用) → 升级到 X / 当前版本已是最新；
+   升级到 X → 正在更新…(禁用) → 更新完成(禁用, 提示重登录)；失败回检查更新。全部反馈只在卡片内。 */
 let upTarget='';
 let upPoll=null;
-async function loadUpCard(){
-  const m=$('#upMsg');
-  try{const v=await api('GET','api/version');$('#upCur').textContent='当前版本 '+v.version;}catch(e){$('#upCur').textContent='';}
-  $('#upPushRow').style.display=curServer?'none':'';
-  try{const s=await api('GET','api/upgrade/status');
-    if(s.state==='applying'){m.textContent='正在升级到 '+(s.target||'')+'…（面板重启后请重新登录）';}
-    else if(s.state==='failed'){m.textContent='上次升级失败：'+(s.error||'');}
-    else if(s.state==='done'){m.textContent='已升级到 '+(s.target||'')+'。';}
-    else{m.textContent='';}
-  }catch(e){}
-}
+let upBusy=false;
+function upSetBtn(text,disabled,primary){const b=$('#btnUpCheck');b.textContent=text;b.disabled=!!disabled;b.classList.toggle('primary',!!primary);}
+function upSetMsg(t){$('#upMsg').textContent=t||'';}
+function upSetPushMsg(t){$('#upPushMsg').textContent=t||'';}
 function stopUpPoll(){if(upPoll){clearInterval(upPoll);upPoll=null;}}
+function upStartPoll(){
+  stopUpPoll();
+  upPoll=setInterval(async()=>{
+    try{const s=await api('GET','api/upgrade/status');
+      if(s.state==='done'){stopUpPoll();upBusy=false;upSetBtn('更新完成',true,false);upSetMsg('更新完成，面板重启后请重新登录。');}
+      else if(s.state==='failed'){stopUpPoll();upBusy=false;$('#btnUpCheck').dataset.mode='';upSetBtn('检查更新',false,false);upSetMsg('升级失败：'+(s.error||''));}
+    }catch(e){stopUpPoll();upBusy=false;upSetBtn('更新完成',true,false);upSetMsg('面板正在重启，重启后请重新登录。');}
+  },3000);
+}
+async function upRefreshPushHint(){
+  try{const d=await apiLocal('GET','api/nodes/servers');
+    const on=(d.servers||[]).filter(s=>s.status==='online');
+    upSetPushMsg(on.length?('当前 '+on.length+' 台在线节点'):('暂无在线节点'));
+  }catch(e){upSetPushMsg('');}
+}
+async function loadUpCard(){
+  try{const v=await api('GET','api/version');$('#upCur').textContent=v.version;}catch(e){$('#upCur').textContent='—';}
+  const sec=$('#upPushSec');
+  if(curServer){sec.style.display='none';}
+  else{sec.style.display='';upRefreshPushHint();}
+  let st=null;
+  try{st=await api('GET','api/upgrade/status');}catch(e){}
+  if(st&&st.state==='applying'){
+    upTarget=st.target||upTarget;
+    $('#btnUpCheck').dataset.mode='applying';upSetBtn('正在更新…',true,false);
+    upSetMsg('正在升级到 '+(st.target||'')+'…（面板重启后请重新登录）');
+    upStartPoll();
+  }else{
+    stopUpPoll();upBusy=false;upTarget='';
+    $('#btnUpCheck').dataset.mode='';upSetBtn('检查更新',false,false);
+    $('#upLatest').textContent='—';
+    if(st&&st.state==='failed'){upSetMsg('上次升级失败：'+(st.error||''));}
+    else if(st&&st.state==='done'){upSetMsg('已升级到 '+(st.target||'')+'。');}
+    else{upSetMsg('');}
+  }
+}
 $('#btnUpCheck').onclick=async()=>{
-  const m=$('#upMsg');
+  if(upBusy)return;
+  const btn=$('#btnUpCheck');
+  if(btn.dataset.mode==='apply'){await upDoApply();return;}
+  upBusy=true;upSetBtn('正在检查…',true,false);upSetMsg('正在检查…');
   try{const d=await api('GET','api/upgrade/check');
     $('#upLatest').textContent=d.latest;
-    if(d.hasUpdate){upTarget=d.latest;$('#upTarget').textContent=d.latest;$('#upApplyRow').style.display='';m.textContent='有新版本，可升级。';}
-    else{$('#upApplyRow').style.display='none';m.textContent='当前版本已是最新。';}
-  }catch(e){m.textContent='检查失败：'+e.message;}
+    if(d.hasUpdate){upTarget=d.latest;btn.dataset.mode='apply';upSetBtn('升级到 '+d.latest,false,true);upSetMsg('有新版本 '+d.latest+'，点“升级到 '+d.latest+'”开始升级。');}
+    else{upSetBtn('检查更新',false,false);upSetMsg('当前版本已是最新。');}
+  }catch(e){upSetBtn('检查更新',false,false);upSetMsg('检查失败：'+e.message);}
+  upBusy=false;
 };
-$('#btnUpApply').onclick=async()=>{
-  const m=$('#upMsg');
+async function upDoApply(){
+  if(upBusy)return;
+  upBusy=true;upSetBtn('正在更新…',true,false);upSetMsg('正在更新到 '+upTarget+'…（面板重启后请重新登录）');
   try{await api('POST','api/upgrade/apply',{version:upTarget});
-    m.textContent='正在升级到 '+upTarget+'…（面板重启后请重新登录）';
-    stopUpPoll();
-    upPoll=setInterval(async()=>{
-      try{const s=await api('GET','api/upgrade/status');
-        if(s.state==='done'){stopUpPoll();m.textContent='已升级到 '+(s.target||upTarget)+'，请重新登录。';}
-        else if(s.state==='failed'){stopUpPoll();m.textContent='升级失败：'+(s.error||'');}
-      }catch(e){stopUpPoll();m.textContent='面板正在重启，重启后请重新登录。';}
-    },3000);
-  }catch(e){m.textContent='升级失败：'+e.message;}
-};
+    $('#btnUpCheck').dataset.mode='applying';upStartPoll();
+  }catch(e){upBusy=false;$('#btnUpCheck').dataset.mode='';upSetBtn('检查更新',false,false);upSetMsg('升级失败：'+e.message);}
+}
 $('#btnUpPushAll').onclick=async()=>{
-  const m=$('#upMsg');
+  const b=$('#btnUpPushAll');
+  if(b.disabled)return;
+  b.disabled=true;const old=b.textContent;b.textContent='正在推送…';upSetPushMsg('正在推送…');
   try{const d=await apiLocal('POST','api/nodes/upgrade-all',{});
-    m.textContent=(d.results||[]).map(r=>(r.name||r.fingerprint)+'：'+(r.ok?'已开始升级':r.detail)).join('；')||'无节点';
-  }catch(e){m.textContent='推送失败：'+e.message;}
+    const rs=d.results||[];
+    upSetPushMsg(rs.length?rs.map(r=>(r.name||r.fingerprint)+'：'+(r.ok?'已开始升级':r.detail)).join('；'):'暂无在线节点');
+  }catch(e){upSetPushMsg('推送失败：'+e.message);}
+  b.disabled=false;b.textContent=old;
 };
 $$('[data-save]').forEach(b=>b.onclick=async()=>{
   try{await api('PUT','api/settings',collectSettings());
