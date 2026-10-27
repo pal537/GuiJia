@@ -47,8 +47,8 @@ func TestPortGuardItemEdit(t *testing.T) {
 	defer func() { dataDir = oldData }()
 	pgMu.Lock()
 	pgRules = []*PortGuardRule{
-		{ID: "g1", PortText: "3005", Proto: "all", Source: FWSource{Kind: "custom_loc", Locations: []GuardLocation{{Kind: "province", Name: "江苏"}}}, Action: "allow", BanHours: 24, Enabled: true, ranges: [][2]int{{3005, 3005}}},
-		{ID: "g2", PortText: "4000", Proto: "all", Source: FWSource{Kind: "custom_loc", Locations: []GuardLocation{{Kind: "province", Name: "浙江"}}}, Action: "allow", BanHours: 24, Enabled: true, ranges: [][2]int{{4000, 4000}}},
+		{ID: "g1", PortText: "3005", Proto: "all", Source: FWSource{Kind: "custom_cn", Locations: []GuardLocation{{Kind: "province", Name: "江苏"}}}, Action: "allow", BanHours: 24, Enabled: true, ranges: [][2]int{{3005, 3005}}},
+		{ID: "g2", PortText: "4000", Proto: "all", Source: FWSource{Kind: "custom_cn", Locations: []GuardLocation{{Kind: "province", Name: "浙江"}}}, Action: "allow", BanHours: 24, Enabled: true, ranges: [][2]int{{4000, 4000}}},
 	}
 	pgMu.Unlock()
 	defer func() { pgMu.Lock(); pgRules = nil; pgMu.Unlock() }()
@@ -60,7 +60,7 @@ func TestPortGuardItemEdit(t *testing.T) {
 		return rec.Code
 	}
 	// 整条编辑: 端口 + 省市 + 时长
-	if code := put("g1", `{"portText":"3006","source":{"kind":"custom_loc","locations":[{"kind":"province","name":"江苏"}]},"banHours":48}`); code != 200 {
+	if code := put("g1", `{"portText":"3006","source":{"kind":"custom_cn","locations":[{"kind":"province","name":"江苏"}]},"banHours":48}`); code != 200 {
 		t.Fatalf("编辑应 200, 实际 %d", code)
 	}
 	pgMu.Lock()
@@ -70,7 +70,7 @@ func TestPortGuardItemEdit(t *testing.T) {
 		t.Fatalf("编辑未生效: %+v", r)
 	}
 	// 与另一条规则完全相同 -> 400, 且原规则不动
-	if code := put("g1", `{"portText":"4000","source":{"kind":"custom_loc","locations":[{"kind":"province","name":"浙江"}]},"banHours":24}`); code != 400 {
+	if code := put("g1", `{"portText":"4000","source":{"kind":"custom_cn","locations":[{"kind":"province","name":"浙江"}]},"banHours":24}`); code != 400 {
 		t.Fatalf("完全相同规则应 400, 实际 %d", code)
 	}
 	pgMu.Lock()
@@ -79,7 +79,7 @@ func TestPortGuardItemEdit(t *testing.T) {
 	}
 	pgMu.Unlock()
 	// 只撞端口、来源不同 -> 200(多规则同端口合法, 拒绝优先于允许)
-	if code := put("g1", `{"portText":"4000","source":{"kind":"custom_loc","locations":[{"kind":"province","name":"江苏"}]},"banHours":24}`); code != 200 {
+	if code := put("g1", `{"portText":"4000","source":{"kind":"custom_cn","locations":[{"kind":"province","name":"江苏"}]},"banHours":24}`); code != 200 {
 		t.Fatalf("来源不同的同端口规则应 200, 实际 %d", code)
 	}
 	// 旧的纯开关切换仍可用

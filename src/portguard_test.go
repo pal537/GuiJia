@@ -141,7 +141,7 @@ func TestGuardProvinceOnlyWholeProvince(t *testing.T) {
 		t.Fatal("只选省不应放行外省")
 	}
 	// 保存路径：只选省的条目归一化后仍是省条目（不丢省、不变市）。
-	rule, err := parseFWRuleInput("8080", "all", FWSource{Kind: "custom_loc", Locations: []GuardLocation{{Kind: "province", Name: "江苏省"}}}, "allow", 24)
+	rule, err := parseFWRuleInput("8080", "all", FWSource{Kind: "custom_cn", Locations: []GuardLocation{{Kind: "province", Name: "江苏省"}}}, "allow", 24)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,7 +317,7 @@ func TestPortGuardCheckEndToEnd(t *testing.T) {
 	defer func() { pgMu.Lock(); pgRules = nil; pgMu.Unlock() }()
 
 	// 114.114.114.114 在内嵌库里是江苏南京: 规则只允许浙江 -> 应封禁(默认封禁)
-	setRules(mkRule("gtest", "all", "allow", FWSource{Kind: "custom_loc", Locations: []GuardLocation{{Kind: "province", Name: "浙江"}}}))
+	setRules(mkRule("gtest", "all", "allow", FWSource{Kind: "custom_cn", Locations: []GuardLocation{{Kind: "province", Name: "浙江"}}}))
 	portGuardCheck("114.114.114.114", 45167, "tcp")
 	if !isBannedFor("114.114.114.114", 45167) {
 		t.Fatal("江苏 IP 连只允许浙江的端口应被默认封禁")
@@ -327,19 +327,19 @@ func TestPortGuardCheckEndToEnd(t *testing.T) {
 	}
 	// 规则改成允许江苏 -> 同一 IP 不应再封(先解封再测)
 	releaseBan("114.114.114.114")
-	setRules(mkRule("gtest", "all", "allow", FWSource{Kind: "custom_loc", Locations: []GuardLocation{{Kind: "province", Name: "江苏"}}}))
+	setRules(mkRule("gtest", "all", "allow", FWSource{Kind: "custom_cn", Locations: []GuardLocation{{Kind: "province", Name: "江苏"}}}))
 	portGuardCheck("114.114.114.114", 45167, "tcp")
 	if isBanned("114.114.114.114") {
 		t.Fatal("白名单内 IP 不应被封禁")
 	}
 	// 市级规则: 只允许南京市 -> 南京 IP 放行
-	setRules(mkRule("gtest", "all", "allow", FWSource{Kind: "custom_loc", Locations: []GuardLocation{{Kind: "city", Name: "南京", Province: "江苏"}}}))
+	setRules(mkRule("gtest", "all", "allow", FWSource{Kind: "custom_cn", Locations: []GuardLocation{{Kind: "city", Name: "南京", Province: "江苏"}}}))
 	portGuardCheck("114.114.114.114", 45167, "tcp")
 	if isBanned("114.114.114.114") {
 		t.Fatal("南京市白名单应放行南京 IP")
 	}
 	// 拒绝规则: 拒绝江苏 -> 南京 IP 被拒绝封禁, 原因含"防火墙拒绝"
-	setRules(mkRule("gtest", "all", "deny", FWSource{Kind: "custom_loc", Locations: []GuardLocation{{Kind: "province", Name: "江苏"}}}))
+	setRules(mkRule("gtest", "all", "deny", FWSource{Kind: "custom_cn", Locations: []GuardLocation{{Kind: "province", Name: "江苏"}}}))
 	portGuardCheck("114.114.114.114", 45167, "tcp")
 	if !isBannedFor("114.114.114.114", 45167) {
 		t.Fatal("拒绝规则命中应封禁")
@@ -358,7 +358,7 @@ func TestPortGuardCheckEndToEnd(t *testing.T) {
 	// 拒绝优先于允许: 允许江苏 + 拒绝全部 IP 同时命中 -> 仍封禁
 	releaseBan("114.114.114.114")
 	setRules(
-		mkRule("gallow", "all", "allow", FWSource{Kind: "custom_loc", Locations: []GuardLocation{{Kind: "province", Name: "江苏"}}}),
+		mkRule("gallow", "all", "allow", FWSource{Kind: "custom_cn", Locations: []GuardLocation{{Kind: "province", Name: "江苏"}}}),
 		mkRule("gdeny", "all", "deny", FWSource{Kind: "all"}),
 	)
 	portGuardCheck("114.114.114.114", 45167, "tcp")
@@ -417,7 +417,7 @@ func TestPortGuardCheckUnknownGeo(t *testing.T) {
 	}
 	pgMu.Lock()
 	pgRules = []*PortGuardRule{{ID: "gtest", PortText: "45167", Proto: "all",
-		Source:   FWSource{Kind: "custom_loc", Locations: []GuardLocation{{Kind: "province", Name: "江苏"}}},
+		Source:   FWSource{Kind: "custom_cn", Locations: []GuardLocation{{Kind: "province", Name: "江苏"}}},
 		Action:   "allow",
 		BanHours: 24, Enabled: true, ranges: [][2]int{{45167, 45167}}}}
 	pgMu.Unlock()

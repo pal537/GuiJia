@@ -36,8 +36,8 @@ func TestFirewallMigration(t *testing.T) {
 	if r.ID != "gold" || r.PortText != "45167,3004" || r.Proto != "all" || r.Action != "allow" {
 		t.Fatalf("迁移字段不对: %+v", r)
 	}
-	if r.Source.Kind != "custom_loc" || len(r.Source.Locations) != 2 {
-		t.Fatalf("迁移来源应为自定义位置(旧省名单), 得到 %+v", r.Source)
+	if r.Source.Kind != "custom_cn" || len(r.Source.Locations) != 2 {
+		t.Fatalf("迁移来源应为自定义位置（中国）(旧省名单), 得到 %+v", r.Source)
 	}
 	if !rangesEqual(r.ranges, [][2]int{{3004, 3004}, {45167, 45167}}) {
 		t.Fatalf("迁移端口范围不对: %v", r.ranges)
@@ -95,14 +95,24 @@ func TestFirewallAPIValidation(t *testing.T) {
 	if code := post(`{"portText":"80","proto":"all","source":{"kind":"custom_ip"},"action":"allow"}`); code != 400 {
 		t.Fatalf("自定义 IP 为空应 400, 实际 %d", code)
 	}
-	if code := post(`{"portText":"80","proto":"all","source":{"kind":"custom_loc"},"action":"allow"}`); code != 400 {
-		t.Fatalf("自定义位置空选应 400, 实际 %d", code)
+	if code := post(`{"portText":"80","proto":"all","source":{"kind":"custom_cn"},"action":"allow"}`); code != 400 {
+		t.Fatalf("自定义位置（中国）空选应 400, 实际 %d", code)
 	}
-	if code := post(`{"portText":"80","proto":"all","source":{"kind":"custom_loc","countries":["不存在的国家"]},"action":"allow"}`); code != 400 {
+	if code := post(`{"portText":"80","proto":"all","source":{"kind":"custom_foreign","countries":["不存在的国家"]},"action":"allow"}`); code != 400 {
 		t.Fatalf("未知国家应 400, 实际 %d", code)
 	}
-	if code := post(`{"portText":"80","proto":"all","source":{"kind":"custom_loc","countries":["香港"]},"action":"allow"}`); code != 200 {
-		t.Fatalf("港澳台国家级选项应 200, 实际 %d", code)
+	if code := post(`{"portText":"80","proto":"all","source":{"kind":"custom_foreign","countries":["HK"]},"action":"allow"}`); code != 200 {
+		t.Fatalf("港澳台地区级选项应 200, 实际 %d", code)
+	}
+	if code := post(`{"portText":"80","proto":"all","source":{"kind":"custom_cn","locations":[{"kind":"province","name":"香港"}]},"action":"allow"}`); code != 400 {
+		t.Fatalf("中国选择器含港澳台应 400, 实际 %d", code)
+	}
+	if code := post(`{"portText":"80","proto":"all","source":{"kind":"custom_loc","countries":["美国"]},"action":"allow"}`); code != 400 {
+		t.Fatalf("旧 kind custom_loc 应 400, 实际 %d", code)
+	}
+	// 旧字符串归一化入库: "美国"存为 US
+	if code := post(`{"portText":"81","proto":"all","source":{"kind":"custom_foreign","countries":["美国","United States"]},"action":"allow"}`); code != 200 {
+		t.Fatalf("旧国家字符串应归一化入库, 实际 %d", code)
 	}
 	// 完全相同规则 -> 400
 	if code := post(`{"portText":"8000-8010","proto":"all","source":{"kind":"cn_in"},"action":"allow","banHours":24}`); code != 400 {
@@ -191,7 +201,7 @@ func TestFirewallCollectionPath(t *testing.T) {
 	// 规则: 只允许江苏(114.114.114.114 是江苏南京, 应放行; 其余默认封禁)
 	pgMu.Lock()
 	pgRules = []*PortGuardRule{{ID: "gtest", PortText: "45167", Proto: "all",
-		Source:   FWSource{Kind: "custom_loc", Locations: []GuardLocation{{Kind: "province", Name: "江苏"}}},
+		Source:   FWSource{Kind: "custom_cn", Locations: []GuardLocation{{Kind: "province", Name: "江苏"}}},
 		Action:   "allow",
 		BanHours: 24, Enabled: true, ranges: [][2]int{{45167, 45167}}}}
 	pgMu.Unlock()
@@ -235,5 +245,73 @@ func TestFirewallCollectionPath(t *testing.T) {
 	banMu.Unlock()
 	if scopes != 1 {
 		t.Fatalf("203.0.113.99 应有 1 条规则作用域, 实际 %d", scopes)
+	}
+}
+
+// TestFirewallCustomLocSplit: v1.0.9 custom_loc 迁移拆分。
+// 只有省市 -> custom_cn(ID 不变); 只有国家 -> custom_foreign(归一化为代码);
+// 两边都有 + 港澳台省市 -> 拆成 ID-cn(大陆省市) + ID-foreign(国家 + HK)。
+func TestFirewallCustomLocSplit(t *testing.T) {
+	dir := banTestSetup(t)
+	oldData := dataDir
+	dataDir = dir
+	defer func() { dataDir = oldData }()
+	oldRules := pgRules
+	defer func() { pgMu.Lock(); pgRules = oldRules; pgMu.Unlock() }()
+
+	seed := func(json string) {
+		if err := os.WriteFile(filepath.Join(dir, "portguard.json"), []byte(json), 0644); err != nil {
+			t.Fatal(err)
+		}
+		loadPortGuard()
+	}
+	kinds := func() map[string]FWSource {
+		pgMu.Lock()
+		defer pgMu.Unlock()
+		m := map[string]FWSource{}
+		for _, r := range pgRules {
+			m[r.ID] = r.Source
+		}
+		return m
+	}
+
+	seed(`[{"id":"a","portText":"80","proto":"all","source":{"kind":"custom_loc","locations":[{"kind":"province","name":"江苏"}]},"action":"allow","banHours":24,"enabled":true}]`)
+	if m := kinds(); len(m) != 1 || m["a"].Kind != "custom_cn" || len(m["a"].Locations) != 1 {
+		t.Fatalf("只有省市应转 custom_cn: %+v", m)
+	}
+
+	seed(`[{"id":"b","portText":"80","proto":"all","source":{"kind":"custom_loc","countries":["美国","United States","Japan"]},"action":"deny","banHours":24,"enabled":true}]`)
+	if m := kinds(); len(m) != 1 || m["b"].Kind != "custom_foreign" || strings.Join(m["b"].Countries, ",") != "US,JP" {
+		t.Fatalf("只有国家应转 custom_foreign 且归一化为代码: %+v", m)
+	}
+
+	seed(`[{"id":"c","portText":"443","proto":"tcp","source":{"kind":"custom_loc","countries":["美国"],"locations":[{"kind":"province","name":"江苏"},{"kind":"province","name":"香港"}]},"action":"allow","banHours":48,"enabled":true}]`)
+	m := kinds()
+	if len(m) != 2 {
+		t.Fatalf("两边都有应拆成 2 条, 实际 %+v", m)
+	}
+	if cn, ok := m["c-cn"]; !ok || cn.Kind != "custom_cn" || len(cn.Locations) != 1 || cn.Locations[0].Name != "江苏" {
+		t.Fatalf("拆分 custom_cn 应只有江苏: %+v", m)
+	}
+	if fr, ok := m["c-foreign"]; !ok || fr.Kind != "custom_foreign" || strings.Join(fr.Countries, ",") != "US,HK" {
+		t.Fatalf("拆分 custom_foreign 应为 US,HK: %+v", m)
+	}
+	pgMu.Lock()
+	for _, r := range pgRules {
+		if r.PortText != "443" || r.Proto != "tcp" || r.Action != "allow" || r.BanHours != 48 || !r.Enabled {
+			pgMu.Unlock()
+			t.Fatalf("拆分后端口/协议/动作/时长/生效态应与旧规则一致: %+v", r)
+		}
+	}
+	pgMu.Unlock()
+	// 回写文件不再含 custom_loc
+	b, _ := os.ReadFile(filepath.Join(dir, "portguard.json"))
+	if strings.Contains(string(b), "custom_loc") {
+		t.Fatal("回写文件不应再含 custom_loc")
+	}
+
+	seed(`[{"id":"d","portText":"80","proto":"all","source":{"kind":"custom_loc"},"action":"allow","banHours":24,"enabled":true}]`)
+	if m := kinds(); len(m) != 0 {
+		t.Fatalf("空的旧规则应丢弃, 实际 %+v", m)
 	}
 }

@@ -188,21 +188,26 @@ tr.trusted td{background:#f7f9fc;opacity:.72}
 #hpPresets{flex:1 1 100%;min-width:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 14px}
 #hpPresets label{display:flex;gap:6px;align-items:center;font-size:13.5px;white-space:nowrap}
 #hpPresets input[type=checkbox]{flex:0 0 auto;width:auto;min-width:0}
-/* 防火墙省市多选下拉 */
-.pgfield{flex:1;min-width:120px;border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:#fff;display:flex;flex-wrap:wrap;gap:6px;align-items:center;cursor:pointer;min-height:36px}
-.pgfield:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(37,99,235,.18)}
-.pgchip{display:inline-flex;gap:4px;align-items:center;background:#eef3ff;border:1px solid #d3e0ff;border-radius:999px;padding:2px 9px;font-size:12.5px}
-.pgchip i{font-style:normal;color:var(--mut);cursor:pointer}
-.pgpair{display:flex;gap:10px;flex:1;min-width:0;flex-wrap:wrap}
-.pgwrap{position:relative;flex:1 1 220px;min-width:0}
-.pgwrap .pgfield{width:100%;box-sizing:border-box}
-.pgdrop{position:absolute;top:100%;left:0;right:0;z-index:50;background:#fff;border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadowPop);margin-top:4px;padding:8px}
-.pgdrop .pgsearch{width:100%;margin-bottom:6px;box-sizing:border-box}
-#pgProvList,#pgCityList{max-height:260px;overflow:auto}
-.pgrow{display:flex;gap:8px;align-items:center;padding:6px 8px;font-size:13.5px;border-radius:6px;cursor:pointer}
-.pgrow:hover{background:#f4f6fa}
-.pgrow input[type=checkbox]{flex:0 0 auto;width:auto;min-width:0;margin:0}
-.pgrow span{flex:1;min-width:0;text-align:left}
+/* 防火墙统一多选组件: 容器 relative, 面板 absolute + left:0 + width:100%,
+   与触发框左沿宽度严格对齐; 面板纯白 + 品牌蓝复选框与高亮 */
+.msel{position:relative;flex:1;min-width:0}
+.mselpair{display:flex;gap:10px;flex:1;min-width:0;flex-wrap:wrap}
+.msel-field{width:100%;box-sizing:border-box;min-width:120px;border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:#fff;display:flex;flex-wrap:wrap;gap:6px;align-items:center;cursor:pointer;min-height:36px}
+.msel-field:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(37,99,235,.18)}
+.msel.open .msel-field{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(37,99,235,.18)}
+.msel-chip{display:inline-flex;gap:4px;align-items:center;background:#eef3ff;border:1px solid #d3e0ff;border-radius:999px;padding:2px 9px;font-size:12.5px}
+.msel-chip i{font-style:normal;color:var(--mut);cursor:pointer}
+.msel-chip i:hover{color:var(--blue2)}
+.msel-drop{display:none;position:absolute;top:calc(100% + 4px);left:0;width:100%;box-sizing:border-box;z-index:50;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(16,24,40,.18);padding:8px}
+.msel.open .msel-drop{display:block}
+.msel-search{width:100%;margin-bottom:6px;box-sizing:border-box}
+.msel-list{max-height:260px;overflow:auto}
+.msel-row{display:flex;gap:8px;align-items:center;padding:7px 8px;font-size:13.5px;border-radius:8px;cursor:pointer}
+.msel-row:hover{background:rgba(37,99,235,.07)}
+.msel-row input[type=checkbox]{flex:0 0 auto;width:auto;min-width:0;margin:0;accent-color:var(--blue2)}
+.msel-row input[type=checkbox]:checked+span{color:var(--blue2);font-weight:600}
+.msel-row span{flex:1;min-width:0;text-align:left}
+.msel-row span i{font-style:normal;color:var(--mut);font-weight:400}
 .scard .savebar{padding:10px 18px 0;display:flex;align-items:center;gap:10px}
 .savedtip{color:var(--green);font-size:12px;display:none}
 textarea.ta{width:calc(100% - 36px);margin:6px 18px 0;min-height:92px;resize:vertical;line-height:1.55}
@@ -263,7 +268,6 @@ body.auth #loginView{margin:auto}
 /* 分区卡片: 标题 + 间距 + 操作区; 操作区(savebar)以顶部分隔线与内容区分 */
 .scard .savebar,.panel .savebar{border-top:1px solid var(--line);margin-top:10px;padding-top:12px}
 /* 分组眉题: 防护/设置页内把相邻卡片归成一组, 只作视觉分组, 不改卡片顺序与 id */
-.grp-head{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--mut);padding:6px 4px 10px}
 .mtitle{color:var(--blue2);border-left:3px solid var(--blue2);padding-left:10px;font-size:15px;font-weight:700}
 .scard h3.mtitle{font-size:15px;padding-left:15px}
 .frow .fv input.in-mid{flex:0 0 143px;min-width:0;width:143px}
@@ -447,13 +451,11 @@ body.auth #loginView{margin:auto}
         <div class="frow"><div class="fl">状态</div><div class="fv"><span class="mono" id="protRescueTx"></span><button class="btn primary" id="btnProtRestore">恢复防护</button></div></div>
       </div>
 
-      <div class="grp-head mtitle">建议与须知</div>
       <div class="scard">
         <h3 class="mtitle">安全建议</h3>
         <div class="hint">建议修改默认的 SSH 端口和面板端口，不要使用默认端口。</div>
       </div>
 
-      <div class="grp-head mtitle">防火墙</div>
       <div class="scard">
         <h3 class="mtitle">防火墙</h3>
         <div class="hint">给指定端口加访问规则：命中拒绝规则的来源按规则端口封禁（不影响该 IP 的其他端口），命中允许规则的放行，多条命中时拒绝优先；无规则命中时按受防护端口默认封禁。端口支持单个、逗号分隔与范围（如 1-65535）。内网与信任名单永远豁免。删除规则不自动解封已封禁，到期或手动解封为止。</div>
@@ -471,7 +473,6 @@ body.auth #loginView{margin:auto}
         <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
       </div>
 
-      <div class="grp-head mtitle">行为检测</div>
       <div class="scard">
         <h3 class="mtitle">爆破自动拉黑</h3>
         <div class="frow"><div class="fl">启用自动拉黑<div class="d">内网与信任名单豁免</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sAbOn"><i></i></label></div></div>
@@ -513,7 +514,6 @@ body.auth #loginView{margin:auto}
         <div class="savebar"><button class="btn primary" id="btnHpSave">保存蜜罐设置</button><span class="savedtip">已保存</span></div>
       </div>
 
-      <div class="grp-head mtitle">应急与情报</div>
       <div class="scard">
         <h3 class="mtitle">急救 <span class="cbadge">TG 超级密码</span></h3>
         <div class="hint">在 Telegram 给机器人发送 /rescue 打开急救菜单：信任 IP、解封全部、关闭所有拦截（30 分钟后自动恢复）、恢复防护。破坏性动作（解封全部、关闭所有拦截）必须输对超级密码；日常拉黑、单个解封不走密码。内网 IP 永远不进黑名单，家里局域网永远是活路；应用挂了时 TG 也救不了，只能 SSH 上去改 bans.json 或清 nft 规则。</div>
@@ -561,7 +561,6 @@ body.auth #loginView{margin:auto}
   </section>
 
   <section id="tab-set" style="display:none">
-    <div class="grp-head mtitle">登录与面板</div>
     <div class="panel" style="margin-bottom:14px" id="totpCard">
       <div class="ph"><h2 class="mtitle">二次验证（2FA）</h2><span class="hint" id="totpState">…</span><span class="sp"></span><button class="btn" id="btnTotpSetup">开通 2FA</button></div>
       <div id="totpDisableBox" style="display:none">
@@ -592,7 +591,6 @@ body.auth #loginView{margin:auto}
       <div class="hint" id="pairPendingMsg" style="margin:0 0 10px"></div>
     </div>
     <div class="setgrid">
-      <div class="grp-head mtitle">通知</div>
       <div class="scard" id="tgCard">
         <h3 class="mtitle">通知方式 <span class="cbadge">Telegram</span></h3>
         <div class="frow"><div class="fl">启用 TG 报警<div class="d">报警消息带一键拉黑按钮</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sTgOn"><i></i></label></div></div>
@@ -612,7 +610,6 @@ body.auth #loginView{margin:auto}
         <div class="savebar"><button class="btn primary" id="btnNtSave">保存节点 TG 设置</button></div>
       </div>
 
-      <div class="grp-head mtitle">报警与统计</div>
       <div class="scard">
         <h3 class="mtitle">报警项目</h3>
         <div id="alertRows"></div>
@@ -636,7 +633,6 @@ body.auth #loginView{margin:auto}
         <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
       </div>
 
-      <div class="grp-head mtitle">数据与维护</div>
       <div class="scard">
         <h3 class="mtitle">归属地库</h3>
         <div class="geoline"><span class="st">IPv4 库</span><span class="dt" id="geoV4Info">…</span><span style="flex:1"></span><span id="geoV4Btns"></span></div>
@@ -661,7 +657,6 @@ body.auth #loginView{margin:auto}
         <div class="frow"><div class="fl">恢复设置<div class="d">上传设置备份 JSON；版本不匹配会先警告</div></div><div class="fv"><input type="file" id="upSettings" accept=".json" style="display:none"><button class="btn" id="btnUpSettings">选择文件恢复</button></div></div>
         <div class="frow"><div class="fl">恢复数据<div class="d">上传数据备份 zip；黑名单随数据一起回来</div></div><div class="fv"><input type="file" id="upData" accept=".zip" style="display:none"><button class="btn" id="btnUpData">选择文件恢复</button></div></div>
       </div>
-      <div class="grp-head mtitle">版本</div>
     <div class="panel" style="margin-bottom:14px" id="upCard">
       <div class="ph"><h2 class="mtitle">版本与升级</h2><span class="hint">升级会重启面板，重启后请重新登录</span></div>
       <div class="frow"><div class="fl">当前版本</div><div class="fv"><span class="mono" id="upCur">…</span><button class="btn" id="btnUpCheck">检查更新</button></div></div>
@@ -1745,70 +1740,108 @@ async function hpSave(confirm){
 }
 $('#btnHpSave').onclick=()=>hpSave(false);
 /* 防火墙: 规则管理 + 添加/编辑对话框 */
-let pgRegions=[],fwCountries=[],fwSAR=['香港','澳门','台湾'];
+let pgRegions=[],fwCountries=[],fwCountryBil=[],fwSARBil=[],cnProvinces=[],cnCities=[];
 async function loadPgRegions(){
   if(pgRegions.length)return;
   try{const r=await api('GET','api/geo/regions');pgRegions=r.regions||[]}catch(e){}
 }
 async function loadFwCountries(){
   if(fwCountries.length)return;
-  try{const r=await api('GET','api/geo/countries');fwCountries=r.countries||[];if(r.sar)fwSAR=r.sar}catch(e){}
+  try{const r=await api('GET','api/geo/countries');fwCountries=r.countries||[];fwCountryBil=r.countriesBilingual||[];fwSARBil=r.sarBilingual||[]}catch(e){}
+}
+async function loadCnCities(){
+  if(cnProvinces.length||cnCities.length)return;
+  try{const r=await api('GET','api/geo/cities');cnProvinces=r.provinces||[];cnCities=r.cities||[]}catch(e){}
 }
 function pgLocKey(l){return l.kind+'|'+l.name+'|'+(l.province||'')}
-function pgChipHtml(l){return '<span class="pgchip" data-k="'+pgLocKey(l)+'">'+l.display+'<i>×</i></span>'}
 function pgSelFromLocs(locs){
   return (locs||[]).map(l=>{
     const f=pgRegions.find(x=>x.kind===l.kind&&x.name===l.name&&((l.kind!=='city')||x.province===l.province));
     return f?{kind:f.kind,name:f.name,province:f.province||'',display:f.display}:{kind:l.kind,name:l.name,province:l.province||'',display:l.name};
   });
 }
-// 对话框选择态(国家字符串 + 省市条目)
-let fwSelCountries=[],fwSelLocs=[];
-function fwCountryChip(c){return '<span class="pgchip" data-c="'+esc(c)+'">'+esc(c)+'<i>×</i></span>'}
-function renderFwCountryField(){
-  const f=$('#fwCountryField');if(!f)return;
-  f.innerHTML=fwSelCountries.length?fwSelCountries.map(fwCountryChip).join(''):'<span>选择国家…</span>';
-  f.querySelectorAll('.pgchip').forEach(c=>c.onclick=ev=>{ev.stopPropagation();fwSelCountries=fwSelCountries.filter(x=>x!==c.dataset.c);renderFwCountryField();renderFwCountryList();});
+// ---------- 统一多选组件 ----------
+// 触发框与下拉面板同属一个 .msel 容器(容器 position:relative, 面板
+// absolute + left:0 + width:100%), 面板左沿与宽度与触发框严格对齐;
+// 面板纯白 + 品牌蓝复选框与高亮; 点面板外或按 Esc 关闭面板(不关对话框)。
+document.addEventListener('click',()=>{document.querySelectorAll('.msel.open').forEach(m=>m.classList.remove('open'))});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape')document.querySelectorAll('.msel.open').forEach(m=>m.classList.remove('open'))});
+function mselInit(fieldId,dropId,searchId,renderList){
+  const field=$(fieldId),drop=$(dropId);
+  if(!field||!drop)return;
+  field.onclick=ev=>{ev.stopPropagation();const w=field.parentElement,was=w.classList.contains('open');document.querySelectorAll('.msel.open').forEach(m=>m.classList.remove('open'));if(!was){w.classList.add('open');renderList();$(searchId).focus()}};
+  drop.onclick=ev=>ev.stopPropagation();
+  $(searchId).onclick=ev=>ev.stopPropagation();
+  $(searchId).oninput=renderList;
 }
-function renderFwLocFields(){
+function mselChip(label,key){
+  return '<span class="msel-chip" data-k="'+esc(key)+'">'+label+'<i>×</i></span>';
+}
+function mselBindChips(fieldId,removeFn){
+  const f=$(fieldId);if(!f)return;
+  f.querySelectorAll('.msel-chip').forEach(c=>c.onclick=ev=>{ev.stopPropagation();removeFn(c.dataset.k)});
+}
+// 对话框选择态: 海外存国家代码(表里没有的库原字符串存原串), 中国存省市条目
+let fwSelForeign=[],fwSelLocs=[];
+// 国家双语条目: 后端三方表优先, 老后端只给字符串时回退为原串单语
+function fwCountryEntries(){
+  if(fwCountryBil.length)return [...fwSARBil,...fwCountryBil];
+  const sar=['香港','澳门','台湾'];
+  return [...sar,...fwCountries].map(s=>({code:'',zh:s,en:s}));
+}
+function fwCountryEntryForSel(sel){
+  const all=fwCountryEntries();
+  return all.find(e=>e.code===sel)||all.find(e=>e.zh===sel)||all.find(e=>e.en===sel)||{code:sel,zh:sel,en:sel};
+}
+function fwCountryLabel(sel){
+  const e=fwCountryEntryForSel(sel);
+  return e.en&&e.en!==e.zh?esc(e.zh)+' <i>'+esc(e.en)+'</i>':esc(e.zh);
+}
+function normSearch(s){
+  return (s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+const fwCountryAlias={turkey:'TR',swaziland:'SZ','cape verde':'CV','czech republic':'CZ',burma:'MM',vietnam:'VN','ivory coast':'CI',macao:'MO',hongkong:'HK'};
+function fwCountryMatch(e,q){
+  if(!q)return true;
+  const nq=normSearch(q);
+  if(e.zh&&e.zh.indexOf(q.trim())>=0)return true;
+  if(e.code&&e.code===q.trim().toUpperCase())return true;
+  if(e.en&&normSearch(e.en).indexOf(nq)>=0)return true;
+  if(fwCountryAlias[nq]&&e.code===fwCountryAlias[nq])return true;
+  return false;
+}
+function renderFwForeignField(){
+  const f=$('#fwForeignField');if(!f)return;
+  f.innerHTML=fwSelForeign.length?fwSelForeign.map(c=>mselChip(fwCountryLabel(c),c)).join(''):'<span>选择国家或地区…</span>';
+  mselBindChips('#fwForeignField',k=>{fwSelForeign=fwSelForeign.filter(x=>x!==k);renderFwForeignField();renderFwForeignList();});
+}
+function renderFwForeignList(){
+  const q=($('#fwForeignSearch').value||'');const list=$('#fwForeignList');if(!list)return;
+  const sel=new Set(fwSelForeign);
+  const rows=fwCountryEntries().filter(e=>fwCountryMatch(e,q));
+  list.innerHTML=rows.map(e=>{const k=e.code||e.zh;return '<label class="msel-row"><input type="checkbox" data-k="'+esc(k)+'"'+(sel.has(k)?' checked':'')+'><span>'+(e.en&&e.en!==e.zh?esc(e.zh)+' <i>'+esc(e.en)+'</i>':esc(e.zh))+'</span></label>'}).join('')||'<div class="msel-row">没有匹配的国家或地区</div>';
+  list.querySelectorAll('input').forEach(cb=>cb.onchange=()=>{const k=cb.dataset.k;if(cb.checked){if(!fwSelForeign.includes(k))fwSelForeign.push(k)}else{fwSelForeign=fwSelForeign.filter(x=>x!==k)}renderFwForeignField();});
+}
+function fwLocDisplay(l){
+  if(l.kind==='province'){const p=cnProvinces.find(x=>x.name===l.name);return p?p.display:l.name}
+  const c=cnCities.find(x=>x.name===l.name&&x.province===l.province);
+  return c?c.display:l.name;
+}
+function renderFwCnFields(){
   const pf=$('#fwProvField'),cf=$('#fwCityField');if(!pf)return;
   const provs=fwSelLocs.filter(l=>l.kind==='province');
   const cities=fwSelLocs.filter(l=>l.kind==='city');
-  pf.innerHTML=provs.length?provs.map(pgChipHtml).join(''):'<span>选择省份…</span>';
-  cf.innerHTML=cities.length?cities.map(pgChipHtml).join(''):'<span>选择城市…</span>';
-  [pf,cf].forEach(fd=>fd.querySelectorAll('.pgchip').forEach(c=>c.onclick=ev=>{ev.stopPropagation();fwSelLocs=fwSelLocs.filter(x=>pgLocKey(x)!==c.dataset.k);renderFwLocFields();renderFwProvList();renderFwCityList();}));
-}
-function fwBindList(list,after){
-  list.querySelectorAll('input').forEach(cb=>cb.onchange=()=>{
-    if(cb.dataset.c!==undefined){
-      if(cb.checked){if(!fwSelCountries.includes(cb.dataset.c))fwSelCountries.push(cb.dataset.c)}else{fwSelCountries=fwSelCountries.filter(x=>x!==cb.dataset.c)}
-      renderFwCountryField();
-    }else{
-      const r=pgRegions.find(x=>pgLocKey(x)===cb.dataset.k);if(!r)return;
-      const sel=new Set(fwSelLocs.map(pgLocKey));
-      if(cb.checked){if(!sel.has(cb.dataset.k))fwSelLocs.push(r)}else{fwSelLocs=fwSelLocs.filter(x=>pgLocKey(x)!==cb.dataset.k)}
-      renderFwLocFields();
-    }
-    if(after)after();
-  });
-}
-function fwRowHtml(label,checked,keyAttr){
-  return '<label class="pgrow"><input type="checkbox" '+keyAttr+(checked?' checked':'')+'><span>'+label+'</span></label>';
-}
-function renderFwCountryList(){
-  const q=($('#fwCountrySearch').value||'').trim();const list=$('#fwCountryList');if(!list)return;
-  const sel=new Set(fwSelCountries);
-  const all=[...fwSAR,...fwCountries]; // 港澳台置顶(国家级选项), 再接库原国家字符串
-  const rows=all.filter(c=>!q||c.indexOf(q)>=0);
-  list.innerHTML=rows.map(c=>fwRowHtml(esc(c),sel.has(c),'data-c="'+esc(c)+'"')).join('')||'<div class="pgrow">没有匹配的国家</div>';
-  fwBindList(list);
+  pf.innerHTML=provs.length?provs.map(l=>mselChip(esc(fwLocDisplay(l)),pgLocKey(l))).join(''):'<span>选择省份…</span>';
+  cf.innerHTML=cities.length?cities.map(l=>mselChip(esc(fwLocDisplay(l)),pgLocKey(l))).join(''):'<span>选择城市…</span>';
+  mselBindChips('#fwProvField',k=>{fwSelLocs=fwSelLocs.filter(x=>pgLocKey(x)!==k);renderFwCnFields();renderFwProvList();renderFwCityList();});
+  mselBindChips('#fwCityField',k=>{fwSelLocs=fwSelLocs.filter(x=>pgLocKey(x)!==k);renderFwCnFields();renderFwProvList();renderFwCityList();});
 }
 function renderFwProvList(){
   const q=($('#fwProvSearch').value||'').trim();const list=$('#fwProvList');if(!list)return;
   const sel=new Set(fwSelLocs.map(pgLocKey));
-  const rows=pgRegions.filter(r=>r.kind==='province'&&(!q||r.display.indexOf(q)>=0||r.name.indexOf(q)>=0));
-  list.innerHTML=rows.map(r=>fwRowHtml(r.display,sel.has(pgLocKey(r)),'data-k="'+pgLocKey(r)+'"')).join('')||'<div class="pgrow">没有匹配的省份</div>';
-  fwBindList(list,renderFwCityList);
+  const rows=cnProvinces.filter(p=>!q||p.display.indexOf(q)>=0||p.name.indexOf(q)>=0);
+  list.innerHTML=rows.map(p=>{const k='province|'+p.name+'|';return '<label class="msel-row"><input type="checkbox" data-k="'+k+'"'+(sel.has(k)?' checked':'')+'><span>'+esc(p.display)+'</span></label>'}).join('')||'<div class="msel-row">没有匹配的省份</div>';
+  list.querySelectorAll('input').forEach(cb=>cb.onchange=()=>{const name=cb.dataset.k.split('|')[1];const r=cnProvinces.find(x=>x.name===name);if(!r)return;const key=pgLocKey({kind:'province',name:r.name,province:''});if(cb.checked){if(!fwSelLocs.some(x=>pgLocKey(x)===key))fwSelLocs.push({kind:'province',name:r.name,province:'',display:r.display})}else{fwSelLocs=fwSelLocs.filter(x=>pgLocKey(x)!==key)}renderFwCnFields();renderFwCityList();});
 }
 function renderFwCityList(){
   const q=($('#fwCitySearch').value||'').trim();const list=$('#fwCityList');if(!list)return;
@@ -1817,32 +1850,16 @@ function renderFwCityList(){
   if(!q){
     const provs=new Set(fwSelLocs.filter(l=>l.kind==='province').map(l=>l.name));
     if(provs.size){
-      const rows=pgRegions.filter(r=>r.kind==='city'&&provs.has(r.province));
-      html=rows.map(r=>fwRowHtml(r.display,sel.has(pgLocKey(r)),'data-k="'+pgLocKey(r)+'"')).join('')||'<div class="pgrow">该省暂无城市数据</div>';
-    }else{html='<div class="pgrow" style="color:var(--mut)">先选省份可直接列出该省各市，或输入关键词搜索城市，如 南京、江苏</div>';}
+      const rows=cnCities.filter(c=>provs.has(c.province));
+      html=rows.map(c=>{const k=pgLocKey(c);return '<label class="msel-row"><input type="checkbox" data-k="'+esc(k)+'"'+(sel.has(k)?' checked':'')+'><span>'+esc(c.display)+'</span></label>'}).join('')||'<div class="msel-row">该省暂无城市数据</div>';
+    }else{html='<div class="msel-row" style="color:var(--mut)">先选省份可直接列出该省各市，或输入关键词搜索城市，如 南京、江苏</div>';}
   }else{
-    const rows=pgRegions.filter(r=>r.kind==='city'&&(r.display.indexOf(q)>=0||r.name.indexOf(q)>=0||(r.province||'').indexOf(q)>=0));
-    html=rows.map(r=>fwRowHtml(r.display,sel.has(pgLocKey(r)),'data-k="'+pgLocKey(r)+'"')).join('')||'<div class="pgrow">没有匹配的城市</div>';
+    const rows=cnCities.filter(c=>c.display.indexOf(q)>=0||c.name.indexOf(q)>=0||(c.province||'').indexOf(q)>=0);
+    html=rows.map(c=>{const k=pgLocKey(c);return '<label class="msel-row"><input type="checkbox" data-k="'+esc(k)+'"'+(sel.has(k)?' checked':'')+'><span>'+esc(c.display)+'</span></label>'}).join('')||'<div class="msel-row">没有匹配的城市</div>';
   }
   list.innerHTML=html;
-  fwBindList(list);
+  list.querySelectorAll('input').forEach(cb=>cb.onchange=()=>{const r=cnCities.find(x=>pgLocKey(x)===cb.dataset.k);if(!r)return;const key=pgLocKey(r);if(cb.checked){if(!fwSelLocs.some(x=>pgLocKey(x)===key))fwSelLocs.push({kind:'city',name:r.name,province:r.province,display:r.display})}else{fwSelLocs=fwSelLocs.filter(x=>pgLocKey(x)!==key)}renderFwCnFields();});
 }
-function fwToggleDrop(which){
-  const drops={country:'#fwCountryDrop',prov:'#fwProvDrop',city:'#fwCityDrop'};
-  for(const k in drops){const d=$(drops[k]);if(d&&k!==which)d.style.display='none'}
-  const t=$(drops[which]);if(!t)return;
-  const show=t.style.display==='none';
-  t.style.display=show?'':'none';
-  if(show){
-    if(which==='country'){renderFwCountryList();$('#fwCountrySearch').focus()}
-    else if(which==='prov'){renderFwProvList();$('#fwProvSearch').focus()}
-    else{renderFwCityList();$('#fwCitySearch').focus()}
-  }
-}
-document.addEventListener('click',ev=>{
-  const pairs=[['#fwCountryField','#fwCountryDrop'],['#fwProvField','#fwProvDrop'],['#fwCityField','#fwCityDrop']];
-  for(const [f,d] of pairs){const fe=$(f),de=$(d);if(fe&&de&&!fe.contains(ev.target)&&!de.contains(ev.target))de.style.display='none'}
-});
 function fwSourceSummary(src){
   if(!src)return '';
   switch(src.kind){
@@ -1852,7 +1869,16 @@ function fwSourceSummary(src){
     case 'cn_in':return '中国大陆境内';
     case 'cn_out':return '中国大陆境外';
     case 'all':return '全部 IP';
+    case 'custom_cn':{
+      const d=pgSelFromLocs(src.locations).map(l=>l.display).join('、');
+      return d?'自定义位置（中国）：'+d:'自定义位置（中国）';
+    }
+    case 'custom_foreign':{
+      const d=(src.countries||[]).map(c=>fwCountryEntryForSel(c).zh).join('、');
+      return d?'自定义位置（海外）：'+d:'自定义位置（海外）';
+    }
     case 'custom_loc':{
+      // 旧节点混用展示: 国家原串 + 省市, 只读语义与旧版一致
       const parts=[...(src.countries||[])];
       const d=pgSelFromLocs(src.locations).map(l=>l.display).join('、');
       if(d)parts.push(d);
@@ -1889,42 +1915,47 @@ async function loadPortGuard(){
   el.querySelectorAll('[data-fwedit]').forEach(b=>b.onclick=()=>openFwDialog(pgRulesShown.find(x=>x.id===b.dataset.fwedit)));
   el.querySelectorAll('[data-pgdel]').forEach(b=>b.onclick=async()=>{try{await api('DELETE','api/portguard/'+b.dataset.pgdel);toast('规则已删除');loadPortGuard()}catch(e){toast(e.message)}});
 }
+const FW_SRC_KINDS=['custom_ip','all_v4','all_v6','cn_in','cn_out','custom_cn','custom_foreign','all'];
 async function openFwDialog(rule){
-  await loadPgRegions();await loadFwCountries();
+  await loadPgRegions();await loadFwCountries();await loadCnCities();
   const isNew=!rule;
-  fwSelCountries=rule&&rule.source&&rule.source.kind==='custom_loc'?[...(rule.source.countries||[])]:[];
-  fwSelLocs=rule&&rule.source&&rule.source.kind==='custom_loc'?pgSelFromLocs(rule.source.locations):[];
-  const srcKind=rule&&rule.source?rule.source.kind:'custom_loc';
+  const srcKind=rule&&rule.source?rule.source.kind:'custom_cn';
+  const knownKind=FW_SRC_KINDS.includes(srcKind);
+  fwSelForeign=rule&&rule.source&&rule.source.kind==='custom_foreign'?[...(rule.source.countries||[])]:[];
+  fwSelLocs=rule&&rule.source&&rule.source.kind==='custom_cn'?(rule.source.locations||[]).map(l=>{const d=fwLocDisplay(l);return {kind:l.kind,name:l.name,province:l.province||'',display:d}}):[];
   const srcCidr=rule&&rule.source?rule.source.cidr||'':'';
   const html='<h3 class="mtitle">'+(isNew?'添加规则':'编辑规则')+'</h3><div class="csub">端口被任一生效规则覆盖即受防护；多条命中时拒绝优先于允许；无规则命中时按受防护端口默认封禁；内网、回环与信任名单永远豁免。</div>'+
+  (knownKind?'':'<div class="sline fail">该节点版本较旧（规则类型 '+esc(srcKind)+'），请先升级节点再编辑；卡片上的启用开关仍可用。</div>')+
   '<div class="fld"><label>网络连接</label><select id="fwNet"><option value="all">全部（所有网卡入站连接）</option></select><div class="hint">规则适用于全部网卡的入站连接</div></div>'+
   '<div class="fld"><label>通信协议</label><select id="fwProto"><option value="all">全部</option><option value="tcp">TCP</option><option value="udp">UDP</option></select></div>'+
   '<div class="fld"><label>端口</label><input id="fwPorts" placeholder="如 80,443 或 8000-8010" value="'+esc(rule?rule.portText||'':'')+'"><div class="hint">单个、逗号分隔、或范围（如 1-65535）</div></div>'+
-  '<div class="fld"><label>来源范围</label><select id="fwSrcKind"><option value="custom_ip">自定义 IP</option><option value="all_v4">全部 IPv4</option><option value="all_v6">全部 IPv6</option><option value="cn_in">中国大陆境内</option><option value="cn_out">中国大陆境外</option><option value="custom_loc">自定义位置</option><option value="all">全部 IP</option></select><div class="hint">中国大陆境内 = 国家是中国且省份不在香港、澳门、台湾；境外模式下港澳台可访问；自定义位置的“中国”不含港澳台，港澳台请单独选</div></div>'+
+  '<div class="fld"><label>来源范围</label><select id="fwSrcKind"><option value="custom_ip">自定义 IP</option><option value="all_v4">全部 IPv4</option><option value="all_v6">全部 IPv6</option><option value="cn_in">中国大陆境内</option><option value="cn_out">中国大陆境外</option><option value="custom_cn">自定义位置（中国）</option><option value="custom_foreign">自定义位置（海外）</option><option value="all">全部 IP</option></select><div class="hint">中国大陆境内 = 国家是中国且省份不在香港、澳门、台湾；境外模式下港澳台可访问；自定义位置（中国）只含大陆省市，港澳台请到自定义位置（海外）里选</div></div>'+
   '<div class="fld" id="fwIpRow"><label>IP 或 CIDR</label><input id="fwCidr" placeholder="如 0.0.0.0/0 或 8.8.8.8" value="'+esc(srcCidr)+'"></div>'+
-  '<div id="fwLocRow">'+
-  '<div class="fld"><label>国家（多选，港澳台置顶）</label><div class="pgwrap"><div id="fwCountryField" class="pgfield" tabindex="0"><span>选择国家…</span></div><div id="fwCountryDrop" class="pgdrop" style="display:none"><input id="fwCountrySearch" class="pgsearch" placeholder="搜索国家…"><div id="fwCountryList"></div></div></div></div>'+
-  '<div class="fld"><label>省市自治区（多选，沿用省份选择器）</label><div class="pgpair"><div class="pgwrap"><div id="fwProvField" class="pgfield" tabindex="0"><span>选择省份…</span></div><div id="fwProvDrop" class="pgdrop" style="display:none"><input id="fwProvSearch" class="pgsearch" placeholder="搜索省份…"><div id="fwProvList"></div></div></div>'+
-  '<div class="pgwrap"><div id="fwCityField" class="pgfield" tabindex="0"><span>选择城市…</span></div><div id="fwCityDrop" class="pgdrop" style="display:none"><input id="fwCitySearch" class="pgsearch" placeholder="搜索城市或省份，如 南京、江苏…"><div id="fwCityList"></div></div></div></div></div>'+
+  '<div id="fwCnRow">'+
+  '<div class="fld"><label>省市自治区（多选）</label><div class="mselpair"><div class="msel"><div id="fwProvField" class="msel-field" tabindex="0"><span>选择省份…</span></div><div id="fwProvDrop" class="msel-drop"><input id="fwProvSearch" class="msel-search" placeholder="搜索省份…"><div id="fwProvList" class="msel-list"></div></div></div>'+
+  '<div class="msel"><div id="fwCityField" class="msel-field" tabindex="0"><span>选择城市…</span></div><div id="fwCityDrop" class="msel-drop"><input id="fwCitySearch" class="msel-search" placeholder="搜索城市或省份，如 南京、江苏…"><div id="fwCityList" class="msel-list"></div></div></div></div></div>'+
   '</div>'+
-  '<div class="fld"><label>动作</label><div><label style="margin-right:16px"><input type="radio" name="fwAction" value="allow"'+(rule&&rule.action==='deny'?'':' checked')+'> 允许</label><label><input type="radio" name="fwAction" value="deny"'+(rule&&rule.action==='deny'?' checked':'')+'> 拒绝</label></div></div>'+
-  '<div class="fld"><label>状态</label><div><label style="margin-right:16px"><input type="radio" name="fwEnabled" value="1"'+(rule&&!rule.enabled?'':' checked')+'> 生效</label><label><input type="radio" name="fwEnabled" value="0"'+(rule&&!rule.enabled?' checked':'')+'> 禁用</label></div></div>'+
+  '<div id="fwForeignRow">'+
+  '<div class="fld"><label>国家与地区（多选，含港澳台）</label><div class="msel"><div id="fwForeignField" class="msel-field" tabindex="0"><span>选择国家或地区…</span></div><div id="fwForeignDrop" class="msel-drop"><input id="fwForeignSearch" class="msel-search" placeholder="搜索国家或地区，中英文都可，如 美国、Japan…"><div id="fwForeignList" class="msel-list"></div></div></div></div>'+
+  '</div>'+
+  '<div class="fld"><label>动作</label><div class="seg" id="fwActionSeg"><button type="button" data-v="allow">允许</button><button type="button" data-v="deny">拒绝</button></div></div>'+
+  '<div class="fld"><label>状态</label><div class="seg" id="fwEnabledSeg"><button type="button" data-v="1">生效</button><button type="button" data-v="0">禁用</button></div></div>'+
   '<div class="fld"><label>封禁时长</label><input type="number" id="fwHours" min="0" max="8760" placeholder="24" value="'+(rule?String(rule.banHours):'')+'"><div class="hint">小时；0 = 永久，留空 = 24 小时</div></div>'+
   '<div class="sline fail" id="fwErr" style="display:none"></div>'+
-  '<div class="cfoot"><button class="btn" id="fwCancel">取消</button><button class="btn primary" id="fwOk">'+(isNew?'添加':'保存')+'</button></div>';
+  '<div class="cfoot"><button class="btn" id="fwCancel">取消</button><button class="btn primary" id="fwOk"'+(knownKind?'':' disabled')+'>'+(isNew?'添加':'保存')+'</button></div>';
   openCModal(html);
   $('#fwProto').value=rule?rule.proto||'all':'all';
-  $('#fwSrcKind').value=srcKind;
-  const fwSyncSrcRow=()=>{const k=$('#fwSrcKind').value;$('#fwIpRow').style.display=k==='custom_ip'?'':'none';$('#fwLocRow').style.display=k==='custom_loc'?'':'none';};
+  $('#fwSrcKind').value=knownKind?srcKind:'custom_cn';
+  const fwSyncSrcRow=()=>{const k=$('#fwSrcKind').value;$('#fwIpRow').style.display=k==='custom_ip'?'':'none';$('#fwCnRow').style.display=k==='custom_cn'?'':'none';$('#fwForeignRow').style.display=k==='custom_foreign'?'':'none';};
   fwSyncSrcRow();
   $('#fwSrcKind').onchange=fwSyncSrcRow;
-  $('#fwCountryField').onclick=()=>fwToggleDrop('country');
-  $('#fwProvField').onclick=()=>fwToggleDrop('prov');
-  $('#fwCityField').onclick=()=>fwToggleDrop('city');
-  $('#fwCountrySearch').oninput=renderFwCountryList;
-  $('#fwProvSearch').oninput=renderFwProvList;
-  $('#fwCitySearch').oninput=renderFwCityList;
-  renderFwCountryField();renderFwLocFields();
+  mselInit('#fwForeignField','#fwForeignDrop','#fwForeignSearch',renderFwForeignList);
+  mselInit('#fwProvField','#fwProvDrop','#fwProvSearch',renderFwProvList);
+  mselInit('#fwCityField','#fwCityDrop','#fwCitySearch',renderFwCityList);
+  const segInit=(id,cur)=>{const seg=$(id);if(!seg)return;seg.querySelectorAll('button').forEach(b=>{b.classList.toggle('sel',b.dataset.v===cur);b.onclick=()=>{seg.querySelectorAll('button').forEach(x=>x.classList.remove('sel'));b.classList.add('sel')}})};
+  segInit('#fwActionSeg',rule&&rule.action==='deny'?'deny':'allow');
+  segInit('#fwEnabledSeg',rule&&!rule.enabled?'0':'1');
+  renderFwForeignField();renderFwCnFields();
   $('#fwCancel').onclick=closeCModal;
   $('#fwOk').onclick=async()=>{
     const errEl=$('#fwErr');
@@ -1937,13 +1968,15 @@ async function openFwDialog(rule){
     if(kind==='custom_ip'){
       src.cidr=$('#fwCidr').value.trim();
       if(!src.cidr)return fail('请填写 IP 或 CIDR');
-    }else if(kind==='custom_loc'){
-      src.countries=[...fwSelCountries];
+    }else if(kind==='custom_cn'){
       src.locations=fwSelLocs.map(l=>({kind:l.kind,name:l.name,province:l.province||''}));
-      if(!src.countries.length&&!src.locations.length)return fail('自定义位置请至少选一个国家或省市');
+      if(!src.locations.length)return fail('自定义位置（中国）请至少选一个省市');
+    }else if(kind==='custom_foreign'){
+      src.countries=[...fwSelForeign];
+      if(!src.countries.length)return fail('自定义位置（海外）请至少选一个国家或地区');
     }
-    const action=document.querySelector('input[name="fwAction"]:checked').value;
-    const enabled=document.querySelector('input[name="fwEnabled"]:checked').value==='1';
+    const action=$('#fwActionSeg button.sel').dataset.v;
+    const enabled=$('#fwEnabledSeg button.sel').dataset.v==='1';
     const hv=$('#fwHours').value.trim();
     const banHours=hv==='' ? 24 : +hv;
     if(!(banHours>=0&&banHours<=8760))return fail('封禁时长须在 0-8760 小时之间（0 = 永久）');

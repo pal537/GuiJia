@@ -272,6 +272,7 @@ func geoCountriesInvalidate() {
 	geoCountriesMu.Lock()
 	geoCountriesCache = nil
 	geoCountriesMu.Unlock()
+	geoCitiesInvalidate()
 }
 
 // geoCountries: 库里全部国家字符串(去重排序, 排除 "0"、空与 Reserved)。
@@ -334,4 +335,155 @@ func geoWalkCountries(r *xdbReader, set map[string]bool) {
 			}
 		}
 	}
+}
+
+// ---------- 中国省市枚举(自定义位置(中国)的数据源) ----------
+// 直接走库段索引枚举, 与归属地判定同源: 只取国家=中国、省份不在港澳台的
+// 行, 省市一律归一化, display 用库原字段机械拼接, 不编造。港澳台不进
+// 中国选择器(走海外地区级选项)。结果缓存, 换库时随 geoCountries 一并失效。
+
+type geoCitiesData struct {
+	Provinces []Region `json:"provinces"`
+	Cities    []Region `json:"cities"`
+}
+
+var (
+	geoCitiesCache *geoCitiesData
+	geoCitiesMu    sync.Mutex
+)
+
+func geoCitiesInvalidate() {
+	geoCitiesMu.Lock()
+	geoCitiesCache = nil
+	geoCitiesMu.Unlock()
+}
+
+func geoCities() *geoCitiesData {
+	geoMu.RLock()
+	r4, r6 := geoV4, geoV6
+	geoMu.RUnlock()
+	if r4 == nil {
+		geoLoadV4Embedded()
+		geoMu.RLock()
+		r4, r6 = geoV4, geoV6
+		geoMu.RUnlock()
+	}
+	geoCitiesMu.Lock()
+	defer geoCitiesMu.Unlock()
+	if geoCitiesCache != nil {
+		return geoCitiesCache
+	}
+	provRaw := map[string]string{}
+	citySet := map[string]Region{}
+	// 两遍走库: 第一遍只收省份原字段(供城市 display 拼接), 第二遍收城市,
+	// 避免先见到的怪省行(如广州市)导致城市 display 缺省份后缀。
+	walk := func(r *xdbReader, cities bool) {
+		if r == nil {
+			return
+		}
+		for idx := 0; idx < 65536; idx++ {
+			vo := r.headerLen + idx*8
+			if vo+8 > len(r.data) {
+				continue
+			}
+			sPtr := binary.LittleEndian.Uint32(r.data[vo:])
+			ePtr := binary.LittleEndian.Uint32(r.data[vo+4:])
+			if sPtr >= ePtr {
+				continue
+			}
+			for off := int(sPtr); off+r.segLen <= int(ePtr); off += r.segLen {
+				seg := r.data[off : off+r.segLen]
+				dlen := int(binary.LittleEndian.Uint16(seg[r.ipLen*2:]))
+				dptr := int(binary.LittleEndian.Uint32(seg[r.ipLen*2+2:]))
+				if dptr+dlen > len(r.data) {
+					continue
+				}
+				parts := strings.Split(string(r.data[dptr:dptr+dlen]), "|")
+				if len(parts) < 3 || parts[0] != "中国" {
+					continue
+				}
+				normProv := normRegionName(parts[1])
+				if normProv == "" {
+					continue
+				}
+				quirk := false
+				if q, ok := quirkProvMap[normProv]; ok {
+					normProv = q
+					quirk = true
+				}
+				if normProv == "香港" || normProv == "澳门" || normProv == "台湾" {
+					continue
+				}
+				if !cities {
+					if !quirk {
+						if _, ok := provRaw[normProv]; !ok && parts[1] != "" && parts[1] != "0" {
+							provRaw[normProv] = parts[1]
+						}
+					}
+					continue
+				}
+				normCity := normRegionName(parts[2])
+				if normCity == "" {
+					continue
+				}
+				key := normProv + "|" + normCity
+				if _, ok := citySet[key]; !ok {
+					disp := parts[2]
+					if disp == "" || disp == "0" {
+						disp = normCity
+					}
+					if pr, ok := provRaw[normProv]; ok && pr != "" {
+						disp = disp + "（" + pr + "）"
+					}
+					citySet[key] = Region{Kind: "city", Name: normCity, Province: normProv, Display: disp}
+				}
+			}
+		}
+	}
+	walk(r4, false)
+	walk(r6, false)
+	walk(r4, true)
+	walk(r6, true)
+	// 省份顺序沿用 chinaRegions 的标准顺序, 其余按名排序。
+	provOrder := map[string]int{}
+	for i, r := range chinaRegions {
+		if r.Kind == "province" {
+			provOrder[r.Name] = i
+		}
+	}
+	provs := []Region{}
+	for name, raw := range provRaw {
+		provs = append(provs, Region{Kind: "province", Name: name, Display: raw})
+	}
+	sort.Slice(provs, func(i, j int) bool {
+		oi, oki := provOrder[provs[i].Name]
+		oj, okj := provOrder[provs[j].Name]
+		if oki && okj {
+			return oi < oj
+		}
+		if oki {
+			return true
+		}
+		if okj {
+			return false
+		}
+		return provs[i].Name < provs[j].Name
+	})
+	cities := []Region{}
+	for _, c := range citySet {
+		cities = append(cities, c)
+	}
+	sort.Slice(cities, func(i, j int) bool {
+		oi, oki := provOrder[cities[i].Province]
+		oj, okj := provOrder[cities[j].Province]
+		if oki && okj && oi != oj {
+			return oi < oj
+		}
+		if cities[i].Province != cities[j].Province {
+			return cities[i].Province < cities[j].Province
+		}
+		return cities[i].Name < cities[j].Name
+	})
+	geoCitiesCache = &geoCitiesData{Provinces: provs, Cities: cities}
+	return geoCitiesCache
 }

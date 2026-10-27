@@ -62,11 +62,13 @@ type GuardLocation struct {
 }
 
 // FWSource 规则的来源范围, 单选其一(kind 决定语义, 其余字段按 kind 取舍)。
+// custom_cn: 自定义位置(中国), 只含大陆省市(Locations); custom_foreign:
+// 自定义位置(海外), 只含国家与地区代码(Countries, 含港澳台 HK/MO/TW)。
 type FWSource struct {
-	Kind      string          `json:"kind"`                // custom_ip | all_v4 | all_v6 | cn_in | cn_out | custom_loc | all
+	Kind      string          `json:"kind"`                // custom_ip | all_v4 | all_v6 | cn_in | cn_out | custom_cn | custom_foreign | all
 	CIDR      string          `json:"cidr,omitempty"`      // custom_ip: IP 或 CIDR(原样存, 匹配用解析后的 cidrNet)
-	Countries []string        `json:"countries,omitempty"` // custom_loc: 国家多选(库原字符串 + 香港/澳门/台湾)
-	Locations []GuardLocation `json:"locations,omitempty"` // custom_loc: 省市多选(任一命中即命中)
+	Countries []string        `json:"countries,omitempty"` // custom_foreign: 国家与地区代码(新); 迁移进来的旧字符串原样保留作回退匹配
+	Locations []GuardLocation `json:"locations,omitempty"` // custom_cn: 省市多选(任一命中即命中)
 
 	cidrNet *net.IPNet // CIDR 解析结果(load 与校验时填充, 不落盘)
 }
@@ -119,18 +121,90 @@ func loadPortGuard() {
 					if json.Unmarshal(item, &r) == nil {
 						r.ranges, _ = parsePortRanges(r.PortText)
 						r.Source.cidrNet = parseCIDRNet(r.Source.CIDR)
+						// v1.0.9 的 custom_loc 已拆: 省市分大陆与港澳台两拨,
+						// 大陆省市 -> custom_cn, 国家 + 港澳台省市 -> custom_foreign;
+						// 两边都有按同端口/协议/动作/时长/生效态拆成两条(新 ID 由
+						// 旧 ID 派生, 并集语义不变); 转换后回写新格式。
+						if r.Source.Kind == "custom_loc" {
+							migrated = true
+							mainLocs := []GuardLocation{}
+							sarCodes := []string{}
+							sarSeen := map[string]bool{}
+							for _, l := range r.Source.Locations {
+								prov := normRegionName(l.Province)
+								name := normRegionName(l.Name)
+								sar := ""
+								if l.Kind == "province" {
+									sar = name
+								} else {
+									sar = prov
+								}
+								if sar == "香港" || sar == "澳门" || sar == "台湾" {
+									code := "HK"
+									if sar == "澳门" {
+										code = "MO"
+									} else if sar == "台湾" {
+										code = "TW"
+									}
+									if !sarSeen[code] {
+										sarSeen[code] = true
+										sarCodes = append(sarCodes, code)
+									}
+									continue
+								}
+								mainLocs = append(mainLocs, l)
+							}
+							foreign := normalizeCountrySelections(r.Source.Countries)
+							for _, c := range sarCodes {
+								found := false
+								for _, x := range foreign {
+									if x == c {
+										found = true
+										break
+									}
+								}
+								if !found {
+									foreign = append(foreign, c)
+								}
+							}
+							hasC := len(foreign) > 0
+							hasL := len(mainLocs) > 0
+							if hasL {
+								cn := r
+								cn.ID = r.ID
+								if hasC {
+									cn.ID = r.ID + "-cn"
+								}
+								cn.Source = FWSource{Kind: "custom_cn", Locations: mainLocs}
+								pgRules = append(pgRules, &cn)
+							}
+							if hasC {
+								fr := r
+								fr.ID = r.ID
+								if hasL {
+									fr.ID = r.ID + "-foreign"
+								}
+								fr.Source = FWSource{Kind: "custom_foreign", Countries: foreign}
+								pgRules = append(pgRules, &fr)
+							}
+							if !hasC && !hasL {
+								// 空的旧规则两边都不命中, 语义为空, 迁移时丢弃。
+								continue
+							}
+							continue
+						}
 						pgRules = append(pgRules, &r)
 					}
 					continue
 				}
-				// 旧格式: 端口不变、协议全部、来源=自定义位置(旧省名单)、允许、生效态与时长不变
+				// 旧格式: 端口不变、协议全部、来源=自定义位置(中国)(旧省名单)、允许、生效态与时长不变
 				var old legacyPortGuardRule
 				if json.Unmarshal(item, &old) != nil {
 					continue
 				}
 				r := &PortGuardRule{
 					ID: old.ID, PortText: formatPorts(old.Ports), Proto: "all",
-					Source:   FWSource{Kind: "custom_loc", Locations: old.Locations},
+					Source:   FWSource{Kind: "custom_cn", Locations: old.Locations},
 					Action:   "allow",
 					BanHours: old.BanHours, Enabled: old.Enabled,
 				}
@@ -149,6 +223,30 @@ func loadPortGuard() {
 }
 
 func savePortGuardLocked() { saveJSON(portGuardFile(), pgRules) }
+
+// normalizeCountrySelections: 旧国家字符串 -> 代码(能归一化的转代码,
+// 归一化不了的原样保留, 匹配时靠原字符串回退, 避免迁移丢语义); 去重保序。
+func normalizeCountrySelections(in []string) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, c := range in {
+		c = strings.TrimSpace(c)
+		if c == "" || seen[c] {
+			continue
+		}
+		if e, ok := countryEntryForName(c); ok {
+			c = e.Code
+		} else if code := countryCodeForName(c); code != "" {
+			c = code
+		}
+		if seen[c] {
+			continue
+		}
+		seen[c] = true
+		out = append(out, c)
+	}
+	return out
+}
 
 // normRegionName 归一化省/市名: 去空格, 去省/市/自治区类后缀(长后缀优先)。
 // "0"/空 = 未知, 归一为空, 永不命中白名单(默认拦)。
@@ -471,23 +569,27 @@ func fwSourceMatch(src FWSource, ip net.IP, geo GeoInfo) bool {
 		return geo.Country != "" && !geo.Private && !geoIsMainland(geo)
 	case "custom_ip":
 		return src.cidrNet != nil && src.cidrNet.Contains(ip)
-	case "custom_loc":
-		// 国家多选: 港澳台归属地只认港澳台选项, "中国"选项不含港澳台;
-		// 大陆归属地只认库原国家字符串。省市多选任一命中即命中。
-		if sar := geoSAR(geo); sar != "" {
-			for _, c := range src.Countries {
-				if c == sar {
+	case "custom_cn":
+		// 自定义位置(中国): 省市任一命中即命中, 港澳台不在此列。
+		return guardLocationAllowed(src.Locations, geo)
+	case "custom_foreign":
+		// 自定义位置(海外): 按代码归一化匹配。库里 "India" 与 "印度" 同属
+		// IN, 选任何一种写法都生效; 迁移残留的旧字符串靠原串回退匹配。
+		code := countryCodeForGeo(geo)
+		for _, c := range src.Countries {
+			if code != "" {
+				if c == code {
+					return true
+				}
+				if e, ok := countryEntryForName(c); ok && e.Code == code {
 					return true
 				}
 			}
-		} else if geo.Country != "" {
-			for _, c := range src.Countries {
-				if c == geo.Country {
-					return true
-				}
+			if geo.Country != "" && c == geo.Country {
+				return true
 			}
 		}
-		return guardLocationAllowed(src.Locations, geo)
+		return false
 	}
 	return false
 }
@@ -505,16 +607,20 @@ func fwSourceSummary(src FWSource) string {
 		return "中国大陆境内"
 	case "cn_out":
 		return "中国大陆境外"
-	case "custom_loc":
-		parts := []string{}
-		parts = append(parts, src.Countries...)
+	case "custom_cn":
 		if d := guardDisplay(src.Locations); d != "" {
-			parts = append(parts, d)
+			return "自定义位置（中国）：" + d
+		}
+		return "自定义位置（中国）"
+	case "custom_foreign":
+		parts := []string{}
+		for _, c := range src.Countries {
+			parts = append(parts, countryZhForCode(c))
 		}
 		if len(parts) == 0 {
-			return "自定义位置"
+			return "自定义位置（海外）"
 		}
-		return strings.Join(parts, "、")
+		return "自定义位置（海外）：" + strings.Join(parts, "、")
 	case "all":
 		return "全部 IP"
 	}
@@ -1052,25 +1158,12 @@ func parseFWRuleInput(portText, proto string, src FWSource, action string, banHo
 		src.CIDR = ""
 		src.Countries = nil
 		src.Locations = nil
-	case "custom_loc":
+	case "custom_cn":
 		src.CIDR = ""
-		if len(src.Countries) == 0 && len(src.Locations) == 0 {
-			return nil, fmt.Errorf("自定义位置请至少选一个国家或省市")
+		src.Countries = nil
+		if len(src.Locations) == 0 {
+			return nil, fmt.Errorf("自定义位置（中国）请至少选一个省市")
 		}
-		seen := map[string]bool{}
-		uniq := []string{}
-		for _, c := range src.Countries {
-			c = strings.TrimSpace(c)
-			if c == "" || seen[c] {
-				continue
-			}
-			if !geoCountryAllowed(c) {
-				return nil, fmt.Errorf("未知国家: %s", c)
-			}
-			seen[c] = true
-			uniq = append(uniq, c)
-		}
-		src.Countries = uniq
 		locSeen := map[string]bool{}
 		locOut := []GuardLocation{}
 		for i := range src.Locations {
@@ -1080,8 +1173,11 @@ func parseFWRuleInput(portText, proto string, src FWSource, action string, banHo
 			if l.Kind == "province" {
 				l.Province = ""
 			}
+			if l.Name == "香港" || l.Name == "澳门" || l.Name == "台湾" || l.Province == "香港" || l.Province == "澳门" || l.Province == "台湾" {
+				return nil, fmt.Errorf("港澳台不进中国选择器, 请到自定义位置（海外）里选")
+			}
 			if !validGuardLocation(l) {
-				return nil, fmt.Errorf("自定义位置中含未知省市: %s", l.Name)
+				return nil, fmt.Errorf("自定义位置（中国）中含未知省市: %s", l.Name)
 			}
 			k := l.Kind + "|" + l.Name + "|" + l.Province
 			if locSeen[k] {
@@ -1091,6 +1187,23 @@ func parseFWRuleInput(portText, proto string, src FWSource, action string, banHo
 			locOut = append(locOut, l)
 		}
 		src.Locations = locOut
+	case "custom_foreign":
+		src.CIDR = ""
+		src.Locations = nil
+		if len(src.Countries) == 0 {
+			return nil, fmt.Errorf("自定义位置（海外）请至少选一个国家或地区")
+		}
+		// 入库一律存代码: 旧字符串(中文名/库原英文)归一化转代码, 归一化不了
+		// 的原样保留(匹配时靠原串回退, 不丢语义)。
+		src.Countries = normalizeCountrySelections(src.Countries)
+		for _, c := range src.Countries {
+			if _, ok := countryEntryForCode(c); ok {
+				continue
+			}
+			if !geoCountryAllowed(c) {
+				return nil, fmt.Errorf("未知国家或地区: %s", c)
+			}
+		}
 	default:
 		return nil, fmt.Errorf("来源范围不对")
 	}
@@ -1309,5 +1422,29 @@ func handleGeoCountries(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, 405, "method")
 		return
 	}
-	writeJSON(w, 200, map[string]any{"countries": geoCountries(), "sar": []string{"香港", "澳门", "台湾"}})
+	// countries/sar 保持老形状(字符串, 旧面板兼容); countriesBilingual/
+	// sarBilingual 为新形状(代码+中英名, 新对话框用, 优先于老字段)。
+	// 表里没有的库原字符串(如 v6 新增国家)原样回退, 不丢选项。
+	names := geoCountries()
+	bil := []CountryEntry{}
+	for _, s := range names {
+		if e, ok := countryEntryForName(s); ok {
+			bil = append(bil, e)
+		} else {
+			bil = append(bil, CountryEntry{Zh: s, En: s})
+		}
+	}
+	writeJSON(w, 200, map[string]any{
+		"countries": names, "sar": []string{"香港", "澳门", "台湾"},
+		"countriesBilingual": bil, "sarBilingual": countrySARTable,
+	})
+}
+
+func handleGeoCities(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		errJSON(w, 405, "method")
+		return
+	}
+	d := geoCities()
+	writeJSON(w, 200, map[string]any{"provinces": d.Provinces, "cities": d.Cities})
 }

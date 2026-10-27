@@ -539,6 +539,7 @@ func main() {
 	mux.HandleFunc("/api/portguard/", handlePortGuardItem)
 	mux.HandleFunc("/api/geo/regions", handleGeoRegions)
 	mux.HandleFunc("/api/geo/countries", handleGeoCountries)
+	mux.HandleFunc("/api/geo/cities", handleGeoCities)
 	mux.HandleFunc("/api/geo/check/status", handleGeoCheckStatus)
 	mux.HandleFunc("/api/settings", handleSettings)
 	mux.HandleFunc("/api/data/clear", handleDataClear)
