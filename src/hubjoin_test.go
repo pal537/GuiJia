@@ -121,7 +121,7 @@ func TestSetupJoinHubBlockedByServers(t *testing.T) {
 		strings.NewReader(`{"hubUrl":"`+hubSrv.URL+`","code":"GOOD"}`))
 	rec := httptest.NewRecorder()
 	handleSetupJoinHub(rec, req)
-	if rec.Code != 400 || !strings.Contains(rec.Body.String(), "请先移除全部子服务器") {
+	if rec.Code != 400 || !strings.Contains(rec.Body.String(), "请先移除/处理全部子服务器") {
 		t.Fatalf("已有子服务器时应 400 且提示先移除: code=%d body=%s", rec.Code, rec.Body.String())
 	}
 	if settings.RunMode != "standalone" {
@@ -187,7 +187,7 @@ func TestJoinHubUI(t *testing.T) {
 		`接入主服务器（被控）`, `生成配对码（控制子服务器）`,
 		`function openJoinHubModal`, `function openPairGenModal`,
 		`api/setup/join-hub`, `api/nodes/pairing-code`,
-		`只读状态页`, `guijia leave`, `请先移除全部子服务器`,
+		`只读状态页`, `guijia leave`, `请先移除/处理全部子服务器`,
 		`id="pairPending"`, `id="btnPairRefresh"`,
 	} {
 		if !strings.Contains(html, s) {

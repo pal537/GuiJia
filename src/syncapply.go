@@ -195,7 +195,28 @@ func applySharedTrust(hubList []string) (added, removed, skipped int, changed bo
 	return added, removed, skipped, changed
 }
 
-// handleSyncApplyLists 节点侧群控同步落地接口: 只认内部头, 其余一律 403。
+// handleSyncApplyProtection 节点侧防护同步落地接口: 只认内部头,
+// 与 apply-lists 同 guard(面板代理调它只会 403)。
+// 主服务器每次推全量四项状态, 节点按收到状态原样落“已同步”标记:
+// 勾选的项应用主服务器配置, 未勾选的项恢复本地可改。
+func handleSyncApplyProtection(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	if r.Header.Get("X-Guijia-Internal") != "1" {
+		errJSON(w, 403, "仅主服务器内部同步可调用")
+		return
+	}
+	var p protSyncPayload
+	if json.NewDecoder(r.Body).Decode(&p) != nil {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	applied := applyProtSyncPayload(p)
+	writeJSON(w, 200, map[string]any{"ok": true, "applied": applied})
+}
+
 // handleSyncSharedState 超时后核实读(第 2 项): 返回节点当前共享状态,
 // 与 apply-lists 同 guard(只认 X-Guijia-Internal 头, 面板代理调它只会 403)。
 // 黑名单只含 Source=="shared" 的记录(enforced=当前是否在内核生效);

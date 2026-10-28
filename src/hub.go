@@ -421,7 +421,11 @@ func handleNodeServers(w http.ResponseWriter, r *http.Request) {
 			pending = append(pending, hubPendingPublic(p))
 		}
 	}
-	writeJSON(w, 200, map[string]any{"servers": servers, "pending": pending})
+	// isHub 是前端“接入主服务器”按钮显隐的唯一事实来源:
+	// 已登记或待添加任一非空即为主服务器, 全部清零才恢复按钮。
+	writeJSON(w, 200, map[string]any{"servers": servers, "pending": pending,
+		"isHub":       len(servers) > 0 || len(pending) > 0,
+		"serverCount": len(servers), "pendingCount": len(pending)})
 }
 
 // handleNodeLocation 首页卡片手动归属地: fingerprint 为 "local" 时改本机

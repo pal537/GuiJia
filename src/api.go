@@ -538,6 +538,11 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		honeypotMu.Lock()
 		m["alertHoneypotHit"] = honeypotCfg.AlertEnabled
 		honeypotMu.Unlock()
+		// 防护同步标记: 节点视图据此把已同步卡片换成“已与主服务器同步”。
+		fl := protSyncSnapshot()
+		m["protectionSynced"] = map[string]any{
+			"flood": fl.Flood, "autoban": fl.Autoban, "scan": fl.Scan, "intel": fl.Intel,
+		}
 		writeJSON(w, 200, m)
 	case "PUT":
 		body, _ := io.ReadAll(r.Body)
@@ -638,6 +643,27 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		in.RescuePassHash = settings.RescuePassHash // 哈希只能由专用接口改, 通用设置接口不得覆盖
 		if in.TGBotToken == tgTokenMask {
 			in.TGBotToken = settings.TGBotToken // 星号占位 = 未改动, 保留旧 Token
+		}
+		// 防护同步护栏: 被控节点上已同步的项, 本地通用保存不得改动其配置值
+		// (前端已隐藏这些卡片, 这里是防旧页面/直接调接口的第二道; 未改动的值
+		// 原样回传不触发, 不影响其他项保存)。
+		// 注意: 此处已持有 mu, 绝不能调 effectiveRunMode()(它会再锁 mu 而死锁);
+		// 只需判 RunMode=="managed" 本身。
+		if settings.RunMode == "managed" {
+			fl := protSyncSnapshot()
+			violated := ""
+			if fl.Flood && (settings.FloodEnabled != in.FloodEnabled || settings.FloodWindowMin != in.FloodWindowMin || settings.FloodDistinctIPs != in.FloodDistinctIPs || settings.FloodCloseMin != in.FloodCloseMin) {
+				violated = "重点端口洪峰防护"
+			} else if fl.Autoban && (settings.AutoBanEnabled != in.AutoBanEnabled || settings.BruteWindowMin != in.BruteWindowMin || settings.BruteThreshold != in.BruteThreshold || settings.BruteBanHours != in.BruteBanHours) {
+				violated = "爆破自动拉黑"
+			} else if fl.Scan && (settings.ScanEnabled != in.ScanEnabled || settings.ScanAutoBan != in.ScanAutoBan || settings.ScanWindowMin != in.ScanWindowMin || settings.ScanDistinctPorts != in.ScanDistinctPorts) {
+				violated = "扫描识别"
+			}
+			if violated != "" {
+				mu.Unlock()
+				errJSON(w, 403, violated+"已与主服务器同步，本地不可改")
+				return
+			}
 		}
 		panelUnchanged := settings.PanelBanThreshold == in.PanelBanThreshold &&
 			settings.PanelSSLMode == in.PanelSSLMode &&
@@ -745,9 +771,15 @@ func handleTrust(w http.ResponseWriter, r *http.Request) {
 
 // 设置/更换急救超级密码(网页端, 信任通道)。空密码 = 清除密码保护,
 // 之后 TG 破坏性急救动作会被拒绝(需先设密码)。
+// 被控节点不设本地密码: 急救统一走主服务器(主服务器密码管全部服务器),
+// 面板代理到节点调本接口一律拒绝, 本地密码栏在节点视图里也不显示。
 func handleRescuePassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		errJSON(w, 405, "method")
+		return
+	}
+	if effectiveRunMode() == "managed" {
+		errJSON(w, 403, "被控节点不设本地超级密码，急救统一走主服务器")
 		return
 	}
 	var in struct {

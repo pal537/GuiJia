@@ -358,7 +358,7 @@ func handleCallback(cb map[string]any) {
 	}
 
 	if data == "rescue" {
-		editText("🆘 急救菜单\n\n信任 IP：解封并加入信任名单（不再自动拉黑）。\n解封全部：放掉全部生效封禁，记录保留。\n关闭所有拦截：解封全部 + 关掉自动拦截开关，30 分钟后自动恢复。")
+		editText(rescueMenuText())
 		editMarkup(map[string]any{"inline_keyboard": rescueMenuKB()})
 		answer("急救菜单")
 		return
@@ -376,6 +376,9 @@ func handleCallback(cb map[string]any) {
 		}
 		rows = append(rows, []map[string]string{{"text": "取消", "callback_data": tgCB("res:cancel")}})
 		txt := "点一个解封并信任，或直接发送一个 IP（10 分钟内有效）。"
+		if len(rescueOnlineNodes()) > 0 {
+			txt += "信任将同时作用于本机与全部在线子服务器。"
+		}
 		if len(active) == 0 {
 			txt = "当前没有生效中的封禁。直接发送一个 IP 即可解封并信任（10 分钟内有效）。"
 		} else if len(active) > 30 {
@@ -389,6 +392,13 @@ func handleCallback(cb map[string]any) {
 	}
 	if strings.HasPrefix(data, "rt:") {
 		ip := strings.TrimPrefix(data, "rt:")
+		if len(rescueOnlineNodes()) > 0 {
+			lines := rescueFanoutTrust(ip)
+			editText(origText + "\n—— " + strings.Join(lines, "\n—— "))
+			answer("已信任")
+			clearRescuePendingTrust()
+			return
+		}
 		released := releaseBan(ip)
 		already, _ := trustIP(ip)
 		suffix := "（已在信任名单）"
@@ -405,6 +415,12 @@ func handleCallback(cb map[string]any) {
 	}
 	if strings.HasPrefix(data, "tc:") {
 		ip := strings.TrimPrefix(data, "tc:")
+		if len(rescueOnlineNodes()) > 0 {
+			lines := rescueFanoutTrust(ip)
+			editText(origText + "\n—— " + strings.Join(lines, "\n—— "))
+			answer("已信任")
+			return
+		}
 		already, err := trustIP(ip)
 		if err != nil {
 			answer("信任失败：" + err.Error())
@@ -455,6 +471,12 @@ func handleCallback(cb map[string]any) {
 		return
 	}
 	if data == "res:restore" {
+		if len(rescueOnlineNodes()) > 0 {
+			lines := rescueFanoutRestore()
+			editText(origText + "\n—— " + strings.Join(lines, "\n—— "))
+			answer("已恢复防护")
+			return
+		}
 		if rescueRestore() {
 			editText(origText + "\n—— 已按快照恢复防护")
 			answer("已恢复防护")
@@ -576,7 +598,7 @@ func tgDeleteMessage(chatID, msgID int64) {
 }
 
 func sendRescueMenu(chatID int64) {
-	tgSendDirect(chatID, "🆘 急救菜单\n\n信任 IP：解封并加入信任名单（不再自动拉黑）。\n解封全部：放掉全部生效封禁，记录保留。\n关闭所有拦截：解封全部 + 关掉自动拦截开关，30 分钟后自动恢复。", rescueMenuKB())
+	tgSendDirect(chatID, rescueMenuText(), rescueMenuKB())
 }
 
 // handleTGMessage 处理机器人收到的文字消息(命令 + 急救待处理状态)。
@@ -670,10 +692,20 @@ func handleTGMessage(msg map[string]any) {
 		clearRescuePendingPass()
 		switch passAct {
 		case "unbanall":
+			if len(rescueOnlineNodes()) > 0 {
+				lines := rescueFanoutUnbanAll()
+				tgSendDirect(chatID, "已解封全部（记录保留，仅状态改为已解封）：\n"+strings.Join(lines, "\n"), nil)
+				return
+			}
 			n := rescueUnbanAll()
 			pushEvent(Event{Type: "rescue", Detail: "急救：解封全部（" + itoa(n) + " 条，记录保留）"})
 			tgSendDirect(chatID, "已解封全部 "+itoa(n)+" 条（记录保留，仅状态改为已解封）", nil)
 		case "kill":
+			if len(rescueOnlineNodes()) > 0 {
+				lines := rescueFanoutKill()
+				tgSendDirect(chatID, "已关闭所有拦截（监控与报警不停），各机 30 分钟后自动恢复防护；也可发送 /rescue 点「恢复防护」提前恢复：\n"+strings.Join(lines, "\n"), nil)
+				return
+			}
 			rescueActivateKill(time.Now())
 			tgSendDirect(chatID, "已关闭所有拦截（监控与报警不停），30 分钟后自动恢复防护；也可发送 /rescue 点「恢复防护」提前恢复", nil)
 		}
@@ -691,6 +723,19 @@ func handleTGMessage(msg map[string]any) {
 		}
 		released := releaseBan(text)
 		clearRescuePendingTrust()
+		if len(rescueOnlineNodes()) > 0 {
+			// 本机已信任, 只需把节点侧补齐(不重复推本机事件)。
+			suffix := ""
+			if released {
+				suffix = "（已同时解封）"
+			} else if already {
+				suffix = "（已在信任名单）"
+			}
+			lines := append([]string{"本机：已信任 " + text + suffix}, rescueTrustNodes(text)...)
+			pushEvent(Event{Type: "rescue", IP: text, Detail: "急救：信任 IP " + text})
+			tgSendDirect(chatID, strings.Join(lines, "\n"), nil)
+			return
+		}
 		suffix := ""
 		if released {
 			suffix = "（已同时解封）"

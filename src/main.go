@@ -247,6 +247,7 @@ func loadAll() {
 	loadServers()      // 主服务器侧节点登记(servers.json)
 	loadHomeSeen()     // 首页新设备提醒已确认集合(home-seen.json)
 	loadGroupSync()    // 群控共享名单配置(groupsync.json)
+	loadProtSync()     // 防护同步“已同步”标记(protsync.json)
 }
 
 // newServerID 生成 8 位 hex 服务器指纹(4 字节随机数); 失败时回落时间戳 hex, 绝不返回空。
@@ -553,6 +554,10 @@ func main() {
 	mux.HandleFunc("/api/rescue/password", handleRescuePassword)
 	mux.HandleFunc("/api/rescue/status", handleRescueStatus)
 	mux.HandleFunc("/api/rescue/restore", handleRescueRestore)
+	mux.HandleFunc("/api/rescue/trust-node", handleRescueNodeTrust)
+	mux.HandleFunc("/api/rescue/unban-node", handleRescueNodeUnbanAll)
+	mux.HandleFunc("/api/rescue/kill-node", handleRescueNodeKill)
+	mux.HandleFunc("/api/rescue/restore-node", handleRescueNodeRestore)
 	mux.HandleFunc("/api/honeypot", handleHoneypot)
 	mux.HandleFunc("/api/backup/settings", handleBackupSettings)
 	mux.HandleFunc("/api/backup/data", handleBackupData)
@@ -587,6 +592,7 @@ func main() {
 	mux.HandleFunc("/api/group-sync/now", handleGroupSyncNow)
 	mux.HandleFunc("/api/backup/export", handleBackupExport)
 	mux.HandleFunc("/api/sync/apply-lists", handleSyncApplyLists)
+	mux.HandleFunc("/api/sync/apply-protection", handleSyncApplyProtection)
 	mux.HandleFunc("/api/sync/shared-state", handleSyncSharedState)
 	mux.HandleFunc("/api/sync/full-bans", handleSyncFullBans)
 	mux.HandleFunc("/api/local-info", handleLocalInfo)

@@ -325,6 +325,7 @@ func rollbackJoin(reason string) {
 	mu.Unlock()
 	clearNodeToken()
 	clearNodePairingCode()
+	clearProtSync() // 脱离即恢复本地控制权, “已同步”标记不留给独立模式
 }
 
 // handleSetupMode 首次运行模式二选一(公开接口, 未登录时就要能选)。
@@ -430,6 +431,25 @@ func hubRegisteredCount() int {
 	return n
 }
 
+// hubHasNodes: 本机是否已是主服务器——已登记或待添加任一非空即算。
+// 待添加也算主服务器: 否则一台已生成配对码、正等节点确认的机器仍可点
+// “接入主服务器”加入别台, 待添加节点会被静默孤儿化; 100% 识别不留这个口子。
+func hubHasNodes() bool {
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	for _, s := range hubServers {
+		if s != nil {
+			return true
+		}
+	}
+	for _, p := range hubPending {
+		if p != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // handleSetupJoinHub: 已登录管理员把独立面板转为被控节点（设置页“接入主服务器”弹窗）。
 // 未登录由中间件挡（不在 authPublic 里）；被控节点由中间件先 403，这里再防一层。
 // 流程与首次加入一致：先同步校验配对码（错码模式不动、凭证不动）→ 通过才翻转模式并起拨号器，
@@ -449,8 +469,8 @@ func handleSetupJoinHub(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, 400, "请先选择运行模式")
 		return
 	}
-	if hubRegisteredCount() > 0 {
-		errJSON(w, 400, "请先移除全部子服务器")
+	if hubHasNodes() {
+		errJSON(w, 400, "本机已有子服务器（含待添加），请先移除/处理全部子服务器")
 		return
 	}
 	var in struct {

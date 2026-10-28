@@ -179,6 +179,10 @@ tr.trusted td{background:#f7f9fc;opacity:.72}
 .scard{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 12px 32px rgba(37,99,235,.12);padding:6px 0 14px;margin-bottom:16px}
 .scard h3{font-size:14.5px;font-weight:700;padding:12px 18px 4px;display:flex;align-items:center;gap:8px}
 .scard h3 .cbadge{font-size:11px;font-weight:700;color:var(--blue2);background:rgba(37,99,235,.1);padding:3px 8px;border-radius:6px;letter-spacing:.04em}
+/* 防护同步: 已同步的卡片只留标题 + “已与主服务器同步”, 其余配置一律不显示。 */
+.scard.synced>:not(h3):not(.syncnote){display:none}
+.scard .syncnote{display:none;padding:10px 18px 4px;font-size:13.5px;color:var(--blue2)}
+.scard.synced .syncnote{display:block}
 .frow{display:flex;align-items:center;gap:12px;padding:11px 18px}
 .frow .fl{flex:0 0 168px;font-weight:600;font-size:13.5px}
 .frow .fl .d{display:block;font-weight:400;color:var(--mut);font-size:12px;margin-top:2px}
@@ -483,8 +487,9 @@ body.auth #loginView{margin:auto}
         <div class="savebar"><button class="btn primary" id="btnFwAdd">添加规则</button></div>
       </div>
 
-      <div class="scard">
+      <div class="scard" id="cardFlood">
         <h3 class="mtitle">重点端口洪峰防护 <span class="cbadge">分布式爆破</span></h3>
+        <div class="syncnote">已与主服务器同步<div class="hint" style="margin:4px 0 0">配置由主服务器统一管理，本机不显示、不改。</div></div>
         <div class="hint">防的是代理池分布式爆破：攻击者用成百上千个代理 IP、每个 IP 只试一两次，上面那种「单个 IP 失败 N 次」的阈值永远抓不到。开启后，同一个重点端口若在短时间内涌入大量不同来源 IP，将判定为洪峰，立即临时关闭该端口并通过 TG 升级报警。</div>
         <div class="frow"><div class="fl">启用洪峰防护<div class="d">只对重点（星标）端口生效</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sFldOn"><i></i></label></div></div>
         <div class="frow"><div class="fl">触发条件</div><div class="fv"><input type="number" id="sFldWin" min="1" max="60"><span class="mono">分钟内，同一重点端口出现</span><input type="number" id="sFldIPs" min="2"><span class="mono">个不同公网 IP 的新连接</span></div></div>
@@ -493,16 +498,18 @@ body.auth #loginView{margin:auto}
         <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
       </div>
 
-      <div class="scard">
+      <div class="scard" id="cardAutoban">
         <h3 class="mtitle">爆破自动拉黑</h3>
+        <div class="syncnote">已与主服务器同步<div class="hint" style="margin:4px 0 0">配置由主服务器统一管理，本机不显示、不改。</div></div>
         <div class="frow"><div class="fl">启用自动拉黑<div class="d">内网与信任名单豁免</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sAbOn"><i></i></label></div></div>
         <div class="frow"><div class="fl">触发条件</div><div class="fv"><input type="number" id="sAbWin" min="1"><span class="mono">分钟内 SSH 失败</span><input type="number" id="sAbThr" min="2"><span class="mono">次，自动拉黑</span></div></div>
         <div class="frow"><div class="fl">封禁时长</div><div class="fv"><span class="mono">自动递进：首次 1 小时、再次 24 小时、累犯永久（到期或解封后再次触发继续累进）</span></div></div>
         <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
       </div>
 
-      <div class="scard">
+      <div class="scard" id="cardScan">
         <h3 class="mtitle">扫描识别 <span class="cbadge">被动观察</span></h3>
+        <div class="syncnote">已与主服务器同步<div class="hint" style="margin:4px 0 0">配置由主服务器统一管理，本机不显示、不改。</div></div>
         <div class="hint">只看、不探：从本机连接与内核连接表里被动观察某 IP 在短时间内触达的不同 TCP 端口数，达阈值即判定为扫描。闭口试探（对方敲没开的端口）也能看见，因为它在内核连接表里留痕。采样间隔 1 秒；亚秒级全端口快扫理论上可能漏报。内网与信任名单豁免。</div>
         <div class="frow"><div class="fl">启用扫描识别<div class="d">默认关</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sScanOn"><i></i></label></div></div>
         <div class="frow"><div class="fl">触发条件</div><div class="fv"><input type="number" id="sScanWin" min="1"><span class="mono">分钟内，同一公网 IP 触达</span><input type="number" id="sScanThr" min="2"><span class="mono">个不同 TCP 端口</span></div></div>
@@ -534,15 +541,16 @@ body.auth #loginView{margin:auto}
         <div class="savebar"><button class="btn primary" id="btnHpSave">保存蜜罐设置</button><span class="savedtip">已保存</span></div>
       </div>
 
-      <div class="scard">
+      <div class="scard" id="rescueCard">
         <h3 class="mtitle">急救 <span class="cbadge">TG 超级密码</span></h3>
-        <div class="hint">在 Telegram 给机器人发送 /rescue 打开急救菜单：信任 IP、解封全部、关闭所有拦截（30 分钟后自动恢复）、恢复防护。破坏性动作（解封全部、关闭所有拦截）必须输对超级密码；日常拉黑、单个解封不走密码。内网 IP 永远不进黑名单，家里局域网永远是活路；应用挂了时 TG 也救不了，只能 SSH 上去改 bans.json 或清 nft 规则。</div>
+        <div class="hint">在 Telegram 给机器人发送 /rescue 打开急救菜单：信任 IP、解封全部、关闭所有拦截（30 分钟后自动恢复）、恢复防护。破坏性动作（解封全部、关闭所有拦截）必须输对超级密码；日常拉黑、单个解封不走密码。群控时：在主服务器机器人上用 /rescue，默认作用于主服务器与全部在线子服务器，子服务器无需单独设密码。内网 IP 永远不进黑名单，家里局域网永远是活路；应用挂了时 TG 也救不了，只能 SSH 上去改 bans.json 或清 nft 规则。</div>
         <div class="frow"><div class="fl">超级密码<div class="d">只存哈希不存明文；空 = 清除密码保护（之后 TG 破坏性急救会被拒绝，需先设密码）</div></div><div class="fv"><input id="rescuePw" type="password" placeholder="至少 6 位"><button class="btn" id="btnRescuePw">保存密码</button></div></div>
         <div class="frow"><div class="fl">急救状态</div><div class="fv"><span class="mono" id="rescueStatusTx">…</span></div></div>
       </div>
 
-      <div class="scard">
+      <div class="scard" id="cardIntel">
         <h3 class="mtitle">威胁情报 <span class="cbadge">默认关 · 手动开启</span></h3>
+        <div class="syncnote">已与主服务器同步<div class="hint" style="margin:4px 0 0">配置由主服务器统一管理，本机不显示、不改。</div></div>
         <div class="hint">外部攻击名单单独分区：底层 nft 全端口封禁，不进入黑名单记录、不计入今日拉黑与黑名单总数。信任白名单优先于黑名单与情报名单，加入信任后照样能连。</div>
         <div class="frow"><div class="fl">启用威胁情报<div class="d">默认关；开启后立即拉取并生效；关闭立即清空情报集合</div></div><div class="fv"><label class="sw"><input type="checkbox" id="itOn"><i></i></label></div></div>
         <div class="frow"><div class="fl">名单直链<div class="d">默认 FireHOL level1，可改；免费、无需 Key；约一天一更</div></div><div class="fv"><input id="itPubUrl" style="width:100%"></div></div>
@@ -599,6 +607,7 @@ body.auth #loginView{margin:auto}
     <div class="panel" style="margin-bottom:14px" id="pairCard">
       <div class="ph"><h2 class="mtitle">群控设置</h2><span class="hint">接入主服务器（被控）或生成配对码（控制子服务器）</span></div>
       <div class="frow"><div class="fl">多服务器<div class="d">本机可接入主服务器成为被控节点，也可作为主服务器生成配对码接纳子服务器</div></div><div class="fv"><button class="btn" id="btnJoinHub">接入主服务器（被控）</button><button class="btn primary" id="btnPairGen2">生成配对码（控制子服务器）</button></div></div>
+      <div class="sline run" id="pairIdentity" style="display:none"></div>
       <div class="hint" id="pairMsg" style="margin:0 0 10px"></div>
       <div style="border-top:1px solid var(--line);margin:6px 0 0"></div>
       <div class="frow"><div class="fl">待添加节点<div class="d">节点填码加入后出现在这里，点确认即登记上线</div></div><div class="fv"><button class="btn" id="btnPairRefresh">刷新</button></div></div>
@@ -822,20 +831,31 @@ function gsSectionHTML(group,title,desc,cfg){
 async function openGroupSyncModal(){
   let cfg;try{cfg=await apiLocal('GET','api/group-sync/settings');}catch(e){openCModal('<h3 class="mtitle">群控设置</h3><div class="sline fail">读取失败：'+esc(e.message)+'</div>');return;}
   const bl=cfg.blacklist||{enabled:false,intervalMin:10}, wl=cfg.whitelist||{enabled:false,intervalMin:10};
+  const pt=cfg.protection||{enabled:false,intervalMin:10,items:{}};
+  const ptIt=pt.items||{};
+  const ptStCls=!pt.lastSyncAt?'hint':(pt.lastStatus==='failed'?'sline fail':pt.lastStatus==='ok'?'sline ok':'sline run');
+  const ptStTx=pt.lastSyncAt?('上次同步：'+fmtTs(pt.lastSyncAt*1000)+(pt.lastDetail?' · '+esc(pt.lastDetail):'')):'上次同步：从未同步';
+  const ptSec='<div style="border:1px solid var(--line);border-radius:12px;padding:14px"><div style="display:flex;align-items:center;gap:10px"><b>防护同步</b><span class="hint" id="gsDirty_protection" style="display:none;color:#b45309"> · 未保存</span><span style="flex:1"></span><label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="gsEn_protection"'+(pt.enabled?' checked':'')+'> 开启共享</label></div>'+
+  '<div class="csub" style="margin:6px 0 10px">勾选的防护项跟主服务器走：主服务器配置为准，节点相关卡片只显示“已与主服务器同步”，不显示配置、本地不可改。未勾选的项留节点本地。开启后新加入节点批准后立即自动同步一次；关闭整组会立即通知各节点恢复本地控制。</div>'+
+  '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px">'+[['flood','重点端口洪峰防护'],['autoban','爆破自动拉黑'],['scan','扫描识别'],['intel','威胁情报']].map(it=>'<label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="gsIt_'+it[0]+'"'+(ptIt[it[0]]?' checked':'')+'> '+it[1]+'</label>').join('')+'</div>'+
+  '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13px">同步间隔</span><select id="gsIv_protection">'+[5,10,30,60].map(v=>'<option value="'+v+'"'+(pt.intervalMin===v?' selected':'')+'>'+v+' 分钟</option>').join('')+'</select>'+
+  '<button class="btn" id="gsNow_protection">立即同步</button></div>'+
+  '<div class="'+ptStCls+'" id="gsSt_protection" style="margin-top:10px">'+ptStTx+'</div></div>';
   openCModal('<h3 class="mtitle">群控设置</h3><div style="display:flex;flex-direction:column;gap:12px">'+
     gsSectionHTML('blacklist','共享黑名单','主服务器的黑名单为源，推向各节点；只新增与改状态，绝不删记录，本机条目不动。开启后新加入节点批准后立即自动同步一次。',bl)+
     gsSectionHTML('whitelist','共享白名单','主服务器的信任名单为源，推向各节点；只动共享标记的条目，本机条目不动。开启后新加入节点批准后立即自动同步一次。',wl)+
+    ptSec+
     '<div class="sline" id="gsSaveMsg" style="display:none"></div>'+
     '<div style="display:flex;gap:8px"><button class="btn primary" id="gsSave">保存群控设置</button><button class="btn" id="gsClose">关闭</button></div></div>');
-  const loaded={blacklist:{enabled:!!bl.enabled,intervalMin:bl.intervalMin},whitelist:{enabled:!!wl.enabled,intervalMin:wl.intervalMin}};
-  const openedSync={blacklist:{at:bl.lastSyncAt||0,detail:bl.lastDetail||''},whitelist:{at:wl.lastSyncAt||0,detail:wl.lastDetail||''}};
+  const loaded={blacklist:{enabled:!!bl.enabled,intervalMin:bl.intervalMin},whitelist:{enabled:!!wl.enabled,intervalMin:wl.intervalMin},protection:{enabled:!!pt.enabled,intervalMin:pt.intervalMin,items:{flood:!!ptIt.flood,autoban:!!ptIt.autoban,scan:!!ptIt.scan,intel:!!ptIt.intel}}};
+  const openedSync={blacklist:{at:bl.lastSyncAt||0,detail:bl.lastDetail||''},whitelist:{at:wl.lastSyncAt||0,detail:wl.lastDetail||''},protection:{at:pt.lastSyncAt||0,detail:pt.lastDetail||''}};
   const renderGsSt=(g,cfg)=>{const stEl=$('#gsSt_'+g);if(!stEl)return;
     stEl.className=!cfg.lastSyncAt?'hint':(cfg.lastStatus==='failed'?'sline fail':cfg.lastStatus==='ok'?'sline ok':'sline run');
     stEl.textContent=cfg.lastSyncAt?('上次同步：'+fmtTs(cfg.lastSyncAt*1000)+(cfg.lastDetail?' · '+cfg.lastDetail:'')):'上次同步：从未同步';};
   // 保存后轮询: 已开启的组后端已异步触发立即同步, 每 5 秒查一次上次同步,
   // 有结果(时间或明细变了)即刷新状态行, 最多 2 分钟, 超时留“进行中”提示。
   const pollSyncAfterSave=()=>{
-    const targets=['blacklist','whitelist'].filter(g=>$('#gsEn_'+g).checked);
+    const targets=['blacklist','whitelist','protection'].filter(g=>$('#gsEn_'+g).checked);
     if(!targets.length)return;
     targets.forEach(g=>{const stEl=$('#gsSt_'+g);if(stEl){stEl.className='sline run';stEl.textContent='正在立即同步…';}});
     let n=0;
@@ -855,13 +875,19 @@ async function openGroupSyncModal(){
       }
     },5000);
   };
-  const dirty=()=>{['blacklist','whitelist'].forEach(g=>{const d=$('#gsDirty_'+g);if(!d)return;const ch=$('#gsEn_'+g).checked!==loaded[g].enabled||+$('#gsIv_'+g).value!==loaded[g].intervalMin;d.style.display=ch?'':'none';});};
+  const gsCurItems=()=>({flood:$('#gsIt_flood').checked,autoban:$('#gsIt_autoban').checked,scan:$('#gsIt_scan').checked,intel:$('#gsIt_intel').checked});
+  const dirty=()=>{['blacklist','whitelist','protection'].forEach(g=>{const d=$('#gsDirty_'+g);if(!d)return;let ch=$('#gsEn_'+g).checked!==loaded[g].enabled||+$('#gsIv_'+g).value!==loaded[g].intervalMin;if(g==='protection'){const it=gsCurItems(),lo=loaded[g].items;ch=ch||it.flood!==lo.flood||it.autoban!==lo.autoban||it.scan!==lo.scan||it.intel!==lo.intel;}d.style.display=ch?'':'none';});};
   const saveAll=async()=>{
     const m=$('#gsSaveMsg');
     try{
-      for(const g of ['blacklist','whitelist']){await apiLocal('POST','api/group-sync/settings',{group:g,enabled:$('#gsEn_'+g).checked,intervalMin:+$('#gsIv_'+g).value});}
+      for(const g of ['blacklist','whitelist','protection']){
+        const body={group:g,enabled:$('#gsEn_'+g).checked,intervalMin:+$('#gsIv_'+g).value};
+        if(g==='protection')body.items=gsCurItems();
+        await apiLocal('POST','api/group-sync/settings',body);
+      }
       loaded.blacklist={enabled:$('#gsEn_blacklist').checked,intervalMin:+$('#gsIv_blacklist').value};
       loaded.whitelist={enabled:$('#gsEn_whitelist').checked,intervalMin:+$('#gsIv_whitelist').value};
+      loaded.protection={enabled:$('#gsEn_protection').checked,intervalMin:+$('#gsIv_protection').value,items:gsCurItems()};
       dirty();
       m.style.display='';m.className='sline ok';m.textContent='已保存';
       pollSyncAfterSave();
@@ -870,9 +896,10 @@ async function openGroupSyncModal(){
   };
   $('#gsSave').onclick=saveAll;
   $('#gsClose').onclick=closeCModal;
-  ['blacklist','whitelist'].forEach(g=>{
+  ['blacklist','whitelist','protection'].forEach(g=>{
     $('#gsEn_'+g).onchange=dirty;
     $('#gsIv_'+g).onchange=dirty;
+    if(g==='protection'){['flood','autoban','scan','intel'].forEach(it=>{$('#gsIt_'+it).onchange=dirty;});}
     $('#gsNow_'+g).onclick=async()=>{
       const stEl=$('#gsSt_'+g);
       stEl.className='sline run';stEl.textContent='正在保存并同步…';
@@ -923,6 +950,7 @@ function openRemoveModal(fp){
     try{await apiLocal('POST','api/nodes/remove',{fingerprint:fp});closeCModal();
       if(curServer===fp){curServer='';}
       await refreshHomeNav();
+      await loadPairCard(); // 移除后若已无子服务器, 设置页身份行与接入按钮同步恢复
       if(curTab==='home')loadHome();else gotoTab(homeServers.length?'home':'ov');
     }catch(e){errEl.textContent='移除失败：'+e.message;errEl.style.display='';}
   };
@@ -1647,6 +1675,8 @@ async function loadProtection(){
   loadHoneypot();
   loadPortGuard();
   loadIntel();
+  // 被控节点不设本地超级密码(急救统一走主服务器): 节点视图隐藏急救卡。
+  const rc=$('#rescueCard');if(rc)rc.style.display=curServer?'none':'';
   let st={};try{st=await api('GET','api/rescue/status')}catch(e){}
   const rb=$('#protRescueBanner');
   if(st.killActive){
@@ -1682,6 +1712,7 @@ function itPollDone(){
 }
 async function loadIntel(){
   let r={};try{r=await api('GET','api/intel')}catch(e){return}
+  applyProtSyncedCard('cardIntel',!!curServer&&!!r.synced);
   $('#itOn').checked=!!r.enabled;
   $('#itPubUrl').value=r.publicUrl||'';
   $('#itUpd').value=r.updatesPerDay||4;
@@ -2304,6 +2335,17 @@ function fillSettings(s){
   $('#sPanelBan').value=(s.panelBanThreshold==null?5:s.panelBanThreshold);
   $('#sServerName').value=s.serverName||'';
   $('#sPanelPort').value=(s.panelPort||59188);
+  // 防护同步: 只在节点视图生效, 已同步的卡片只留标题 + 同步提示。
+  // 本机视图一律清除(主服务器自己的标记恒为空, 切回本机时旧 class 不能残留)。
+  const ps=s.protectionSynced||{};
+  applyProtSyncedCard('cardFlood',!!curServer&&!!ps.flood);
+  applyProtSyncedCard('cardAutoban',!!curServer&&!!ps.autoban);
+  applyProtSyncedCard('cardScan',!!curServer&&!!ps.scan);
+}
+/* 防护同步卡片切换: on 时只显示标题 + “已与主服务器同步”(CSS 隐藏其余子元素)。 */
+function applyProtSyncedCard(cardId,on){
+  const c=$('#'+cardId);if(!c)return;
+  c.classList.toggle('synced',!!on);
 }
 function collectSettings(){
   const s=Object.assign({},setLoaded||{});
@@ -2469,6 +2511,16 @@ async function loadPairPending(){
   try{
     const d=await apiLocal('GET','api/nodes/servers');
     const list=d.pending||[];
+    const servers=d.servers||[];
+    // 主服务器身份 100% 识别: 后端 isHub 为准(已登记或待添加任一非空);
+    // 是主服务器时隐藏“接入主服务器”按钮, 全部清零(移除/拒绝完)后自动恢复。
+    const isHub=!!d.isHub||servers.length>0||list.length>0;
+    const jb=$('#btnJoinHub');if(jb)jb.style.display=isHub?'none':'';
+    const idEl=$('#pairIdentity');
+    if(idEl){
+      if(isHub){idEl.style.display='';idEl.textContent='本机是主服务器：管理 '+servers.length+' 台子服务器（待添加 '+list.length+' 台）。“接入主服务器”按钮已隐藏；移除全部子服务器后恢复。';}
+      else{idEl.style.display='';idEl.textContent='本机是独立服务器，未管理子服务器。';}
+    }
     if(!list.length){box.innerHTML='<div class="hint" style="margin:0 18px 10px">暂无待添加节点</div>';}
     else{box.innerHTML=list.map(pairPendingRow).join('');}
     box.querySelectorAll('[data-pair-ok]').forEach(b=>b.onclick=()=>pairDecide(b.dataset.pairOk,true));
@@ -2528,7 +2580,7 @@ function openPairGenModal(){
   };
 }
 function openJoinHubModal(){
-  openCModal('<h3 class="mtitle">接入主服务器（被控）</h3><div class="csub">接入后，本机面板变为只读状态页，全部管理都在主服务器上进行；本机原有防护数据不动，防护继续在本机生效。注意：接入会立即取消本机登录密码与 2FA（现存登录一并失效）。脱离办法：主服务器上移除管理（本机回到模式选择页，选独立使用需重新设置密码），或主服务器彻底没了时用本机命令 guijia leave 兜底。本机如已有子服务器，接入会被拒绝，请先移除全部子服务器。</div>'+
+  openCModal('<h3 class="mtitle">接入主服务器（被控）</h3><div class="csub">接入后，本机面板变为只读状态页，全部管理都在主服务器上进行；本机原有防护数据不动，防护继续在本机生效。注意：接入会立即取消本机登录密码与 2FA（现存登录一并失效）。脱离办法：主服务器上移除管理（本机回到模式选择页，选独立使用需重新设置密码），或主服务器彻底没了时用本机命令 guijia leave 兜底。本机如已有子服务器（含待添加），接入会被拒绝，请先移除/处理全部子服务器。</div>'+
     '<div class="fld"><label>主服务器地址</label><input id="cmJoinUrl" placeholder="如 https://主服务器IP:59188"></div>'+
     '<div class="fld"><label>配对码</label><input id="cmJoinCode" placeholder="主服务器面板生成的配对码"></div>'+
     '<div class="sline fail" id="cmJoinMsg" style="display:none"></div>'+

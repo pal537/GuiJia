@@ -28,9 +28,20 @@ type groupSyncCfg struct {
 	LastDetail  string `json:"lastDetail"`
 }
 
+// protSyncItems 防护同步勾选项(与 protsync.go 的四项一一对应):
+// 只勾选的项跟主服务器走, 其余留本地。
+type protSyncItems struct {
+	Flood   bool `json:"flood"`
+	Autoban bool `json:"autoban"`
+	Scan    bool `json:"scan"`
+	Intel   bool `json:"intel"`
+}
+
 type groupSyncFile struct {
-	Blacklist groupSyncCfg `json:"blacklist"`
-	Whitelist groupSyncCfg `json:"whitelist"`
+	Blacklist  groupSyncCfg  `json:"blacklist"`
+	Whitelist  groupSyncCfg  `json:"whitelist"`
+	Protection groupSyncCfg  `json:"protection"`
+	ProtItems  protSyncItems `json:"protItems"`
 }
 
 var (
@@ -50,8 +61,9 @@ func loadGroupSync() {
 	gsMu.Lock()
 	defer gsMu.Unlock()
 	gsCfg = groupSyncFile{
-		Blacklist: groupSyncCfg{IntervalMin: 10},
-		Whitelist: groupSyncCfg{IntervalMin: 10},
+		Blacklist:  groupSyncCfg{IntervalMin: 10},
+		Whitelist:  groupSyncCfg{IntervalMin: 10},
+		Protection: groupSyncCfg{IntervalMin: 10},
 	}
 	if b, err := os.ReadFile(groupSyncFilePath()); err == nil {
 		var f groupSyncFile
@@ -72,6 +84,15 @@ func loadGroupSync() {
 				gsCfg.Whitelist.LastStatus = f.Whitelist.LastStatus
 				gsCfg.Whitelist.LastDetail = f.Whitelist.LastDetail
 			}
+			if f.Protection.IntervalMin != 0 {
+				gsCfg.Protection = f.Protection
+			} else {
+				gsCfg.Protection.Enabled = f.Protection.Enabled
+				gsCfg.Protection.LastSyncAt = f.Protection.LastSyncAt
+				gsCfg.Protection.LastStatus = f.Protection.LastStatus
+				gsCfg.Protection.LastDetail = f.Protection.LastDetail
+			}
+			gsCfg.ProtItems = f.ProtItems
 		}
 	}
 	if gsCfg.Blacklist.IntervalMin <= 0 {
@@ -79,6 +100,9 @@ func loadGroupSync() {
 	}
 	if gsCfg.Whitelist.IntervalMin <= 0 {
 		gsCfg.Whitelist.IntervalMin = 10
+	}
+	if gsCfg.Protection.IntervalMin <= 0 {
+		gsCfg.Protection.IntervalMin = 10
 	}
 }
 
@@ -101,6 +125,15 @@ func groupSyncPublic() map[string]any {
 			"lastSyncAt": gsCfg.Whitelist.LastSyncAt, "lastStatus": gsCfg.Whitelist.LastStatus,
 			"lastDetail": gsCfg.Whitelist.LastDetail,
 		},
+		"protection": map[string]any{
+			"enabled": gsCfg.Protection.Enabled, "intervalMin": gsCfg.Protection.IntervalMin,
+			"lastSyncAt": gsCfg.Protection.LastSyncAt, "lastStatus": gsCfg.Protection.LastStatus,
+			"lastDetail": gsCfg.Protection.LastDetail,
+			"items": map[string]any{
+				"flood": gsCfg.ProtItems.Flood, "autoban": gsCfg.ProtItems.Autoban,
+				"scan": gsCfg.ProtItems.Scan, "intel": gsCfg.ProtItems.Intel,
+			},
+		},
 	}
 }
 
@@ -110,15 +143,16 @@ func handleGroupSyncSettings(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, groupSyncPublic())
 	case "POST":
 		var in struct {
-			Group       string `json:"group"` // blacklist | whitelist
-			Enabled     bool   `json:"enabled"`
-			IntervalMin int    `json:"intervalMin"`
+			Group       string        `json:"group"` // blacklist | whitelist | protection
+			Enabled     bool          `json:"enabled"`
+			IntervalMin int           `json:"intervalMin"`
+			Items       protSyncItems `json:"items"`
 		}
 		if json.NewDecoder(r.Body).Decode(&in) != nil {
 			errJSON(w, 400, "请求无效")
 			return
 		}
-		if in.Group != "blacklist" && in.Group != "whitelist" {
+		if in.Group != "blacklist" && in.Group != "whitelist" && in.Group != "protection" {
 			errJSON(w, 400, "分组无效")
 			return
 		}
@@ -131,8 +165,11 @@ func handleGroupSyncSettings(w http.ResponseWriter, r *http.Request) {
 		gsMu.Lock()
 		if in.Group == "blacklist" {
 			gsCfg.Blacklist.Enabled, gsCfg.Blacklist.IntervalMin = in.Enabled, in.IntervalMin
-		} else {
+		} else if in.Group == "whitelist" {
 			gsCfg.Whitelist.Enabled, gsCfg.Whitelist.IntervalMin = in.Enabled, in.IntervalMin
+		} else {
+			gsCfg.Protection.Enabled, gsCfg.Protection.IntervalMin = in.Enabled, in.IntervalMin
+			gsCfg.ProtItems = in.Items
 		}
 		saveGroupSyncLocked()
 		startGroupSyncTickerLocked()
@@ -140,7 +177,9 @@ func handleGroupSyncSettings(w http.ResponseWriter, r *http.Request) {
 		// 保存后立即同步一次(已开启的组): 不等 ticker 最长 60 秒后的第一趟,
 		// 用户点保存就能亲眼看到同步生效; 异步跑, 不阻塞保存返回。
 		// 定时同步继续按新间隔走, 本次同步成功后上次时间推进, ticker 自动顺延。
-		if in.Enabled {
+		// 防护组例外: 关闭整组也要立即推一次释放包, 节点当场恢复本地可改,
+		// 不能等(关了就没有下一趟 ticker 了)。
+		if in.Enabled || in.Group == "protection" {
 			runGroupSyncAsync(in.Group)
 		}
 		writeJSON(w, 200, groupSyncPublic())
@@ -384,8 +423,10 @@ func markGroupSyncResult(group string, ok, total int, detail string) {
 	var c *groupSyncCfg
 	if group == "blacklist" {
 		c = &gsCfg.Blacklist
-	} else {
+	} else if group == "whitelist" {
 		c = &gsCfg.Whitelist
+	} else {
+		c = &gsCfg.Protection
 	}
 	if total > 0 && ok == total {
 		c.LastSyncAt = time.Now().Unix()
@@ -402,11 +443,17 @@ func markGroupSyncResult(group string, ok, total int, detail string) {
 // runGroupSyncOnce: 同步一组并记结果, 返回(成功数, 总数, 明细)。
 // 黑名单先做并集合并再推, 白名单只推; 上次同步时间只在全成功时推进,
 // 部分失败留待下次 ticker 补推, 不谎报成功。
+// 防护组: 开启时推勾选项配置, 关闭时推释放包(节点恢复本地控制)。
 func runGroupSyncOnce(group string) (int, int, string) {
 	var ok, total int
 	var detail string
 	if group == "blacklist" {
 		ok, total, detail = syncBlacklistToAllOnline()
+	} else if group == "protection" {
+		gsMu.Lock()
+		enabled, items := gsCfg.Protection.Enabled, gsCfg.ProtItems
+		gsMu.Unlock()
+		ok, total, detail = syncProtectionToAllOnline(enabled, items)
 	} else {
 		ok, total, detail = syncGroupToAllOnline(group)
 	}
@@ -459,7 +506,7 @@ func handleGroupSyncNow(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, 400, "请求无效")
 		return
 	}
-	if in.Group != "blacklist" && in.Group != "whitelist" {
+	if in.Group != "blacklist" && in.Group != "whitelist" && in.Group != "protection" {
 		errJSON(w, 400, "分组无效")
 		return
 	}
@@ -476,9 +523,10 @@ func handleGroupSyncNow(w http.ResponseWriter, r *http.Request) {
 // 等节点上线(最长 2 分钟, 每 10 秒看一次), 上线即推, 不阻塞审批返回。
 func maybeAutoSyncNewNode(fp, name string) {
 	gsMu.Lock()
-	bl, wl := gsCfg.Blacklist.Enabled, gsCfg.Whitelist.Enabled
+	bl, wl, pt := gsCfg.Blacklist.Enabled, gsCfg.Whitelist.Enabled, gsCfg.Protection.Enabled
+	protItems := gsCfg.ProtItems
 	gsMu.Unlock()
-	if !bl && !wl {
+	if !bl && !wl && !pt {
 		return
 	}
 	go func() {
@@ -519,6 +567,14 @@ func maybeAutoSyncNewNode(fp, name string) {
 				gsMu.Unlock()
 			}
 		}
+		if pt {
+			if good, d := syncProtectionToNode(fp, protSyncPayloadForHub(protItems)); good {
+				gsMu.Lock()
+				gsCfg.Protection.LastDetail = "新节点 " + name + " 已自动同步：" + d
+				saveGroupSyncLocked()
+				gsMu.Unlock()
+			}
+		}
 	}()
 }
 
@@ -533,13 +589,13 @@ func startGroupSyncTickerLocked() {
 		for {
 			time.Sleep(60 * time.Second)
 			gsMu.Lock()
-			bl, wl := gsCfg.Blacklist, gsCfg.Whitelist
+			bl, wl, pt := gsCfg.Blacklist, gsCfg.Whitelist, gsCfg.Protection
 			gsMu.Unlock()
 			now := time.Now().Unix()
 			for _, g := range []struct {
 				name string
 				cfg  groupSyncCfg
-			}{{"blacklist", bl}, {"whitelist", wl}} {
+			}{{"blacklist", bl}, {"whitelist", wl}, {"protection", pt}} {
 				if !g.cfg.Enabled {
 					continue
 				}
@@ -563,7 +619,7 @@ func startGroupSyncTickerLocked() {
 func startGroupSyncTicker() {
 	gsMu.Lock()
 	defer gsMu.Unlock()
-	if gsCfg.Blacklist.Enabled || gsCfg.Whitelist.Enabled {
+	if gsCfg.Blacklist.Enabled || gsCfg.Whitelist.Enabled || gsCfg.Protection.Enabled {
 		startGroupSyncTickerLocked()
 	}
 }

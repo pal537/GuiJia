@@ -610,6 +610,7 @@ func handleIntelStatus(w http.ResponseWriter, r *http.Request) {
 		"countV4":       st.CountV4, "countV6": st.CountV6, "count": st.CountV4 + st.CountV6,
 		"lastFetchUnix": st.LastFetchUnix, "nextFetchUnix": st.NextFetchUnix,
 		"status": intelDisplayStatus(), "lastError": st.LastError, "failCount": st.FailCount,
+		"synced": protSyncSnapshot().Intel,
 	})
 }
 
@@ -633,6 +634,16 @@ func handleIntelSave(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.PublicURL == "" {
 		in.PublicURL = intelDefaultPublicURL
+	}
+	// 防护同步护栏: 威胁情报已同步的被控节点, 本地不得改情报配置。
+	if effectiveRunMode() == "managed" && protSyncSnapshot().Intel {
+		intelMu.Lock()
+		cur := intelState
+		intelMu.Unlock()
+		if cur.Enabled != in.Enabled || cur.PublicURL != in.PublicURL || cur.UpdatesPerDay != in.UpdatesPerDay {
+			errJSON(w, 403, "威胁情报已与主服务器同步，本地不可改")
+			return
+		}
 	}
 	if in.Enabled {
 		if err := validateIntelInput(in.PublicURL); err != nil {

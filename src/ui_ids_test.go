@@ -28,6 +28,21 @@ func TestUIIDs(t *testing.T) {
 		"btnPanelPortSave",      // 设置页面板端口保存按钮
 		"panelPortHint",         // 面板端口提示行
 		"pairCard",              // 设置页生成配对码卡片(面板设置卡正下方)
+		"pairIdentity",          // 群控身份行: 主服务器/独立服务器(接入按钮显隐依据)
+		"rescueCard",            // 防护页急救卡(节点视图隐藏, 超级密码只主服务器设)
+		"cardFlood",             // 防护页洪峰卡(已同步时只留标题 + 同步提示)
+		"cardAutoban",           // 防护页爆破自动拉黑卡(同上)
+		"cardScan",              // 防护页扫描识别卡(同上)
+		"cardIntel",             // 防护页威胁情报卡(同上)
+		"gsEn_protection",       // 群控弹窗防护同步开关
+		"gsIv_protection",       // 群控弹窗防护同步间隔
+		"gsNow_protection",      // 群控弹窗防护立即同步
+		"gsSt_protection",       // 群控弹窗防护上次同步状态
+		"gsDirty_protection",    // 群控弹窗防护未保存标记
+		"gsIt_flood",            // 群控弹窗防护勾选: 洪峰
+		"gsIt_autoban",          // 群控弹窗防护勾选: 爆破自动拉黑
+		"gsIt_scan",             // 群控弹窗防护勾选: 扫描识别
+		"gsIt_intel",            // 群控弹窗防护勾选: 威胁情报
 		"btnPairGen2",           // 生成配对码按钮(弹窗入口, 群控模块)
 		"cmPairCode",            // 生成配对码弹窗内码显示
 		"cmPairExp",             // 生成配对码弹窗内有效期显示
