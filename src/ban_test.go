@@ -81,6 +81,13 @@ func TestReleaseBanKeepsRecord(t *testing.T) {
 	if len(all) != 1 || all[0].Status != BanReleased || all[0].ReleasedAt == 0 {
 		t.Fatalf("解封后记录应保留且状态=released: %+v", all)
 	}
+	firstReleasedAt := all[0].ReleasedAt
+	if !releaseBan("203.0.113.26") {
+		t.Fatal("重复解封应幂等成功(记录存在)")
+	}
+	if allBans()[0].ReleasedAt != firstReleasedAt {
+		t.Fatalf("重复解封不应改写原始解封时间: %d -> %d", firstReleasedAt, allBans()[0].ReleasedAt)
+	}
 	if releaseBan("203.0.113.99") {
 		t.Fatal("不存在的 IP 不应报告找到")
 	}

@@ -148,7 +148,7 @@ func TestNodeEventsHubMode(t *testing.T) {
 		return map[string]any{"ok": true}, nil
 	}
 	rec := hubCall(t, handleNodeEvents, "POST", "/api/nodes/events",
-		`{"type":"new_conn","ts":1700000000000,"ip":"1.2.3.4","port":22,"detail":"测试连接"}`,
+		`{"type":"ssh_login","ts":1700000000000,"ip":"1.2.3.4","port":22,"detail":"测试登录"}`,
 		map[string]string{"X-Node-Fingerprint": fp, "X-Node-Token": "tok123"})
 	out := hubCallJSON(t, rec)
 	if rec.Code != 200 || out["sent"] != true {
@@ -158,8 +158,13 @@ func TestNodeEventsHubMode(t *testing.T) {
 		t.Fatalf("应走主服务器 bot 发: token=%q method=%q", gotToken, gotMethod)
 	}
 	text, _ := gotPayload["text"].(string)
-	if !strings.Contains(text, "") || !strings.Contains(text, "重点端口新连接") {
-		t.Fatalf("标题应带节点名、正文应有事件名: %q", text)
+	// hub 代发标题必须真正带节点名(与 tgTitlePrefix 同格式「【名】\n」),
+	// 不许再用 strings.Contains(text, "") 这类恒真式占位。
+	if !strings.HasPrefix(text, "\u3010节点甲\u3011\n") {
+		t.Fatalf("代发标题应带节点名: %q", text)
+	}
+	if !strings.Contains(text, "SSH 登录成功") {
+		t.Fatalf("正文应有事件名: %q", text)
 	}
 	markup, _ := gotPayload["reply_markup"].(map[string]any)
 	kb, _ := markup["inline_keyboard"].([]any)
@@ -168,6 +173,64 @@ func TestNodeEventsHubMode(t *testing.T) {
 	cb, _ := btn["callback_data"].(string)
 	if cb != "ban:1.2.3.4:"+fp {
 		t.Fatalf("拉黑按钮回调应带节点指纹, 得到 %q", cb)
+	}
+}
+
+// TestHubSendNodeEventTitle: hubSendNodeEvent 的标题格式——有名带节点名,
+// 无名不发空标题(与 tgTitlePrefix 的「无名返回空」一致)。
+func TestHubSendNodeEventTitle(t *testing.T) {
+	defer setupHubTest(t)()
+	settings.TGBotToken = "hubtok"
+	settings.TGChatID = "12345"
+	oldCall := tgAPICall
+	defer func() { tgAPICall = oldCall }()
+	var gotText string
+	tgAPICall = func(token, method string, payload any, timeout time.Duration) (map[string]any, error) {
+		b, _ := json.Marshal(payload)
+		var m map[string]any
+		json.Unmarshal(b, &m)
+		gotText, _ = m["text"].(string)
+		return map[string]any{"ok": true}, nil
+	}
+	ev := Event{Type: "ssh_login", Ts: 1700000000000, IP: "1.2.3.4", Port: 22, Detail: "测试登录"}
+	hubSendNodeEvent("节点甲", "fp-test", ev)
+	if !strings.HasPrefix(gotText, "\u3010节点甲\u3011\n") {
+		t.Fatalf("有名节点代发标题应带节点名, 得到 %q", gotText)
+	}
+	hubSendNodeEvent("", "fp-test", ev)
+	if strings.HasPrefix(gotText, "\u3010") {
+		t.Fatalf("无名节点代发不应有空标题, 得到 %q", gotText)
+	}
+}
+
+// TestNodeEventsDroppedTypes: 已删除的通知类型(new_conn、port_flood)即使旧版本
+// 节点仍推过来, 主服务器也不代发(混版本不能从主服务器漏出去)。
+func TestNodeEventsDroppedTypes(t *testing.T) {
+	defer setupHubTest(t)()
+	_, fp, pubB64 := hubTestKey(t)
+	hubServers = []*hubServer{{
+		Fingerprint: fp, PubKey: pubB64, Name: "节点甲", Status: "online",
+		LastSeen: time.Now().Unix(), TokenHash: hashToken("tok123"), TGMode: "hub",
+	}}
+	settings.TGEnabled = true
+	settings.TGBotToken = "hubtok"
+	settings.TGChatID = "12345"
+	called := false
+	tgAPICall = func(token, method string, payload any, timeout time.Duration) (map[string]any, error) {
+		called = true
+		return map[string]any{"ok": true}, nil
+	}
+	for _, typ := range []string{"new_conn", "port_flood"} {
+		rec := hubCall(t, handleNodeEvents, "POST", "/api/nodes/events",
+			`{"type":"`+typ+`","ts":1700000000000,"ip":"1.2.3.4","port":22,"detail":"旧节点事件"}`,
+			map[string]string{"X-Node-Fingerprint": fp, "X-Node-Token": "tok123"})
+		out := hubCallJSON(t, rec)
+		if rec.Code != 200 || out["sent"] != false || out["reason"] != "type-dropped" {
+			t.Fatalf("%s 应被丢弃不代发: code=%d body=%s", typ, rec.Code, rec.Body.String())
+		}
+	}
+	if called {
+		t.Fatal("被丢弃的事件不应调用 Telegram API")
 	}
 }
 

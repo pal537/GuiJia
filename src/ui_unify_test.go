@@ -108,10 +108,10 @@ func TestUIUnifyGroups(t *testing.T) {
 	unifyMust(t, html,
 		`.scard .savebar,.panel .savebar{border-top:1px solid var(--line)`,
 	)
-	// 标题去重不得打乱防护卡顺序(与 TestProtCardOrder 同口径)。
+	// 标题去重不得打乱防护卡顺序(与 TestProtCardOrder 同口径; 防火墙卡已移出防护页)。
 	sec := html[strings.Index(html, `<section id="tab-prot"`):]
 	sec = sec[:strings.Index(sec, `<section id="tab-proxy"`)]
-	for _, h3 := range []string{"安全建议", "防火墙", "重点端口洪峰防护 ", "爆破自动拉黑", "扫描识别 ", "蜜罐 ", "急救 ", "威胁情报 "} {
+	for _, h3 := range []string{"安全建议", "端口洪峰防护 ", "爆破自动拉黑", "扫描识别 ", "蜜罐 ", "急救 ", "威胁情报 "} {
 		if !strings.Contains(sec, `<h3 class="mtitle">`+h3) {
 			t.Errorf("防护页应有卡片 %q", h3)
 		}
@@ -119,16 +119,16 @@ func TestUIUnifyGroups(t *testing.T) {
 }
 
 // TestUIUnifyPages: 9 个页面分区与关键新样式元素齐全; 减动效覆盖新组件; 绝不用紫色渐变与原生弹框。
+// 端口菜单已删、防火墙独立成菜单(原端口位置), 洪峰临时关闭端口列表随防火墙卡同页。
 func TestUIUnifyPages(t *testing.T) {
 	html := unifyHTML(t)
 	unifyMust(t, html,
-		`id="tab-home"`, `id="tab-ov"`, `id="tab-ports"`, `id="tab-events"`, `id="tab-bans"`,
+		`id="tab-home"`, `id="tab-ov"`, `id="tab-fw"`, `id="tab-events"`, `id="tab-bans"`,
 		`id="tab-prot"`, `id="tab-proxy"`, `id="tab-cert"`, `id="tab-set"`,
-		`id="sessCard"`, `id="portStarWrap"`, `id="evQ"`, `id="banExpand"`, `id="trustExpand"`,
+		`id="sessCard"`, `id="closedPortList"`, `id="evQ"`, `id="banExpand"`, `id="trustExpand"`,
 		`id="banIpSearch"`, `id="banStatusFilter"`, `id="pxRuleBody"`, `id="pxCertBody"`,
 		`id="totpCard"`, `id="pairCard"`, `id="upCard"`, `id="cmodal"`, `id="pop"`,
-		`border-radius:16px;margin:0 18px 12px`,
 		"@media (prefers-reduced-motion: reduce){.btn,.stat,.seg button,.fchip,#pop .dur{transition:none}",
 	)
-	unifyMustNot(t, html, "purple", "128,0,128", "confirm(", "prompt(")
+	unifyMustNot(t, html, "purple", "128,0,128", "confirm(", "prompt(", `id="tab-ports"`, "重点端口洪峰防护")
 }

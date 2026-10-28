@@ -84,26 +84,25 @@ type Settings struct {
 	TGChatID          string   `json:"tgChatId"`
 	AlertSSHLogin     bool     `json:"alertSshLogin"`       // 默认开
 	AlertSSHBrute     bool     `json:"alertSshBrute"`       // 默认开
-	AlertSSHConn      bool     `json:"alertSshConn"`        // SSH 端口新连接推送, 默认开(与重点端口新连接叠加, 只影响 SSH 端口)
+	AlertSSHConn      bool     `json:"alertSshConn"`        // SSH 端口新连接推送, 默认开
 	AlertPortGuardBan bool     `json:"alertPortGuardBan"`   // 端口防护封禁推送, 默认开(此前无开关恒推送)
 	AlertUILogin      bool     `json:"alertUiLogin"`        // 默认开
-	AlertNewConnStar  bool     `json:"alertNewConnStar"`    // 默认关
 	AlertNewListener  bool     `json:"alertNewListener"`    // 默认关
 	AlertMuteInternal bool     `json:"alertMuteInternal"`   // 内网访问不通知(只记录不推送), 默认关=内网照常通知
 	AutoBanEnabled    bool     `json:"autoBanEnabled"`      // 默认关(手动开启)
 	BruteWindowMin    int      `json:"bruteWindowMin"`      // 默认10
 	BruteThreshold    int      `json:"bruteThreshold"`      // 默认5
 	BruteBanHours     int      `json:"bruteBanHours"`       // 默认24
-	AlertPortFlood    bool     `json:"alertPortFlood"`      // 默认开
 	ScanEnabled       bool     `json:"scanEnabled"`         // 扫描识别, 默认关
 	AlertScan         bool     `json:"alertScan"`           // 扫描报警, 默认开
 	ScanAutoBan       bool     `json:"scanAutoBan"`         // 扫描自动拉黑, 默认关
 	ScanWindowMin     int      `json:"scanWindowMin"`       // 默认 5
 	ScanDistinctPorts int      `json:"scanDistinctPorts"`   // 默认 5
-	FloodEnabled      bool     `json:"floodEnabled"`        // 重点端口洪峰防护(分布式爆破), 默认关
+	FloodEnabled      bool     `json:"floodEnabled"`        // 端口洪峰防护(分布式爆破), 默认关
 	FloodWindowMin    int      `json:"floodWindowMin"`      // 默认1
 	FloodDistinctIPs  int      `json:"floodDistinctIps"`    // 默认30
 	FloodCloseMin     int      `json:"floodCloseMin"`       // 默认60
+	FloodPorts        string   `json:"floodPorts"`          // 手动洪峰端口列表(原始文本, 用统一解析逻辑解析; 空 = 不对任何端口触发)
 	ReportEnabled     bool     `json:"reportEnabled"`       // 默认开
 	ReportTime        string   `json:"reportTime"`          // 默认 09:00
 	LogKeepDays       int      `json:"logKeepDays"`         // 默认30
@@ -134,8 +133,7 @@ func defaultSettings() Settings {
 	return Settings{
 		AlertSSHLogin: true, AlertSSHBrute: true, AlertSSHConn: true, AlertPortGuardBan: true, AlertUILogin: true,
 		AutoBanEnabled: false, BruteWindowMin: 10, BruteThreshold: 5, BruteBanHours: 24,
-		AlertPortFlood: true,
-		ScanEnabled:    false, AlertScan: true, ScanAutoBan: false, ScanWindowMin: 5, ScanDistinctPorts: 5,
+		ScanEnabled: false, AlertScan: true, ScanAutoBan: false, ScanWindowMin: 5, ScanDistinctPorts: 5,
 		FloodEnabled: false, FloodWindowMin: 1, FloodDistinctIPs: 30, FloodCloseMin: 60,
 		ReportEnabled: true, ReportTime: "09:00", LogKeepDays: 30, NewSrcKeepDays: 7,
 		TrafficAcct: true, LedgerKeepDays: 7,
@@ -199,7 +197,6 @@ func loadAll() {
 		settings.FloodWindowMin = 1
 		settings.FloodDistinctIPs = 30
 		settings.FloodCloseMin = 60
-		settings.AlertPortFlood = true
 	}
 	if settings.LogKeepDays < 1 {
 		settings.LogKeepDays = 30
@@ -259,7 +256,7 @@ func newServerID() string {
 	return hex.EncodeToString([]byte{byte(time.Now().Unix() >> 24), byte(time.Now().Unix() >> 16), byte(time.Now().Unix() >> 8), byte(time.Now().Unix())})
 }
 
-// ensurePanelPortSeed: 面板端口默认监控条目（默认加星，重点端口里可见）。
+// ensurePanelPortSeed: 面板端口默认监控条目(历史遗留, 兼容旧版本与多机同步)。
 // 只在启动时补一次：已有单个/范围覆盖面板端口、或用户删过（ignoredPorts）时不补；
 // 手动添加的条目一律不动（不改星标、不改名）。种子直写清单，不走 planRangeAdd，
 // 因此不受星标自身端口排除影响；手动添加仍走原有排除逻辑不变。

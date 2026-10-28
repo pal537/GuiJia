@@ -391,7 +391,7 @@ body.auth #loginView{margin:auto}
   </div>
 
   <div class="nav" id="nav">
-    <button data-tab="home" id="navHome" style="display:none">首页</button><button data-tab="ov" class="on">总览</button><button data-tab="ports">端口</button><button data-tab="events">事件</button><button data-tab="bans">黑白名单</button><button data-tab="prot">防护</button><button data-tab="proxy">反代</button><button data-tab="cert">证书</button><button data-tab="set">设置</button>
+    <button data-tab="home" id="navHome" style="display:none">首页</button><button data-tab="ov" class="on">总览</button><button data-tab="fw">防火墙</button><button data-tab="events">事件</button><button data-tab="bans">黑白名单</button><button data-tab="prot">防护</button><button data-tab="proxy">反代</button><button data-tab="cert">证书</button><button data-tab="set">设置</button>
   </div>
 
   <section id="tab-home" style="display:none">
@@ -413,12 +413,12 @@ body.auth #loginView{margin:auto}
       <div class="empty" id="sessEmpty" style="display:none">当前没有登录会话</div>
     </div>
     <div class="panel">
-      <div class="ph"><span class="staric">★</span><h2 class="mtitle">重点端口 · 实时连接</h2><span class="pcount" id="starCount"></span><span class="hint">加星标的端口 · 未信任在前</span><span class="sp"></span><span class="hint">排序</span><select class="sortsel" id="sortSelA"><option value="dur-desc">连接时长 · 久→新</option><option value="dur-asc">连接时长 · 新→久</option><option value="traf-desc">流量 · 大→小</option><option value="traf-asc">流量 · 小→大</option></select><span class="upd" id="ovTime"></span></div>
+      <div class="ph"><span class="staric">★</span><h2 class="mtitle">重点端口 · 实时连接</h2><span class="pcount" id="starCount"></span><span class="hint">防火墙规则端口 · 未信任在前</span><span class="sp"></span><span class="hint">排序</span><select class="sortsel" id="sortSelA"><option value="dur-desc">连接时长 · 久→新</option><option value="dur-asc">连接时长 · 新→久</option><option value="traf-desc">流量 · 大→小</option><option value="traf-asc">流量 · 小→大</option></select><span class="upd" id="ovTime"></span></div>
       <div class="tblwrap"><table class="fixed" style="min-width:940px"><colgroup><col style="width:248px"><col style="width:198px"><col><col style="width:104px"><col style="width:158px"><col style="width:64px"><col style="width:140px"></colgroup><thead><tr><th>监控端口</th><th>来源 IP</th><th>归属地</th><th>进程</th><th>流量（总）</th><th>已连接</th><th>操作</th></tr></thead><tbody id="connStarBody"></tbody></table></div>
-      <div class="empty" id="connStarEmpty" style="display:none">当前没有重点端口的连接</div>
+      <div class="empty" id="connStarEmpty" style="display:none">当前没有防火墙规则端口的连接</div>
     </div>
     <div class="panel">
-      <div class="ph"><h2 class="mtitle">其他端口 · 实时连接</h2><span class="pcount" id="otherCount"></span><span class="hint">未加星标的监控端口</span><span class="sp"></span><span class="hint">排序</span><select class="sortsel" id="sortSelB"><option value="dur-desc">连接时长 · 久→新</option><option value="dur-asc">连接时长 · 新→久</option><option value="traf-desc">流量 · 大→小</option><option value="traf-asc">流量 · 小→大</option></select><button class="btn sm" id="btnFoldOther">收起</button></div>
+      <div class="ph"><h2 class="mtitle">其他端口 · 实时连接</h2><span class="pcount" id="otherCount"></span><span class="hint">非防火墙规则端口</span><span class="sp"></span><span class="hint">排序</span><select class="sortsel" id="sortSelB"><option value="dur-desc">连接时长 · 久→新</option><option value="dur-asc">连接时长 · 新→久</option><option value="traf-desc">流量 · 大→小</option><option value="traf-asc">流量 · 小→大</option></select><button class="btn sm" id="btnFoldOther">收起</button></div>
       <div id="otherWrap">
       <div class="tblwrap"><table class="fixed" style="min-width:940px"><colgroup><col style="width:248px"><col style="width:198px"><col><col style="width:104px"><col style="width:158px"><col style="width:64px"><col style="width:140px"></colgroup><thead><tr><th>监控端口</th><th>来源 IP</th><th>归属地</th><th>进程</th><th>流量（总）</th><th>已连接</th><th>操作</th></tr></thead><tbody id="connBody"></tbody></table></div>
       <div class="empty" id="connEmpty" style="display:none">当前没有其他端口的连接</div>
@@ -426,17 +426,21 @@ body.auth #loginView{margin:auto}
     </div>
   </section>
 
-  <section id="tab-ports" style="display:none">
-    <div class="panel">
-      <div class="ph"><h2 class="mtitle">监控端口</h2><span class="hint">彩色框 = 服务类型，后面灰字 = 备注；星标区置顶</span><span class="sp"></span>
-        <button class="btn" id="btnScan">扫描添加</button>
-        <button class="btn primary" id="btnAddPort">手动添加</button></div>
-      <div id="portStarWrap" style="display:none;border:1px solid var(--line);border-radius:16px;margin:0 18px 12px">
-        <div class="ph" style="border:0;padding:10px 18px 0"><h2 style="font-size:14px">★ 重点端口</h2></div>
-        <div class="tblwrap"><table class="fixed" style="min-width:860px"><colgroup><col style="width:48px"><col><col style="width:280px"><col style="width:76px"><col style="width:246px"></colgroup><thead><tr><th>重点</th><th>端口</th><th>状态</th><th>来源</th><th>操作</th></tr></thead><tbody id="portStarBody"></tbody></table></div>
+  <section id="tab-fw" style="display:none">
+    <div class="setgrid">
+      <div class="scard">
+        <h3 class="mtitle">防火墙</h3>
+        <div class="hint">给指定端口加访问规则：一个端口（同一协议）只能有一种动作：允许规则只放行来源命中的，其余一律拒绝；拒绝规则只拒绝来源命中的，其余一律放行；同动作多条规则按来源并集算；没有规则的端口防火墙不管。端口支持单个、逗号分隔与范围（如 1-65535）。内网与信任名单永远豁免。封禁一律永久，直到规则删除、禁用或手动解封才释放。</div>
+        <div id="pgRuleList" style="padding:6px 18px 0"></div>
+        <div class="savebar"><button class="btn primary" id="btnFwAdd">添加规则</button></div>
       </div>
-      <div class="tblwrap"><table class="fixed" style="min-width:860px"><colgroup><col style="width:48px"><col><col style="width:280px"><col style="width:76px"><col style="width:246px"></colgroup><thead><tr><th>重点</th><th>端口</th><th>状态</th><th>来源</th><th>操作</th></tr></thead><tbody id="portBody"></tbody></table></div>
-      <div class="empty" id="portEmpty" style="display:none">清单是空的。点「扫描添加」从当前监听里挑，或「手动添加」。</div>
+
+      <div class="scard" id="cardClosedPorts">
+        <h3 class="mtitle">洪峰防护临时关闭的端口</h3>
+        <div class="hint">洪峰防护触发后临时关闭的端口：期间公网新连接全部拒绝，内网不受影响；到期自动恢复，也可点「立即恢复」马上放开。</div>
+        <div id="closedPortList" style="padding:6px 18px 0"></div>
+        <div class="empty" id="closedPortEmpty" style="display:none">当前没有被洪峰防护临时关闭的端口</div>
+      </div>
     </div>
   </section>
 
@@ -480,21 +484,15 @@ body.auth #loginView{margin:auto}
         <div class="hint">建议修改默认的 SSH 端口和面板端口，不要使用默认端口。</div>
       </div>
 
-      <div class="scard">
-        <h3 class="mtitle">防火墙</h3>
-        <div class="hint">给指定端口加访问规则：一个端口（同一协议）只能有一种动作：允许规则只放行来源命中的，其余一律拒绝；拒绝规则只拒绝来源命中的，其余一律放行；同动作多条规则按来源并集算；没有规则的端口防火墙不管。端口支持单个、逗号分隔与范围（如 1-65535）。内网与信任名单永远豁免。封禁一律永久，直到规则删除、禁用或手动解封才释放。</div>
-        <div id="pgRuleList" style="padding:6px 18px 0"></div>
-        <div class="savebar"><button class="btn primary" id="btnFwAdd">添加规则</button></div>
-      </div>
-
       <div class="scard" id="cardFlood">
-        <h3 class="mtitle">重点端口洪峰防护 <span class="cbadge">分布式爆破</span></h3>
+        <h3 class="mtitle">端口洪峰防护 <span class="cbadge">分布式爆破</span></h3>
         <div class="syncnote">已与主服务器同步<div class="hint" style="margin:4px 0 0">配置由主服务器统一管理，本机不显示、不改。</div></div>
-        <div class="hint">防的是代理池分布式爆破：攻击者用成百上千个代理 IP、每个 IP 只试一两次，上面那种「单个 IP 失败 N 次」的阈值永远抓不到。开启后，同一个重点端口若在短时间内涌入大量不同来源 IP，将判定为洪峰，立即临时关闭该端口并通过 TG 升级报警。</div>
-        <div class="frow"><div class="fl">启用洪峰防护<div class="d">只对重点（星标）端口生效</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sFldOn"><i></i></label></div></div>
-        <div class="frow"><div class="fl">触发条件</div><div class="fv"><input type="number" id="sFldWin" min="1" max="60"><span class="mono">分钟内，同一重点端口出现</span><input type="number" id="sFldIPs" min="2"><span class="mono">个不同公网 IP 的新连接</span></div></div>
-        <div class="frow"><div class="fl">触发动作</div><div class="fv"><span class="mono">临时关闭该端口</span><input type="number" id="sFldClose" min="1" max="1440"><span class="mono">分钟：期间公网新连接全部拒绝，内网不受影响；到期自动恢复，也可在「端口」页立即恢复</span></div></div>
-        <div class="hint warn">注意：下载类端口（qBittorrent、Transmission 等 BT 下载）千万不要设为重点端口——BT 对端成百上千是正常流量，会误触发关端口。重点端口只适合 SSH、面板、管理后台这类来源 IP 很少的服务。</div>
+        <div class="hint">防的是代理池分布式爆破：攻击者用成百上千个代理 IP、每个 IP 只试一两次，上面那种「单个 IP 失败 N 次」的阈值永远抓不到。开启后，手动添加的端口若在短时间内涌入大量不同来源 IP，将判定为洪峰，立即临时关闭该端口并记一条事件。</div>
+        <div class="frow"><div class="fl">启用洪峰防护<div class="d">只对手动添加的端口生效</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sFldOn"><i></i></label></div></div>
+        <div class="frow"><div class="fl">防御端口<div class="d">不自动匹配，只认这里手动添加的端口</div></div><div class="fv"><span class="mono" id="fldPortsTx"></span><button class="btn" id="btnFldPorts">设置洪峰端口</button></div></div>
+        <div class="frow"><div class="fl">触发条件</div><div class="fv"><input type="number" id="sFldWin" min="1" max="60"><span class="mono">分钟内，同一端口出现</span><input type="number" id="sFldIPs" min="2"><span class="mono">个不同公网 IP 的新连接</span></div></div>
+        <div class="frow"><div class="fl">触发动作</div><div class="fv"><span class="mono">临时关闭该端口</span><input type="number" id="sFldClose" min="1" max="1440"><span class="mono">分钟：期间公网新连接全部拒绝，内网不受影响；到期自动恢复，也可在「防火墙」页立即恢复</span></div></div>
+        <div class="hint warn">注意：下载类端口（qBittorrent、Transmission 等 BT 下载）千万不要加进洪峰端口——BT 对端成百上千是正常流量，会误触发关端口。洪峰端口只适合 SSH、面板、管理后台这类来源 IP 很少的服务。</div>
         <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
       </div>
 
@@ -621,7 +619,7 @@ body.auth #loginView{margin:auto}
         <div class="frow"><div class="fl">Bot Token</div><div class="fv"><input id="sTgToken" type="password" placeholder="123456:ABC-..."></div></div>
         <div class="frow"><div class="fl">Chat ID<div class="d">只认这个会话的拉黑回调</div></div><div class="fv"><input id="sTgChat" placeholder="例如 123456789"></div></div>
         <div class="frow"><div class="fl">连通性测试<div class="d">用当前填写的值发送，无需先保存</div></div><div class="fv"><button class="btn" id="btnTgTest">发送测试消息</button></div></div>
-        <div class="frow"><div class="fl">通知配置<div class="d">报警项目开关：SSH 登录、爆破、连接、面板登录、重点端口、防火墙封禁、蜜罐、新监听等</div></div><div class="fv"><button class="btn" id="btnAlertCfg">通知配置</button></div></div>
+        <div class="frow"><div class="fl">通知配置<div class="d">报警项目开关：SSH 登录、爆破、连接、面板登录、防火墙封禁、蜜罐、新监听等</div></div><div class="fv"><button class="btn" id="btnAlertCfg">通知配置</button></div></div>
         <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
       </div>
 
@@ -794,7 +792,7 @@ function homeCardHTML(fp,name,online,tag,foot,animate,delay,meta){
   const ip=esc(m.ip||'未知');
   const logo=osLogo(m.os,m.arch);
   const menu='<div class="srv-foot2"><button class="btn sm" data-act="menu" data-fp="'+fp+'">设置</button>'+logo+'</div>';
-  return '<div class="srv-card'+(online?'':' offline')+(animate?' srv-in':'')+(((fp&&fp===curServer)||(!fp&&managingLocal))?' managing':'')+'" data-fp="'+fp+'"'+(animate?' style="animation-delay:'+delay+'ms"':'')+'><div class="srv-top"><span class="srv-dot"></span><span class="srv-name">'+esc(name)+'</span><span class="srv-tag">'+tag+'</span></div><div class="srv-meta" data-k="loc">'+loc+' · <b>'+ip+'</b></div><div class="srv-nums"><div><div class="srv-num" data-k="conns">…</div><div class="srv-lab">当前连接</div></div><div><div class="srv-num" data-k="bans">…</div><div class="srv-lab">今日拉黑</div></div><div><div class="srv-num" data-k="ports">…</div><div class="srv-lab">监控端口</div></div><div><div class="srv-num" data-k="blist" title="黑名单：生效 / 全部记录">…</div><div class="srv-lab">黑名单</div></div></div><div class="srv-foot">'+esc(foot)+'</div>'+menu+'</div>';
+  return '<div class="srv-card'+(online?'':' offline')+(animate?' srv-in':'')+(((fp&&fp===curServer)||(!fp&&managingLocal))?' managing':'')+'" data-fp="'+fp+'"'+(animate?' style="animation-delay:'+delay+'ms"':'')+'><div class="srv-top"><span class="srv-dot"></span><span class="srv-name">'+esc(name)+'</span><span class="srv-tag">'+tag+'</span></div><div class="srv-meta" data-k="loc">'+loc+' · <b>'+ip+'</b></div><div class="srv-nums"><div><div class="srv-num" data-k="conns">…</div><div class="srv-lab">当前连接</div></div><div><div class="srv-num" data-k="bans">…</div><div class="srv-lab">今日拉黑</div></div><div><div class="srv-num" data-k="ports">…</div><div class="srv-lab">监听端口</div></div><div><div class="srv-num" data-k="blist" title="黑名单：生效 / 全部记录">…</div><div class="srv-lab">黑名单</div></div></div><div class="srv-foot">'+esc(foot)+'</div>'+menu+'</div>';
 }
 function homeSetMeta(fp,m){
   const c=homeCardEl(fp);if(!c||!m)return;
@@ -837,7 +835,7 @@ async function openGroupSyncModal(){
   const ptStTx=pt.lastSyncAt?('上次同步：'+fmtTs(pt.lastSyncAt*1000)+(pt.lastDetail?' · '+esc(pt.lastDetail):'')):'上次同步：从未同步';
   const ptSec='<div style="border:1px solid var(--line);border-radius:12px;padding:14px"><div style="display:flex;align-items:center;gap:10px"><b>防护同步</b><span class="hint" id="gsDirty_protection" style="display:none;color:#b45309"> · 未保存</span><span style="flex:1"></span><label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="gsEn_protection"'+(pt.enabled?' checked':'')+'> 开启共享</label></div>'+
   '<div class="csub" style="margin:6px 0 10px">勾选的防护项跟主服务器走：主服务器配置为准，节点相关卡片只显示“已与主服务器同步”，不显示配置、本地不可改。未勾选的项留节点本地。开启后新加入节点批准后立即自动同步一次；关闭整组会立即通知各节点恢复本地控制。</div>'+
-  '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px">'+[['flood','重点端口洪峰防护'],['autoban','爆破自动拉黑'],['scan','扫描识别'],['intel','威胁情报']].map(it=>'<label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="gsIt_'+it[0]+'"'+(ptIt[it[0]]?' checked':'')+'> '+it[1]+'</label>').join('')+'</div>'+
+  '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px">'+[['flood','端口洪峰防护'],['autoban','爆破自动拉黑'],['scan','扫描识别'],['intel','威胁情报']].map(it=>'<label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="gsIt_'+it[0]+'"'+(ptIt[it[0]]?' checked':'')+'> '+it[1]+'</label>').join('')+'</div>'+
   '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13px">同步间隔</span><select id="gsIv_protection">'+[5,10,30,60].map(v=>'<option value="'+v+'"'+(pt.intervalMin===v?' selected':'')+'>'+v+' 分钟</option>').join('')+'</select>'+
   '<button class="btn" id="gsNow_protection">立即同步</button></div>'+
   '<div class="'+ptStCls+'" id="gsSt_protection" style="margin-top:10px">'+ptStTx+'</div></div>';
@@ -1036,7 +1034,6 @@ const KINDS={
   db:{label:'数据库',color:'#4f46e5'}, download:{label:'下载',color:'#16a34a'},
   other:{label:'其他',color:'#94a3b8'}};
 function kindTag(k){const m=KINDS[k]||KINDS.other;return '<span class="tag" style="color:'+m.color+';border-color:'+m.color+'">'+m.label+'</span>'}
-function kindOptions(sel){return Object.keys(KINDS).map(k=>'<option value="'+k+'"'+(k===sel?' selected':'')+'>'+KINDS[k].label+'</option>').join('')}
 function tint(hex,a){const n=parseInt(hex.slice(1),16);return 'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')'}
 const DURS=[['1 小时',1],['6 小时',6],['24 小时',24],['3 天',72],['7 天',168],['30 天',720],['永久',0]];
 /* ---------- 锚定浮层(全部点击弹窗一律在点击位置下方弹出) ---------- */
@@ -1098,11 +1095,11 @@ function gotoTab(name,arg){
   curTab=name;
   renderViewBar();
   $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
-  ['home','ov','ports','events','bans','prot','proxy','cert','set'].forEach(t=>{$('#tab-'+t).style.display=t===name?'':'none'});
+  ['home','ov','fw','events','bans','prot','proxy','cert','set'].forEach(t=>{$('#tab-'+t).style.display=t===name?'':'none'});
   closePop();
   if(homeTimer){clearInterval(homeTimer);homeTimer=null;}
   if(name==='home'){loadHome();homeTimer=setInterval(()=>{if(document.visibilityState==='visible')loadHome();},10000);}
-  if(name==='ports')loadPorts();
+  if(name==='fw')loadFirewall();
   if(name==='events')loadEvents(arg&&arg.type);
   if(name==='bans'){banShown=10;loadBans();loadSettings();}
   if(name==='prot')loadProtection();
@@ -1574,7 +1571,7 @@ const STATDEF=[
  {ic:'M12 3l7 3v5c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6zM9.5 9.5l5 5M14.5 9.5l-5 5',c:'#d43a2f',lab:'今日拉黑次数',get:o=>o.today.bans,go:()=>gotoTab('bans')},
  {ic:'M5 5.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5v13A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5zM12 8v4M12 15.5v.2',c:'#ea580c',lab:'今日 SSH 失败',get:o=>o.today.sshFails,go:()=>gotoTab('events',{type:'ssh_fail'})},
  {ic:'M8 6h13M8 12h13M8 18h13M4 6h.2M4 12h.2M4 18h.2',c:'#4f46e5',lab:'黑名单生效中',get:o=>o.activeBans,sub:o=>o.bansTotal!=null?('共 '+o.bansTotal+' 条记录'):'' ,go:()=>gotoTab('bans')},
- {ic:'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',c:'#059669',lab:'监控端口',get:o=>o.watchedPorts,go:()=>gotoTab('ports')}];
+ {ic:'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',c:'#059669',lab:'监听端口',get:o=>o.watchedPorts,go:null}];
 let geoState={v6:false};
 function renderPills(o){
   const fw=$('#pillFw');$('#pillFwTx').textContent=o.fwLinkOk?'拦截链正常':'拦截链异常';
@@ -1596,7 +1593,7 @@ function renderTraffic(list){
   $('#trafItems').innerHTML=list.map(t=>'<span class="tnic"><span class="tn">'+esc(t.name)+'</span>'+(t.addr?'<span class="ta">'+esc(t.addr)+'</span>':'')+'<span class="tr dn">'+dn+fmtRate(t.rxBps)+'</span><span class="tr up">'+up+fmtRate(t.txBps)+'</span></span>').join('');
 }
 function portCell(c){
-  return '<div class="portcell">'+(c.star?'<span class="star">★</span>':'<span class="staroff"></span>')+'<span class="pnum">'+c.port+'</span> '+kindTag(c.kind)+(c.proto==='udp'?' <span class="tag" style="color:#0f766e;border-color:#0f766e">UDP</span>':'')+(c.portName?' <span class="memo">'+esc(c.portName)+'</span>':'')+'</div>';
+  return '<div class="portcell"><span class="staroff"></span><span class="pnum">'+c.port+'</span> '+kindTag(c.kind)+(c.proto==='udp'?' <span class="tag" style="color:#0f766e;border-color:#0f766e">UDP</span>':'')+(c.portName?' <span class="memo">'+esc(c.portName)+'</span>':'')+'</div>';
 }
 function connOps(c){
   if(c.banned)return '<span class="bannedlab">已拉黑</span>';
@@ -1653,7 +1650,7 @@ async function loadOverview(){
       default: return x.since-y.since; // dur-desc: 连接久的在前
     }
   });
-  const star=sortRows(conns.filter(c=>c.star)), rest=sortRows(conns.filter(c=>!c.star));
+  const star=sortRows(conns.filter(c=>c.fw)), rest=sortRows(conns.filter(c=>!c.fw));
   $('#starCount').textContent='（'+star.length+'）';
   $('#otherCount').textContent='（'+rest.length+'）';
   $('#connStarBody').innerHTML=star.map(c=>connRow(c,now)).join('');
@@ -1669,11 +1666,15 @@ async function loadOverview(){
   $('#sessEmpty').style.display=sess.length?'none':'';
   bindConnOps($('#tab-ov'));
 }
-/* 防护页: 急救状态 + 蜜罐 + 防火墙 */
+/* 防火墙页: 规则 + 洪峰临时关闭端口 */
+async function loadFirewall(){
+  loadPortGuard();
+  loadClosedPorts();
+}
+/* 防护页: 急救状态 + 蜜罐 */
 async function loadProtection(){
   loadSettings();
   loadHoneypot();
-  loadPortGuard();
   loadIntel();
   // 被控节点不设本地超级密码(急救统一走主服务器): 节点视图隐藏急救卡。
   const rc=$('#rescueCard');if(rc)rc.style.display=curServer?'none':'';
@@ -1765,12 +1766,12 @@ async function loadHoneypot(){
   $('#hpStatusRows').innerHTML=(c.ports||[]).map(p=>'<div class="geoline"><span class="st">端口 '+p+'</span><span class="dt">'+(st[p]?'<span style="color:var(--green)">监听中</span>':'<span style="color:var(--red)">未监听</span>')+'</span><span class="dt">今日命中 '+(hits[p]||0)+' 次</span></div>').join('')||'<div class="geoline"><span class="dt">未配置蜜罐端口</span></div>';
   try{const o=await api('GET','api/overview');$('#hpBansToday').textContent=o.honeypotBansToday||0}catch(e){}
 }
-/* 端口列表解析(与后端 parsePortList 同款口径): 英文逗号、中文逗号、正反斜杠、
-顿号分隔; 含不支持的符号直接报错, 绝不静默丢掉 */
+/* 端口列表解析(与后端统一分隔口径): 英文逗号、中文逗号、正反斜杠、
+顿号、空白都能分隔; 含不支持的符号直接报错, 绝不静默丢掉 */
 function parsePortList(s){
   if(!s||!s.trim())throw new Error('请填写端口');
   const out=[],seen={};
-  for(const f of s.split(/[,，\/\\、]/)){
+  for(const f of s.split(/[,，\/\\、\s]/)){
     const t=f.trim();
     if(!t)continue;
     for(const ch of t){if(ch<'0'||ch>'9')throw new Error("符号 '"+ch+"' 不对，不可以");}
@@ -1780,6 +1781,31 @@ function parsePortList(s){
   }
   if(!out.length)throw new Error('请填写端口');
   return out.sort((a,b)=>a-b);
+}
+/* 端口范围列表解析(洪峰端口输入用): 与 parsePortList 同款分隔,
+每段可为单个端口或 lo-hi 范围(如 8000-8010); 短横线两侧的空白先归一,
+写 "8000 - 8010" 也算范围; 含不支持的符号直接报错。空输入 = 空集合。 */
+function parsePortRangeList(s){
+  if(!s||!s.trim())return [];
+  const ranges=[];
+  for(const f of s.replace(/\s*-\s*/g,'-').split(/[,，\/\\、\s]/)){
+    const t=f.trim();
+    if(!t)continue;
+    if(t.includes('-')){
+      const parts=t.split('-');
+      if(parts.length!==2||!parts[0]||!parts[1])throw new Error('范围 '+t+' 格式不对');
+      for(const ch of parts[0]+parts[1]){if(ch<'0'||ch>'9')throw new Error("符号 '"+ch+"' 不对，不可以");}
+      const lo=parseInt(parts[0],10),hi=parseInt(parts[1],10);
+      if(lo<1||hi>65535||lo>hi)throw new Error('范围 '+t+' 无效：须为 1-65535 且起始不大于结束');
+      ranges.push([lo,hi]);
+    }else{
+      for(const ch of t){if(ch<'0'||ch>'9')throw new Error("符号 '"+ch+"' 不对，不可以");}
+      const n=parseInt(t,10);
+      if(n<1||n>65535)throw new Error('端口 '+t+' 超出范围（1-65535）');
+      ranges.push([n,n]);
+    }
+  }
+  return ranges;
 }
 function hpCollect(){
   const ports=[];
@@ -1991,7 +2017,7 @@ async function openFwDialog(rule){
   (knownKind?'':'<div class="sline fail">该节点版本较旧（规则类型 '+esc(srcKind)+'），请先升级节点再编辑；卡片上的启用开关仍可用。</div>')+
   '<div class="fld"><label>网络连接</label><select id="fwNet"><option value="all">全部（所有网卡入站连接）</option></select><div class="hint">规则适用于全部网卡的入站连接</div></div>'+
   '<div class="fld"><label>通信协议</label><select id="fwProto"><option value="all">全部</option><option value="tcp">TCP</option><option value="udp">UDP</option></select></div>'+
-  '<div class="fld"><label>端口</label><input id="fwPorts" placeholder="如 80,443 或 8000-8010" value="'+esc(rule?rule.portText||'':'')+'"><div class="hint">单个、逗号分隔、或范围（如 1-65535）</div></div>'+
+  '<div class="fld"><label>端口</label><input id="fwPorts" placeholder="如 80,443 或 8000-8010" value="'+esc(rule?rule.portText||'':'')+'"><div class="hint">单个、逗号/空格分隔、或范围（如 1-65535）</div></div>'+
   '<div class="fld"><label>来源范围</label><select id="fwSrcKind"><option value="custom_ip">自定义 IP</option><option value="all_v4">全部 IPv4</option><option value="all_v6">全部 IPv6</option><option value="cn_in">中国大陆境内</option><option value="cn_out">中国大陆境外</option><option value="custom_cn">自定义位置（中国）</option><option value="custom_foreign">自定义位置（海外）</option><option value="all">全部 IP</option></select><div class="hint">中国大陆境内 = 国家是中国且省份不在香港、澳门、台湾；境外模式下港澳台可访问；自定义位置（中国）只含大陆省市，港澳台请到自定义位置（海外）里选</div></div>'+
   '<div class="fld" id="fwIpRow"><label>IP 或 CIDR</label><input id="fwCidr" placeholder="如 8.8.8.8, 1.2.3.0/24（多个逗号分隔）" value="'+esc(srcCidr)+'"></div>'+
   '<div id="fwCnRow">'+
@@ -2072,135 +2098,6 @@ $('#btnFoldOther').onclick=()=>{otherFolded=!otherFolded;try{localStorage.setIte
 applyFold();
 setInterval(()=>{if(curTab==='ov'&&document.visibilityState==='visible'&&$('#loginView').style.display==='none')loadOverview()},5000);
 setInterval(async()=>{if(curTab!=='ov'&&document.visibilityState==='visible'){try{const o=await api('GET','api/overview');renderPills(o);renderTraffic(o.traffic)}catch(e){}}},5000);
-/* ---------- 端口 ---------- */
-const SRCLAB={firewall:'防火墙',scan:'扫描',manual:'手动'};
-async function loadPorts(){
-  let data={ports:[],ranges:[]};try{data=await api('GET','api/ports')}catch(e){toast(e.message);return}
-  const nowS=Math.floor(Date.now()/1000);
-  const singleRow=p=>{const closed=p.closedUntil&&p.closedUntil>nowS;
-    return '<tr><td><button class="starpick'+(p.star?' on':'')+'" data-star="'+p.port+'" title="重点关注">★</button></td>'+
-    '<td><div class="portcell"><span class="pnum">'+p.port+'</span> '+kindTag(p.kind)+(p.name?' <span class="memo">'+esc(p.name)+'</span>':'')+'</div></td>'+
-    '<td>'+(closed?'<span style="color:var(--red);font-weight:600">已被洪峰防护关闭 · 剩 '+fmtDur(p.closedUntil-nowS)+'</span>':(p.listening?'<span style="color:var(--green);font-weight:600">监听中</span>':'<span class="mono">未监听</span>'))+'</td>'+
-    '<td class="mono">'+(SRCLAB[p.source]||p.source)+'</td>'+
-    '<td><div class="ops">'+(closed?'<button class="btn sm" data-reopen="'+p.port+'">立即恢复</button>':'')+'<button class="btn sm" data-edit="'+p.port+'">编辑</button><button class="btn sm danger" data-del="'+p.port+'">删除</button></div></td></tr>'};
-  const rangeRow=g=>{
-    return '<tr><td><button class="starpick'+(g.star?' on':'')+'" data-rstar="'+g.from+'-'+g.to+'" title="重点关注">★</button></td>'+
-    '<td><div class="portcell"><span class="pnum">'+g.from+'-'+g.to+'</span> <span class="mono">（'+g.count+' 个端口）</span> '+kindTag(g.kind)+(g.name?' <span class="memo">'+esc(g.name)+'</span>':'')+'</div></td>'+
-    '<td><span class="mono">范围监控</span></td>'+
-    '<td class="mono">'+(SRCLAB[g.source]||g.source)+'</td>'+
-    '<td><div class="ops"><button class="btn sm danger" data-rdel="'+g.from+'-'+g.to+'">删除</button></div></td></tr>'};
-  // 星标区置顶、各自内部端口号升序(范围按起始端口)
-  const sortMixed=(singles,ranges)=>{
-    const items=[...singles.map(p=>({k:p.port,html:singleRow(p)})),
-                 ...ranges.map(g=>({k:g.from,html:rangeRow(g)}))];
-    items.sort((a,b)=>a.k-b.k);
-    return items.map(i=>i.html).join('');
-  };
-  const starHtml=sortMixed(data.ports.filter(p=>p.star),data.ranges.filter(g=>g.star));
-  $('#portStarWrap').style.display=starHtml?'':'none';
-  $('#portStarBody').innerHTML=starHtml;
-  $('#portBody').innerHTML=sortMixed(data.ports.filter(p=>!p.star),data.ranges.filter(g=>!g.star));
-  $('#portEmpty').style.display=(data.ports.length||data.ranges.length)?'none':'';
-  const scope=$('#tab-ports');
-  scope.querySelectorAll('[data-reopen]').forEach(b=>b.onclick=async()=>{
-    try{await api('DELETE','api/portbans/'+b.dataset.reopen);toast('端口 '+b.dataset.reopen+' 已恢复开放');loadPorts()}catch(e){toast(e.message)}
-  });
-  scope.querySelectorAll('[data-star]').forEach(b=>b.onclick=async()=>{
-    const p=data.ports.find(x=>x.port===+b.dataset.star);if(!p)return;
-    try{await api('PUT','api/ports/'+p.port,{star:!p.star});loadPorts()}catch(e){toast(e.message)}
-  });
-  scope.querySelectorAll('[data-rstar]').forEach(b=>b.onclick=async()=>{
-    const [from,to]=b.dataset.rstar.split('-').map(Number);
-    const g=data.ranges.find(x=>x.from===from&&x.to===to);if(!g)return;
-    try{const r=await api('POST','api/ports/range/star',{from,to,star:!g.star});if(r.notice)toast(r.notice);loadPorts()}catch(e){toast(e.message)}
-  });
-  scope.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{const p=data.ports.find(x=>x.port===+b.dataset.edit);portFormPop(b,p)});
-  scope.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
-    const p=data.ports.find(x=>x.port===+b.dataset.del);
-    confirmPop(b,'删除监控端口','确定不再监控端口 '+p.port+' 吗？防火墙同步也不会再把它导回来。','删除',async()=>{
-      await api('DELETE','api/ports/'+p.port);toast('已删除');loadPorts();
-    });
-  });
-  scope.querySelectorAll('[data-rdel]').forEach(b=>b.onclick=()=>{
-    const [from,to]=b.dataset.rdel.split('-').map(Number);
-    confirmPop(b,'删除监控范围','确定不再监控范围 '+from+'-'+to+' 吗？整段一起删，防火墙同步也不会再把它导回来。','删除',async()=>{
-      await api('DELETE','api/ports',{from,to});toast('已删除');loadPorts();
-    });
-  });
-}
-function portFormPop(anchor,p){
-  const isNew=!p; p=p||{port:'',name:'',kind:'other',star:false};
-  openPop(anchor,
-   '<div class="pt">'+(isNew?'添加监控端口':'编辑端口 '+p.port)+'</div><div style="height:10px"></div>'+
-   (isNew?'<div class="fld"><label>端口</label><input id="pfPort" type="number" min="1" max="65535" placeholder="例如 22"></div>':'')+
-   '<div class="fld"><label>备注名</label><input id="pfName" value="'+esc(p.name||'')+'" placeholder="例如 影视（可空）"></div>'+
-   '<div class="fld"><label>服务类型</label><select id="pfKind">'+kindOptions(p.kind)+'</select></div>'+
-   '<div class="fld" style="display:flex;align-items:center;gap:8px"><label class="sw"><input type="checkbox" id="pfStar"'+(p.star?' checked':'')+'><i></i></label><span style="font-size:13px">重点关注（星标端口的新连接会记事件）</span></div>'+
-   '<div style="font-size:12px;color:var(--mut);line-height:1.6;margin:-2px 0 10px">重点端口受洪峰防护：短时间内涌入大量不同 IP 会自动临时关端口。下载类（BT）服务不要设重点，会误伤。</div>'+
-   '<div class="pops"><button class="btn" id="popCancel">取消</button><button class="btn primary" id="popOk">保存</button></div>',true);
-  pop.querySelector('#popCancel').onclick=closePop;
-  pop.querySelector('#popOk').onclick=async()=>{
-    const name=pop.querySelector('#pfName').value.trim(),kind=pop.querySelector('#pfKind').value,star=pop.querySelector('#pfStar').checked;
-    try{
-      if(isNew){const port=+pop.querySelector('#pfPort').value;if(!(port>=1&&port<=65535)){toast('端口无效');return}
-        await api('POST','api/ports',{port,name,star,kind});}
-      else await api('PUT','api/ports/'+p.port,{name,star,kind});
-      toast('已保存');closePop();loadPorts();
-    }catch(e){toast(e.message)}
-  };
-}
-/* 端口范围添加(第 7 项): 一个框全支持单个/范围/逗号组合, 撞上先提示后确认 */
-function portAddPop(anchor){
-  openPop(anchor,
-   '<div class="pt">添加监控端口</div><div style="height:10px"></div>'+
-   '<div class="fld"><label>端口</label><input id="pfSpec" placeholder="例如 443、8000-8010、80,443,8000-8010"></div>'+
-   '<div class="fld"><label>备注名</label><input id="pfName" placeholder="例如 影视（可空）"></div>'+
-   '<div class="fld"><label>服务类型</label><select id="pfKind">'+kindOptions('other')+'</select></div>'+
-   '<div class="fld" style="display:flex;align-items:center;gap:8px"><label class="sw"><input type="checkbox" id="pfStar"><i></i></label><span style="font-size:13px">同时星标（默认不勾；星标意味着洪峰时关端口）</span></div>'+
-   '<div style="font-size:12px;color:var(--mut);line-height:1.6;margin:-2px 0 10px">星标范围自动排除自身端口 18793 并提示；星标与普通互斥，撞上会先提示、确认后才切开；范围在端口页里就是一条整体记录，整体删除。</div>'+
-   '<div class="pops"><button class="btn" id="popCancel">取消</button><button class="btn primary" id="popOk">保存</button></div>',true);
-  pop.querySelector('#popCancel').onclick=closePop;
-  pop.querySelector('#popOk').onclick=()=>portAddSubmit(false);
-}
-async function portAddSubmit(confirm,preset){
-  const spec=preset?preset.spec:pop.querySelector('#pfSpec').value.trim();
-  const name=preset?preset.name:pop.querySelector('#pfName').value.trim();
-  const kind=preset?preset.kind:pop.querySelector('#pfKind').value;
-  const star=preset?preset.star:pop.querySelector('#pfStar').checked;
-  if(!spec){toast('端口不能为空');return}
-  try{
-    const r=await api('POST','api/ports',{spec,name,star,kind,confirm});
-    if(r.needConfirm){
-      const p=r.plan, fmtSeg=s=>s.from===s.to?s.from:s.from+'-'+s.to;
-      let html='<div class="pt">确认添加</div><div class="pw" style="white-space:normal;font-size:12.5px;line-height:1.7">';
-      if(p.toAdd&&p.toAdd.length)html+='将添加：'+p.toAdd.map(fmtSeg).join('、')+'<br>';
-      if(p.cut&&p.cut.length)html+='将被切开：'+p.cut.map(c=>c.single?('普通端口 '+c.from+' 将移除'):('普通范围 '+c.from+'-'+c.to+' 将切开为 '+(c.remain.length?c.remain.map(fmtSeg).join('、'):'（整段移除）'))).join('；')+'<br>';
-      if(p.skipped&&p.skipped.length)html+='将跳过：'+p.skipped.map(x=>fmtSeg(x)+'（'+x.reason+'）').join('、')+'<br>';
-      if(p.excludedSelf&&p.excludedSelf.length)html+='已自动排除自身端口 '+p.excludedSelf.join('、')+'<br>';
-      html+='</div><div class="pops"><button class="btn" id="popCancel2">取消</button><button class="btn primary" id="popOk2">确认添加</button></div>';
-      openPop($('#btnAddPort'),html,true);
-      pop.querySelector('#popCancel2').onclick=closePop;
-      pop.querySelector('#popOk2').onclick=async()=>{closePop();await portAddSubmit(true,{spec,name,kind,star})};
-      return;
-    }
-    toast('已保存');closePop();loadPorts();
-  }catch(e){toast(e.message)}
-}
-$('#btnAddPort').onclick=e=>portAddPop(e.currentTarget);
-$('#btnScan').onclick=async e=>{
-  const anchor=e.currentTarget;
-  let items=[];try{items=await api('GET','api/ports/scan')}catch(err){toast(err.message);return}
-  const avail=items.filter(i=>!i.watched);
-  openPop(anchor,'<div class="pt">扫描添加</div><div class="pw">当前正在监听的端口，勾选加入监控清单</div>'+
-   '<div class="chklist">'+(avail.length?avail.map(i=>'<label><input type="checkbox" value="'+i.port+'"> <b>'+i.port+'</b> <span class="mono">'+esc(i.proc||'')+'</span>'+(i.ignored?' <span class="mono">（曾删除）</span>':'')+'</label>').join(''):'<div class="mono" style="padding:8px 4px">没有可添加的监听端口</div>')+'</div>'+
-   '<div class="pops"><button class="btn" id="popCancel">取消</button><button class="btn primary" id="popOk">添加选中</button></div>',true);
-  pop.querySelector('#popCancel').onclick=closePop;
-  pop.querySelector('#popOk').onclick=async()=>{
-    const sel=[...pop.querySelectorAll('input[type=checkbox]:checked')].map(x=>({port:+x.value,name:''}));
-    if(!sel.length){toast('先勾选端口');return}
-    try{const r=await api('POST','api/ports/scan',{items:sel});toast('已添加 '+r.added+' 个');closePop();loadPorts()}catch(err){toast(err.message)}
-  };
-};
 /* ---------- 事件 ---------- */
 const EVTYPES=[['','全部'],['ssh_login','SSH 登录'],['ssh_fail','SSH 失败'],['ui_login','UI 登录'],['new_conn','新连接'],['new_src','新来源'],['new_listener','新监听'],['autoban','自动拉黑'],['port_flood','端口洪峰'],['ban','拉黑'],['unban','解除拉黑']];
 const EVCOLOR={ssh_login:['#e8f5ee','#1d7a4c'],ssh_fail:['#fdeeee','#c0392b'],ui_login:['#eaf0fe','#2456c8'],new_conn:['#e6f7fa','#0e7490'],new_src:['#f0f9ff','#0369a1'],new_listener:['#fdf3e3','#b45309'],autoban:['#fdeeee','#c0392b'],port_flood:['#fdeeee','#c0392b'],port_scan:['#fdf3e3','#b45309'],honeypot_hit:['#fdf3e3','#b45309'],honeypot_ban:['#fdeeee','#c0392b'],honeypot_status:['#f0f9ff','#0369a1'],ban:['#f1f5f9','#475569'],unban:['#eef6ee','#3f7d4e']};
@@ -2311,10 +2208,7 @@ $('#btnAddBan').onclick=e=>{
 const ALERTROWS=[
  ['sAlSsh','alertSshLogin','SSH 登录成功','有人 SSH 登录就推送'],
  ['sAlBrute','alertSshBrute','SSH 爆破','达到阈值自动拉黑时推送'],
- ['sAlSshConn','alertSshConn','SSH 连接','SSH 端口有新 TCP 连接时推送（登录前也推）；只影响 SSH 端口'],
  ['sAlUi','alertUiLogin','面板登录成功','有人登录面板就推送'],
- ['sAlConn','alertNewConnStar','重点端口新连接','同一 IP 同一端口每天最多推 1 条（重复只记事件）'],
- ['sAlFlood','alertPortFlood','重点端口洪峰','触发洪峰防护、端口被临时关闭时推送（分布式爆破）'],
  ['sAlPgBan','alertPortGuardBan','防火墙封禁','白名单外 IP 被防火墙封禁时推送（带解除封禁按钮）'],
  ['sAlHpHit','alertHoneypotHit','蜜罐命中报警','蜜罐端口被命中、触发封禁时推送；同一 IP 10 分钟内命中只报一次'],
  ['sAlLis','alertNewListener','新监听端口出现','新端口持续出现后推送'],
@@ -2326,6 +2220,7 @@ function fillSettings(s){
   // 报警项目不在页内平铺, 由通知配置弹窗从 setLoaded 取值(见 openAlertModal), 这里不碰页内元素。
   $('#sAbOn').checked=!!s.autoBanEnabled;$('#sAbWin').value=s.bruteWindowMin;$('#sAbThr').value=s.bruteThreshold;
   $('#sFldOn').checked=!!s.floodEnabled;$('#sFldWin').value=s.floodWindowMin||1;$('#sFldIPs').value=s.floodDistinctIps||30;$('#sFldClose').value=s.floodCloseMin||60;
+  renderFldPortsTx();
   $('#sScanOn').checked=!!s.scanEnabled;$('#sScanAlert').checked=s.alertScan!==false;$('#sScanAuto').checked=!!s.scanAutoBan;$('#sScanWin').value=s.scanWindowMin||5;$('#sScanThr').value=s.scanDistinctPorts||5;
   $('#sAcctOn').checked=s.trafficAcct!==false;
   $('#acctStatus').textContent=s.acctOn?(s.acctByApp?'内核计数已开启（由本应用自动打开）':'内核计数已开启'):'内核计数未开启';
@@ -2377,6 +2272,48 @@ async function loadSettings(){
   loadNodeTg();
   loadUpCard();
   loadPairCard();
+}
+/* ---------- 端口洪峰防护: 手动防御端口 + 临时关闭列表 ---------- */
+function fldPortsText(){
+  return (setLoaded&&setLoaded.floodPorts||'').trim();
+}
+function renderFldPortsTx(){
+  const el=$('#fldPortsTx');if(!el)return;
+  const t=fldPortsText();
+  el.textContent=t?('已设置：'+t):'未设置（洪峰防护不对任何端口触发）';
+}
+function fldPortsPop(anchor){
+  openPop(anchor,
+   '<div class="pt">设置洪峰端口</div><div style="height:10px"></div>'+
+   '<div class="fld"><label>端口</label><input id="fldPortsInput" value="'+esc(fldPortsText())+'" placeholder="例如 22、443、8000-8010"></div>'+
+   '<div style="font-size:12px;color:var(--mut);line-height:1.6;margin:-2px 0 10px">只认这里手动添加的端口，不自动匹配加星端口、防火墙端口或其他端口。多个端口用英文逗号、中文逗号、斜杠、反斜杠、顿号或空格分隔，也支持范围（如 8000-8010）。留空 = 不对任何端口触发。</div>'+
+   '<div class="msgbox err" id="fldPortsErr" style="display:none"></div>'+
+   '<div class="pops"><button class="btn" id="popCancel">取消</button><button class="btn primary" id="popOk">保存</button></div>',true);
+  const errEl=pop.querySelector('#fldPortsErr');
+  const showErr=m=>{errEl.textContent=m;errEl.className='msgbox err';errEl.style.display=m?'':'none'};
+  pop.querySelector('#popCancel').onclick=closePop;
+  pop.querySelector('#popOk').onclick=async()=>{
+    const v=pop.querySelector('#fldPortsInput').value.trim();
+    try{parsePortRangeList(v)}catch(e){showErr(e.message);return}
+    showErr('');
+    try{
+      await api('PUT','api/settings',{floodPorts:v});
+      if(setLoaded)setLoaded.floodPorts=v;
+      renderFldPortsTx();
+      errEl.textContent='已保存';errEl.className='msgbox ok';errEl.style.display='';
+      setTimeout(closePop,900);
+    }catch(e){showErr(e.message)}
+  };
+}
+$('#btnFldPorts').onclick=e=>fldPortsPop(e.currentTarget);
+async function loadClosedPorts(){
+  let o;try{o=await api('GET','api/overview')}catch(e){return}
+  const cp=o.closedPorts||[];
+  $('#closedPortList').innerHTML=cp.map(x=>'<div class="geoline"><span class="st">端口 '+x.port+'</span><span class="dt">临时关闭至 '+fmtTs(x.until*1000)+'</span><span class="dt"><button class="btn sm" data-reopen="'+x.port+'">立即恢复</button></span></div>').join('');
+  $('#closedPortEmpty').style.display=cp.length?'none':'';
+  $('#closedPortList').querySelectorAll('[data-reopen]').forEach(b=>b.onclick=async()=>{
+    try{await api('DELETE','api/portbans/'+b.dataset.reopen);toast('端口 '+b.dataset.reopen+' 已恢复开放');loadClosedPorts()}catch(e){toast(e.message)}
+  });
 }
 /* 版本与升级: 当前视图的服务器(本机或节点)走 api() 代理; 推送全部节点只在本机视图用 apiLocal。
    检查按钮状态机: 检查更新 → 正在检查…(禁用) → 升级到 X / 当前版本已是最新；
@@ -2880,7 +2817,7 @@ function showLogin(setup){
   document.body.classList.remove('app');
   const ic=document.querySelector('link[rel=icon]');if(ic)$('#authLogo').src=ic.href;
   $('#loginView').style.display='';
-  ['home','ov','ports','events','bans','prot','proxy','set'].forEach(t=>{$('#tab-'+t).style.display='none'});
+  ['home','ov','fw','events','bans','prot','proxy','set'].forEach(t=>{$('#tab-'+t).style.display='none'});
   $('#managingTag').style.display='none';
   if(homeTimer){clearInterval(homeTimer);homeTimer=null;}
   $('#nav').style.display='none';
@@ -2900,7 +2837,7 @@ function showChoice(joinError){
   document.body.classList.remove('app');
   const ic=document.querySelector('link[rel=icon]');if(ic)$('#authLogo').src=ic.href;
   $('#loginView').style.display='';
-  ['home','ov','ports','events','bans','prot','proxy','set'].forEach(t=>{$('#tab-'+t).style.display='none'});
+  ['home','ov','fw','events','bans','prot','proxy','set'].forEach(t=>{$('#tab-'+t).style.display='none'});
   $('#managingTag').style.display='none';
   if(homeTimer){clearInterval(homeTimer);homeTimer=null;}
   $('#nav').style.display='none';

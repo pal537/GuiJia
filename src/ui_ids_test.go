@@ -137,6 +137,7 @@ func TestUIIDs(t *testing.T) {
 		}
 	}
 	for _, id := range []string{
+		"sAlSshConn",     // 已删: SSH 连接报警开关(推送已随重点端口通知删除, 开关无消费方)
 		"sPanelSSLMode",    // 已删: 面板 SSL 模式下拉
 		"sPanelSSLCert",    // 已删: SSL 证书下拉
 		"sPanelSSLPort",    // 已删: SSL 端口输入
@@ -204,8 +205,8 @@ func TestModalNoToast(t *testing.T) {
 	}
 }
 
-// TestProtCardOrder: 防护页防火墙卡置顶到五项防护最前面（洪峰之前），
-// 安全建议与急救等其他卡位置不动。组标题一律走共享类 mtitle。
+// TestProtCardOrder: 防火墙卡已移出防护页、独立成防火墙菜单(原端口菜单位置),
+// 防护页内顺序为 安全建议 < 洪峰 < 爆破 < 扫描 < 蜜罐 < 急救。组标题一律走共享类 mtitle。
 func TestProtCardOrder(t *testing.T) {
 	html := string(indexHTML)
 	sec := html[strings.Index(html, `<section id="tab-prot"`):]
@@ -218,14 +219,25 @@ func TestProtCardOrder(t *testing.T) {
 		return i
 	}
 	safe := idx("安全建议")
-	pg := idx("防火墙")
-	flood := idx("重点端口洪峰防护 ")
+	flood := idx("端口洪峰防护 ")
 	autoban := idx("爆破自动拉黑")
 	scan := idx("扫描识别 ")
 	honey := idx("蜜罐 ")
 	rescue := idx("急救 ")
-	if !(safe < pg && pg < flood && flood < autoban && autoban < scan && scan < honey && honey < rescue) {
-		t.Errorf("防护页卡顺序应为 安全建议 < 防火墙 < 洪峰 < 爆破 < 扫描 < 蜜罐 < 急救，实际下标 %d %d %d %d %d %d %d",
-			safe, pg, flood, autoban, scan, honey, rescue)
+	if !(safe < flood && flood < autoban && autoban < scan && scan < honey && honey < rescue) {
+		t.Errorf("防护页卡顺序应为 安全建议 < 洪峰 < 爆破 < 扫描 < 蜜罐 < 急救，实际下标 %d %d %d %d %d %d",
+			safe, flood, autoban, scan, honey, rescue)
+	}
+	if strings.Contains(sec, `<h3 class="mtitle">防火墙</h3>`) {
+		t.Errorf("防火墙卡已移出防护页, 不应再出现在 tab-prot 内")
+	}
+	// 防火墙卡在独立 tab-fw 内, 且 tab-fw 在总览之后、事件之前
+	fw := html[strings.Index(html, `<section id="tab-fw"`):]
+	fw = fw[:strings.Index(fw, `<section id="tab-events"`)]
+	if !strings.Contains(fw, `<h3 class="mtitle">防火墙</h3>`) {
+		t.Errorf("防火墙菜单(tab-fw)内应有防火墙卡")
+	}
+	if !strings.Contains(fw, `id="closedPortList"`) {
+		t.Errorf("防火墙菜单内应有洪峰临时关闭端口列表")
 	}
 }

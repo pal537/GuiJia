@@ -305,3 +305,30 @@ func TestSettingsPUTKeepsServerID(t *testing.T) {
 		t.Errorf("PUT 永不改动服务器指纹, 得到 %q", settings.ServerID)
 	}
 }
+
+// TestBuildEventTextBanBtn: 拉黑/解封按钮只给仍会推送的事件类型;
+// new_conn 的 banBtn 是死分支(推送已删, emit 只传 false, 代发已丢弃),
+// 删掉后 new_conn 必须不再带拉黑按钮, 登录类与防火墙封禁的按钮不受影响。
+func TestBuildEventTextBanBtn(t *testing.T) {
+	cases := []struct {
+		typ       string
+		ip        string
+		wantBan   bool
+		wantUnban bool
+	}{
+		{"ssh_login", "1.2.3.4", true, false},
+		{"ui_login", "1.2.3.4", true, false},
+		{"ssh_login", "", false, false},
+		{"new_conn", "1.2.3.4", false, false},
+		{"port_flood", "1.2.3.4", false, false},
+		{"portguard_ban", "1.2.3.4", false, true},
+		{"autoban", "1.2.3.4", false, false},
+	}
+	for _, c := range cases {
+		_, ban, unban := buildEventText(Event{Type: c.typ, IP: c.ip, Ts: 1700000000000, Detail: "x"})
+		if ban != c.wantBan || unban != c.wantUnban {
+			t.Errorf("type=%s ip=%s: ban=%v unban=%v, want ban=%v unban=%v",
+				c.typ, c.ip, ban, unban, c.wantBan, c.wantUnban)
+		}
+	}
+}

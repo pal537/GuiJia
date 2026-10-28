@@ -2,7 +2,7 @@ package main
 
 // 防护同步(2026-10-28, PAPA 定): 首页群控设置里新增“防护同步”组,
 // 勾选哪项、哪项就跟主服务器走, 主服务器配置为准、节点本地不可改:
-//   flood   重点端口洪峰防护(FloodEnabled + 窗口/不同 IP 数/关闭分钟)
+//   flood   端口洪峰防护(FloodEnabled + 窗口/不同 IP 数/关闭分钟/手动端口)
 //   autoban 爆破自动拉黑(AutoBanEnabled + 窗口/阈值/递进时长)
 //   scan    扫描识别(ScanEnabled + 扫描自动拉黑 + 窗口/端口数)
 //   intel   威胁情报(Enabled + 名单直链 + 每天更新次数)
@@ -73,11 +73,12 @@ func clearProtSync() {
 // ---------- 同步 payload(主服务器 → 节点) ----------
 
 type protFloodCfg struct {
-	Synced      bool `json:"synced"`
-	Enabled     bool `json:"enabled"`
-	WindowMin   int  `json:"windowMin"`
-	DistinctIPs int  `json:"distinctIps"`
-	CloseMin    int  `json:"closeMin"`
+	Synced      bool   `json:"synced"`
+	Enabled     bool   `json:"enabled"`
+	WindowMin   int    `json:"windowMin"`
+	DistinctIPs int    `json:"distinctIps"`
+	CloseMin    int    `json:"closeMin"`
+	Ports       string `json:"ports"`
 }
 
 type protAutobanCfg struct {
@@ -121,7 +122,7 @@ func protSyncPayloadForHub(items protSyncItems) protSyncPayload {
 	intelMu.Unlock()
 	p := protSyncPayload{}
 	if items.Flood {
-		p.Flood = protFloodCfg{Synced: true, Enabled: s.FloodEnabled, WindowMin: s.FloodWindowMin, DistinctIPs: s.FloodDistinctIPs, CloseMin: s.FloodCloseMin}
+		p.Flood = protFloodCfg{Synced: true, Enabled: s.FloodEnabled, WindowMin: s.FloodWindowMin, DistinctIPs: s.FloodDistinctIPs, CloseMin: s.FloodCloseMin, Ports: s.FloodPorts}
 	}
 	if items.Autoban {
 		p.Autoban = protAutobanCfg{Synced: true, Enabled: s.AutoBanEnabled, WindowMin: s.BruteWindowMin, Threshold: s.BruteThreshold, BanHours: s.BruteBanHours}
@@ -150,6 +151,7 @@ func applyProtSyncPayload(p protSyncPayload) []string {
 		settings.FloodWindowMin = p.Flood.WindowMin
 		settings.FloodDistinctIPs = p.Flood.DistinctIPs
 		settings.FloodCloseMin = p.Flood.CloseMin
+		settings.FloodPorts = p.Flood.Ports
 		applied = append(applied, "flood")
 	}
 	if p.Autoban.Synced {

@@ -45,6 +45,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -504,17 +505,25 @@ func normRegionName(s string) string {
 	return strings.TrimSpace(s)
 }
 
-// parsePortRanges 解析端口文本: 分隔符支持英文逗号、中文逗号、正反斜杠、
-// 顿号, 空格只做修剪不做分隔; 每段可为单个端口或 lo-hi 范围(如 1-65535)。
-// 重叠/相邻范围自动合并并升序。出错时返回带问题片段的报错, 其中含非法
-// 符号的按 PAPA 原话提示"符号不对, 不可以"。
+// splitPortTokens 统一端口列表分隔: 英文逗号、中文逗号、正反斜杠、顿号、
+// 空白(空格/制表/换行)都能分隔; 短横线两侧的空白先归一, 写 "80 - 90" 也算范围。
+var portDashSpace = regexp.MustCompile(`\s*-\s*`)
+
+func splitPortTokens(s string) []string {
+	s = portDashSpace.ReplaceAllString(s, "-")
+	return strings.FieldsFunc(s, func(r rune) bool {
+		return r == ',' || r == '，' || r == '/' || r == '\\' || r == '、' || unicode.IsSpace(r)
+	})
+}
+
+// parsePortRanges 解析端口文本: 分隔符见 splitPortTokens; 每段可为单个端口
+// 或 lo-hi 范围(如 1-65535)。重叠/相邻范围自动合并并升序。出错时返回带问题
+// 片段的报错, 其中含非法符号的按 PAPA 原话提示"符号不对, 不可以"。
 func parsePortRanges(s string) ([][2]int, error) {
 	if strings.TrimSpace(s) == "" {
 		return nil, fmt.Errorf("请填写端口")
 	}
-	fields := strings.FieldsFunc(s, func(r rune) bool {
-		return r == ',' || r == '，' || r == '/' || r == '\\' || r == '、'
-	})
+	fields := splitPortTokens(s)
 	out := [][2]int{}
 	for _, f := range fields {
 		t := strings.TrimSpace(f)

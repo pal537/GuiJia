@@ -482,6 +482,12 @@ func handleNodeEvents(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ok": true, "sent": false, "reason": "independent"})
 		return
 	}
+	// 已删除的通知类型(new_conn、port_flood)一律不代发:
+	// 旧版本节点仍可能把这类事件推过来, 混版本时也不能从主服务器漏出去。
+	if ev.Type == "new_conn" || ev.Type == "port_flood" {
+		writeJSON(w, 200, map[string]any{"ok": true, "sent": false, "reason": "type-dropped"})
+		return
+	}
 	if settings.TGEnabled && settings.TGBotToken != "" && settings.TGChatID != "" {
 		hubSendNodeEvent(name, fp, ev)
 		writeJSON(w, 200, map[string]any{"ok": true, "sent": true})
@@ -496,7 +502,7 @@ func hubSendNodeEvent(nodeName, nodeFP string, ev Event) {
 	body, banBtn, unbanBtn := buildEventText(ev)
 	title := ""
 	if nodeName != "" {
-		title = "\n"
+		title = "【" + nodeName + "】\n"
 	}
 	sendTGButtons(settings.TGBotToken, settings.TGChatID, title+body, ev.IP, banBtn, unbanBtn, nodeFP)
 }

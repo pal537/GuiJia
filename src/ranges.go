@@ -159,12 +159,11 @@ func parsePortSpec(spec string) ([]rangeSeg, error) {
 		return nil, fmt.Errorf("端口不能为空")
 	}
 	var segs []rangeSeg
-	for i, part := range strings.Split(spec, ",") {
+	// 与 parsePortRanges 同款统一分隔(逗号/中文逗号/斜杠/反斜杠/顿号/空白):
+	// 连续分隔符直接并作一个, 不再有空段报错。
+	for i, part := range splitPortTokens(spec) {
 		part = strings.TrimSpace(part)
 		segNo := i + 1
-		if part == "" {
-			return nil, fmt.Errorf("第 %d 段为空", segNo)
-		}
 		if strings.Contains(part, "-") {
 			f := strings.SplitN(part, "-", 2)
 			a, err1 := strconv.Atoi(strings.TrimSpace(f[0]))
@@ -180,6 +179,9 @@ func parsePortSpec(spec string) ([]rangeSeg, error) {
 			return nil, fmt.Errorf("第 %d 段 %q 无效: 端口须为 1-65535 的整数", segNo, part)
 		}
 		segs = append(segs, rangeSeg{n, n})
+	}
+	if len(segs) == 0 {
+		return nil, fmt.Errorf("端口不能为空")
 	}
 	return segs, nil
 }

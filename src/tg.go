@@ -183,12 +183,8 @@ func eventTitle(t string) string {
 		return "面板登录"
 	case "autoban":
 		return "爆破自动拉黑"
-	case "new_conn":
-		return "重点端口新连接"
 	case "new_listener":
 		return "新监听端口"
-	case "port_flood":
-		return "🚨 重点端口洪峰告警(疑似分布式爆破)"
 	case "rescue":
 		return "🆘 急救操作"
 	case "port_scan":
@@ -223,7 +219,7 @@ func buildEventText(ev Event) (string, bool, bool) {
 		sb.WriteString("端口: " + strconv.Itoa(ev.Port) + "\n")
 	}
 	sb.WriteString(ev.Detail)
-	banBtn := (ev.Type == "ssh_login" || ev.Type == "ui_login" || ev.Type == "new_conn") && ev.IP != ""
+	banBtn := (ev.Type == "ssh_login" || ev.Type == "ui_login") && ev.IP != ""
 	unbanBtn := ev.Type == "portguard_ban" && ev.IP != ""
 	return sb.String(), banBtn, unbanBtn
 }

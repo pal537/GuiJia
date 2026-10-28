@@ -46,7 +46,20 @@ func TestParsePortSpec(t *testing.T) {
 	if segs := mustSegs(t, "80,443,8000-8010"); len(segs) != 3 {
 		t.Fatalf("组合解析应得 3 段, 实际 %+v", segs)
 	}
-	for _, bad := range []string{"", "0", "65536", "8000-7999", "abc", "80,,443", "80-"} {
+	// 统一分隔: 空白、混合分隔、连续分隔符都直接并作分隔, 不再有空段报错
+	if segs := mustSegs(t, "80,,443"); len(segs) != 2 || segs[0] != (rangeSeg{80, 80}) || segs[1] != (rangeSeg{443, 443}) {
+		t.Fatalf("连续分隔符应并作一个, 实际 %+v", segs)
+	}
+	if segs := mustSegs(t, "80 443"); len(segs) != 2 {
+		t.Fatalf("空格分隔应得 2 段, 实际 %+v", segs)
+	}
+	if segs := mustSegs(t, "80，443/8000-8010\\22"); len(segs) != 4 {
+		t.Fatalf("混合分隔应得 4 段, 实际 %+v", segs)
+	}
+	if segs := mustSegs(t, "80 - 90"); len(segs) != 1 || segs[0] != (rangeSeg{80, 90}) {
+		t.Fatalf("短横线两侧空白应归一为范围, 实际 %+v", segs)
+	}
+	for _, bad := range []string{"", "0", "65536", "8000-7999", "abc", "80-", ",,,"} {
 		if _, err := parsePortSpec(bad); err == nil {
 			t.Fatalf("非法输入 %q 应报错", bad)
 		}

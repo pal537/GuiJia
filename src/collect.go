@@ -4,9 +4,9 @@ package main
 // - 每 1 秒采样连接(第 5 项由 5 秒改到 1 秒, 闭口试探的 conntrack 条目默认存活
 //   120 秒, 1 秒轮询在实践中不漏; 亚秒级全端口快扫理论上仍可能漏报):
 //   ss 取本机 TCP(established + syn-recv 半开), conntrack 补 UDP 与
-//   转发给 Docker 容器的 TCP(ss 无套接字看不见); 监控范围 = 清单端口 ∪ 当前所有监听端口
-// - 新对端一律计入今日新来源统计(按 IP 去重); 事件/报警只给重点端口的 TCP 新连接
-// - 重点端口洪峰检测: 短窗口内不同公网 IP 涌入超阈值 -> 临时关闭该端口(分布式爆破防护)
+//   转发给 Docker 容器的 TCP(ss 无套接字看不见); 监控范围 = 本机全部端口
+// - 新对端一律计入今日新来源统计(按 IP 去重); 旧清单加星端口的 TCP 新连接记事件
+// - 端口洪峰检测: 手动洪峰端口在短窗口内不同公网 IP 涌入超阈值 -> 临时关闭该端口(分布式爆破防护)
 // - 每 60 秒拍监听快照, 新监听端口连续出现 2 次 -> 事件(哨兵)
 // - 尾随系统 auth 日志: SSH 登录成功/失败, 爆破达阈值自动拉黑
 //   (路径自动识别 auth.log/secure, 设置里可指定; 面板自身登录事件由鉴权层直接记)
@@ -41,14 +41,13 @@ type Conn struct {
 }
 
 var (
-	connMu          sync.RWMutex
-	liveConns       = map[string]*Conn{} // key: srcIP|dstPort|proto
-	knownListen     = map[int]bool{}     // 已知的监听端口基线
-	pendingLst      = map[int]int{}      // 新监听候选 -> 连续出现次数
-	failWin         = map[string][]int64{}
-	failMu          sync.Mutex
-	lastAutoBan     = map[string]int64{}
-	newConnAlertDay = map[string]string{} // 新连接 TG 去重: ip|port -> 已推送的自然日(中国时间)
+	connMu      sync.RWMutex
+	liveConns   = map[string]*Conn{} // key: srcIP|dstPort|proto
+	knownListen = map[int]bool{}     // 已知的监听端口基线
+	pendingLst  = map[int]int{}      // 新监听候选 -> 连续出现次数
+	failWin     = map[string][]int64{}
+	failMu      sync.Mutex
+	lastAutoBan = map[string]int64{}
 )
 
 // stripZone 去掉 IPv6 地址的 %zone 后缀(如 %enp2s0), 否则 ParseIP/端口解析会失败
@@ -394,6 +393,13 @@ func sampleConns() {
 	now := time.Now().Unix()
 	seen := map[string]bool{}
 	handle := func(c Conn) {
+		// 蜜罐端口一律走蜜罐流程, 不进正常连接处理: 原先只在合成分支跳过,
+		// 清单/范围/防火墙覆盖的蜜罐端口会漏网进正常流程(展示、统计、扫描
+		// 跟踪都多算一份)。蜜罐端口不可能是正常服务端口(蜜罐启动时已做
+		// 冲突校验), 前置跳过恒正确。
+		if honeypotIsEnabled(c.DstPort) {
+			return
+		}
 		pw, ok := eff[c.DstPort]
 		if !ok {
 			// 范围覆盖的端口不在 eff 表里(范围不展开): 查位图合成条目
@@ -408,7 +414,9 @@ func sampleConns() {
 			}
 		}
 		if !ok {
-			return
+			// 默认监控本机全部端口: 不再依赖监控清单, 未入清单的本地端口
+			// 也正常展示(名称用进程名或端口号兜底)。
+			pw = &PortWatch{Port: c.DstPort, Proto: c.Proto, Name: c.Proc, Source: "scan", Kind: guessKind(c.DstPort, c.Proc)}
 		}
 		// 回环/本机自连不算外部连接, 不展示不统计
 		if pip := net.ParseIP(c.SrcIP); pip == nil || pip.IsLoopback() || locals[c.SrcIP] {
@@ -441,14 +449,13 @@ func sampleConns() {
 		// 新对端一律计入今日新来源统计(按 IP 去重): 含 UDP 与转发连接,
 		// 否则 QB 几十个 UDP 对端在统计里纹丝不动, 与连接列表对不上。
 		firstToday := statsNewConn(c.SrcIP, c.DstPort)
-		if pw.Star {
-			floodTrack(pw, c.SrcIP) // 洪峰检测: 所有协议的新连接都算涌入
-			// 重点端口的 TCP 新连接: 记事件 + 按开关报警(原有行为)
-			if c.Proto == "tcp" {
-				emit(Event{Type: "new_conn", IP: c.SrcIP, Port: c.DstPort,
-					Detail: "新连接 → " + portLabel(pw)}, newConnAlert(c.SrcIP, c.DstPort, time.Now()))
-				return
-			}
+		// 洪峰检测: 所有协议的新连接都算涌入, 只认手动洪峰端口集合
+		floodTrack(pw, c.SrcIP)
+		if pw.Star && c.Proto == "tcp" {
+			// 旧监控清单加星端口的 TCP 新连接: 记事件, 不再推 TG
+			emit(Event{Type: "new_conn", IP: c.SrcIP, Port: c.DstPort,
+				Detail: "新连接 → " + portLabel(pw)}, false)
+			return
 		}
 		// 其余新对端(普通端口 / UDP / 转发): 只在该 IP 当日首次出现时补记一条
 		// new_src 事件(不报警, 独立目录/独立保留期), 让「今日新来源 IP」点进
@@ -514,19 +521,46 @@ func sampleConns() {
 	connMu.Unlock()
 }
 
-// ---------- 重点端口洪峰防护(分布式爆破) ----------
+// ---------- 端口洪峰防护(分布式爆破) ----------
 // 单 IP 爆破有 SSH 失败阈值与自动拉黑管; 但代理池分布式爆破每个 IP 只试一两次,
-// 阈值永远抓不到。这里按重点端口统计滑动窗口内不同公网 IP 的新连接数, 超阈值即
-// 判定洪峰: 临时关闭该端口(只拦公网新连接, 内网不受影响) + 升级报警。
+// 阈值永远抓不到。这里按手动洪峰端口集合统计滑动窗口内不同公网 IP 的新连接数,
+// 超阈值即判定洪峰: 临时关闭该端口(只拦公网新连接, 内网不受影响) + 记事件。
+// 不自动包含加星端口、防火墙端口或其他任何端口, 空集合时不对任何端口触发。
 
 var (
 	floodMu  sync.Mutex
 	floodWin = map[int]map[string]int64{} // port -> ip -> 最近新连接时间
+
+	floodPortsMu  sync.Mutex
+	floodPortsRaw string
+	floodPortsSet map[int]bool
 )
+
+// floodPortListed 判定端口是否在手动洪峰端口集合内。集合按原始文本缓存,
+// 文本变化时重解析; 解析失败 = 空集(fail-closed, 不触发任何端口)。
+func floodPortListed(port int) bool {
+	floodPortsMu.Lock()
+	defer floodPortsMu.Unlock()
+	if floodPortsRaw != settings.FloodPorts {
+		floodPortsRaw = settings.FloodPorts
+		floodPortsSet = map[int]bool{}
+		if ranges, err := parsePortRanges(settings.FloodPorts); err == nil {
+			for _, r := range ranges {
+				for p := r[0]; p <= r[1]; p++ {
+					floodPortsSet[p] = true
+				}
+			}
+		}
+	}
+	return floodPortsSet[port]
+}
 
 func floodTrack(pw *PortWatch, ip string) {
 	if !settings.FloodEnabled || isPortClosed(pw.Port) {
 		return
+	}
+	if !floodPortListed(pw.Port) {
+		return // 只认手动洪峰端口集合
 	}
 	pip := net.ParseIP(ip)
 	if pip == nil || isPrivateIP(pip) || isTrusted(ip) {
@@ -560,36 +594,9 @@ func floodTrack(pw *PortWatch, ip string) {
 	floodMu.Unlock()
 	closePort(pw.Port, settings.FloodCloseMin, "洪峰防护自动关闭")
 	emit(Event{Type: "port_flood", Port: pw.Port,
-		Detail: "重点端口 " + portLabel(pw) + " 在 " + itoa(settings.FloodWindowMin) + " 分钟内涌入 " + itoa(cnt) +
+		Detail: "端口 " + portLabel(pw) + " 在 " + itoa(settings.FloodWindowMin) + " 分钟内涌入 " + itoa(cnt) +
 			" 个不同公网 IP 的新连接(疑似分布式爆破), 已临时关闭该端口 " + itoa(settings.FloodCloseMin) + " 分钟(只拦公网新连接, 内网不受影响)"},
-		settings.AlertPortFlood)
-}
-
-// 新连接 TG 去重(第 8 项): 同一 (IP, 端口) 自然日内只推一次,
-// 当天的重复连接只记事件、不推 TG; 跨端口算不同事件, 照常提醒。
-// now 由调用方传入(中国时间, time.Local 已在 init 里设为 Asia/Shanghai)。
-func newConnAlertAllowed(ip string, port int, now time.Time) bool {
-	day := now.Format("2006-01-02")
-	key := ip + "|" + itoa(port)
-	if newConnAlertDay[key] == day {
-		return false
-	}
-	newConnAlertDay[key] = day
-	return true
-}
-
-// newConnAlert 是重点端口新连接的最终推送判定: 开关 + 未拉黑 + 当日去重。
-// SSH 端口另受 SSH 连接开关叠加约束: 关后只静默 SSH 端口, 其他重点端口不变。
-func newConnAlert(ip string, port int, now time.Time) bool {
-	if !settings.AlertNewConnStar || isBannedFor(ip, port) {
-		return false
-	}
-	if !settings.AlertSSHConn {
-		if ssh := detectSSHPort(); ssh.Detected && ssh.Port == port {
-			return false
-		}
-	}
-	return newConnAlertAllowed(ip, port, now)
+		false) // 洪峰 TG 通知已删: 事件照常记, 不推 TG
 }
 
 func portLabel(pw *PortWatch) string {

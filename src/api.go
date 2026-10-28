@@ -29,8 +29,10 @@ func handleOverview(w http.ResponseWriter, r *http.Request) {
 	connMu.RLock()
 	n := len(liveConns)
 	connMu.RUnlock()
-	// 监控端口数 = 位图去重后的覆盖数(单个 + 范围, 不展开计数)
-	watched, starred := coverCounts()
+	// 监听端口数 = 当前本机监听的 TCP+UDP 端口数(去重); 监控清单概念已废弃,
+	// 统计卡不再用清单覆盖数。starredPorts 仅保留兼容(前端不再用)。
+	_, starred := coverCounts()
+	watched := len(ssListeners())
 	var v6Size int64
 	var v6Date int64
 	if fi, err := os.Stat(geoV6Path); err == nil {
@@ -93,7 +95,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		cumRx, cumTx := ledgerCum(c.SrcIP + "|" + itoa(c.DstPort) + "|" + proto)
 		out = append(out, map[string]any{
 			"ip": c.SrcIP, "sport": c.SrcPort, "port": c.DstPort, "portName": name,
-			"star": star, "kind": kind, "proc": c.Proc, "proto": proto, "since": c.Since,
+			"star": star, "fw": fwCoversPort(c.DstPort, proto), "kind": kind, "proc": c.Proc, "proto": proto, "since": c.Since,
 			"geo": g.Text, "private": g.Private, "banned": isBannedFor(c.SrcIP, c.DstPort),
 			"trusted": isTrusted(c.SrcIP),
 			"rx":      c.Rx, "tx": c.Tx, "rxBps": c.RxBps, "txBps": c.TxBps, "hasBytes": c.HasBytes,
@@ -586,6 +588,16 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		if in.FloodCloseMin < 1 || in.FloodCloseMin > 1440 {
 			in.FloodCloseMin = 60
 		}
+		// 手动洪峰端口: 提交了非空文本时必须能解析, 否则 400 拒收(不写盘);
+		// 空文本合法 = 不对任何端口触发。
+		if _, ok := raw["floodPorts"]; ok {
+			if strings.TrimSpace(in.FloodPorts) != "" {
+				if _, err := parsePortRanges(in.FloodPorts); err != nil {
+					errJSON(w, 400, "洪峰端口: "+err.Error())
+					return
+				}
+			}
+		}
 		if in.LogKeepDays < 1 || in.LogKeepDays > 365 {
 			in.LogKeepDays = 30
 		}
@@ -652,8 +664,8 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		if settings.RunMode == "managed" {
 			fl := protSyncSnapshot()
 			violated := ""
-			if fl.Flood && (settings.FloodEnabled != in.FloodEnabled || settings.FloodWindowMin != in.FloodWindowMin || settings.FloodDistinctIPs != in.FloodDistinctIPs || settings.FloodCloseMin != in.FloodCloseMin) {
-				violated = "重点端口洪峰防护"
+			if fl.Flood && (settings.FloodEnabled != in.FloodEnabled || settings.FloodWindowMin != in.FloodWindowMin || settings.FloodDistinctIPs != in.FloodDistinctIPs || settings.FloodCloseMin != in.FloodCloseMin || settings.FloodPorts != in.FloodPorts) {
+				violated = "端口洪峰防护"
 			} else if fl.Autoban && (settings.AutoBanEnabled != in.AutoBanEnabled || settings.BruteWindowMin != in.BruteWindowMin || settings.BruteThreshold != in.BruteThreshold || settings.BruteBanHours != in.BruteBanHours) {
 				violated = "爆破自动拉黑"
 			} else if fl.Scan && (settings.ScanEnabled != in.ScanEnabled || settings.ScanAutoBan != in.ScanAutoBan || settings.ScanWindowMin != in.ScanWindowMin || settings.ScanDistinctPorts != in.ScanDistinctPorts) {

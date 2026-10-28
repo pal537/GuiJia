@@ -669,6 +669,9 @@ func releaseBan(ip string) bool {
 	for _, b := range bans {
 		if b.IP == ip {
 			normBanStatus(b, now)
+			if b.Status == BanReleased {
+				return true // 已解封: 幂等成功, 不改写解封时间(重复解封不应刷掉原始解封时间)。
+			}
 			was := b.enforced(now)
 			ports := append([]int{}, b.Ports...)
 			b.Status = BanReleased

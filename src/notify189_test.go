@@ -6,39 +6,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
-
-func TestNewConnAlertSSHGate(t *testing.T) {
-	dir := banTestSetup(t)
-	cfg := filepath.Join(dir, "sshd_config")
-	if err := os.WriteFile(cfg, []byte("Port 16722\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("GUIJIA_SSHD_CONFIG", cfg)
-
-	oldS := settings
-	oldDay := newConnAlertDay
-	defer func() { settings = oldS; newConnAlertDay = oldDay }()
-	newConnAlertDay = map[string]string{}
-	settings.AlertNewConnStar = true
-	settings.AlertSSHConn = false
-	now := time.Now()
-
-	if newConnAlert("203.0.113.10", 16722, now) {
-		t.Fatal("SSH 连接开关关时, SSH 端口的新连接不应推送")
-	}
-	if !newConnAlert("203.0.113.10", 3005, now) {
-		t.Fatal("SSH 连接开关关时, 非 SSH 重点端口的新连接应照常推送")
-	}
-	settings.AlertSSHConn = true
-	if !newConnAlert("203.0.113.11", 16722, now) {
-		t.Fatal("SSH 连接开关开时, SSH 端口的新连接应推送")
-	}
-}
 
 func TestPortGuardItemEdit(t *testing.T) {
 	dir := banTestSetup(t)
