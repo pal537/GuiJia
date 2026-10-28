@@ -360,15 +360,19 @@ func TestPortGuardCheckEndToEnd(t *testing.T) {
 	if until != 0 {
 		t.Fatalf("拒绝命中封禁必须永久(Until=0), 得到 %d", until)
 	}
-	// 拒绝优先于允许: 允许江苏 + 拒绝全部 IP 同时命中 -> 仍封禁
+	// 拒绝优先于允许已作废: 一个端口只能有一条规则, 允许+拒绝同端口根本建不出来。
+	// 新语义: 拒绝规则只封命中来源, 未命中一律放行(自定义 IP 拒绝 114.114.114.114,
+	// 换个 IP 连同端口应放行, 不再被旧“默认封禁”连坐)。
 	releaseBan("114.114.114.114")
-	setRules(
-		mkRule("gallow", "all", "allow", FWSource{Kind: "custom_cn", Locations: []GuardLocation{{Kind: "province", Name: "江苏"}}}),
-		mkRule("gdeny", "all", "deny", FWSource{Kind: "all"}),
-	)
+	setRules(mkRule("gdeny", "all", "deny", FWSource{Kind: "custom_ip", CIDR: "114.114.114.114", cidrNets: mustCIDRNets(t, "114.114.114.114")}))
 	portGuardCheck("114.114.114.114", 45167, "tcp")
 	if !isBannedFor("114.114.114.114", 45167) {
-		t.Fatal("拒绝优先于允许: 同时命中时应封禁")
+		t.Fatal("拒绝规则命中应封禁")
+	}
+	releaseBan("114.114.114.114")
+	portGuardCheck("1.2.3.4", 45167, "tcp")
+	if isBanned("1.2.3.4") {
+		t.Fatal("拒绝规则未命中应放行, 不得默认封禁")
 	}
 	// 禁用规则不生效
 	releaseBan("114.114.114.114")

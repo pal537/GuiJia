@@ -478,7 +478,7 @@ body.auth #loginView{margin:auto}
 
       <div class="scard">
         <h3 class="mtitle">防火墙</h3>
-        <div class="hint">给指定端口加访问规则：命中拒绝规则的来源按规则端口封禁（不影响该 IP 的其他端口），命中允许规则的放行，多条命中时拒绝优先；无规则命中时按受防护端口默认封禁。端口支持单个、逗号分隔与范围（如 1-65535）。内网与信任名单永远豁免。删除规则不自动解封已封禁，到期或手动解封为止。</div>
+        <div class="hint">给指定端口加访问规则：一个端口（同一协议）只能有一种动作：允许规则只放行来源命中的，其余一律拒绝；拒绝规则只拒绝来源命中的，其余一律放行；同动作多条规则按来源并集算；没有规则的端口防火墙不管。端口支持单个、逗号分隔与范围（如 1-65535）。内网与信任名单永远豁免。封禁一律永久，直到规则删除、禁用或手动解封才释放。</div>
         <div id="pgRuleList" style="padding:6px 18px 0"></div>
         <div class="savebar"><button class="btn primary" id="btnFwAdd">添加规则</button></div>
       </div>
@@ -816,7 +816,8 @@ function gsSectionHTML(group,title,desc,cfg){
   '<div class="'+stCls+'" id="gsSt_'+group+'" style="margin-top:10px">'+stTx+'</div></div>';
 }
 /* 群控设置弹窗(第 2 项): 勾选与间隔改动在保存前只是草稿(改动处标“未保存”),
-   点底部“保存群控设置”才生效并在弹窗内反馈; 点“立即同步”先保存当前表单再同步;
+   点底部“保存群控设置”才生效并在弹窗内反馈; 保存后已开启的组立即同步一次(后端异步触发,
+   前端轮询上次同步时间, 让用户亲眼看到同步生效, 不用等定时器); 点“立即同步”先保存当前表单再同步;
    点关闭直接丢弃未保存改动(什么都没存过, 无需回滚)。反馈只在弹窗内, 不弹顶部提示。 */
 async function openGroupSyncModal(){
   let cfg;try{cfg=await apiLocal('GET','api/group-sync/settings');}catch(e){openCModal('<h3 class="mtitle">群控设置</h3><div class="sline fail">读取失败：'+esc(e.message)+'</div>');return;}
@@ -827,6 +828,33 @@ async function openGroupSyncModal(){
     '<div class="sline" id="gsSaveMsg" style="display:none"></div>'+
     '<div style="display:flex;gap:8px"><button class="btn primary" id="gsSave">保存群控设置</button><button class="btn" id="gsClose">关闭</button></div></div>');
   const loaded={blacklist:{enabled:!!bl.enabled,intervalMin:bl.intervalMin},whitelist:{enabled:!!wl.enabled,intervalMin:wl.intervalMin}};
+  const openedSync={blacklist:{at:bl.lastSyncAt||0,detail:bl.lastDetail||''},whitelist:{at:wl.lastSyncAt||0,detail:wl.lastDetail||''}};
+  const renderGsSt=(g,cfg)=>{const stEl=$('#gsSt_'+g);if(!stEl)return;
+    stEl.className=!cfg.lastSyncAt?'hint':(cfg.lastStatus==='failed'?'sline fail':cfg.lastStatus==='ok'?'sline ok':'sline run');
+    stEl.textContent=cfg.lastSyncAt?('上次同步：'+fmtTs(cfg.lastSyncAt*1000)+(cfg.lastDetail?' · '+cfg.lastDetail:'')):'上次同步：从未同步';};
+  // 保存后轮询: 已开启的组后端已异步触发立即同步, 每 5 秒查一次上次同步,
+  // 有结果(时间或明细变了)即刷新状态行, 最多 2 分钟, 超时留“进行中”提示。
+  const pollSyncAfterSave=()=>{
+    const targets=['blacklist','whitelist'].filter(g=>$('#gsEn_'+g).checked);
+    if(!targets.length)return;
+    targets.forEach(g=>{const stEl=$('#gsSt_'+g);if(stEl){stEl.className='sline run';stEl.textContent='正在立即同步…';}});
+    let n=0;
+    const timer=setInterval(async()=>{
+      n++;
+      let cfg;try{cfg=await apiLocal('GET','api/group-sync/settings');}catch(e){if(n>=24)clearInterval(timer);return;}
+      let done=true;
+      targets.forEach(g=>{
+        const c=cfg[g]||{},o=openedSync[g];
+        if((c.lastSyncAt||0)!==o.at||(c.lastDetail||'')!==o.detail){renderGsSt(g,c);}
+        else done=false;
+      });
+      if(done||n>=24){
+        clearInterval(timer);
+        if(!done)targets.forEach(g=>{const stEl=$('#gsSt_'+g);
+          if(stEl&&stEl.textContent==='正在立即同步…')stEl.textContent='同步进行中，稍后重新打开查看上次同步时间';});
+      }
+    },5000);
+  };
   const dirty=()=>{['blacklist','whitelist'].forEach(g=>{const d=$('#gsDirty_'+g);if(!d)return;const ch=$('#gsEn_'+g).checked!==loaded[g].enabled||+$('#gsIv_'+g).value!==loaded[g].intervalMin;d.style.display=ch?'':'none';});};
   const saveAll=async()=>{
     const m=$('#gsSaveMsg');
@@ -836,6 +864,7 @@ async function openGroupSyncModal(){
       loaded.whitelist={enabled:$('#gsEn_whitelist').checked,intervalMin:+$('#gsIv_whitelist').value};
       dirty();
       m.style.display='';m.className='sline ok';m.textContent='已保存';
+      pollSyncAfterSave();
       return true;
     }catch(e){m.style.display='';m.className='sline fail';m.textContent='保存失败：'+e.message;return false;}
   };
@@ -1927,13 +1956,13 @@ async function openFwDialog(rule){
   fwSelForeign=rule&&rule.source&&rule.source.kind==='custom_foreign'?[...(rule.source.countries||[])]:[];
   fwSelLocs=rule&&rule.source&&rule.source.kind==='custom_cn'?(rule.source.locations||[]).map(l=>{const d=fwLocDisplay(l);return {kind:l.kind,name:l.name,province:l.province||'',display:d}}):[];
   const srcCidr=rule&&rule.source?rule.source.cidr||'':'';
-  const html='<h3 class="mtitle">'+(isNew?'添加规则':'编辑规则')+'</h3><div class="csub">端口被任一生效规则覆盖即受防护；多条命中时拒绝优先于允许；无规则命中时按受防护端口默认封禁；内网、回环与信任名单永远豁免。拒绝命中与默认封禁一律永久封禁，直到规则删除、禁用或手动解封才释放。</div>'+
+  const html='<h3 class="mtitle">'+(isNew?'添加规则':'编辑规则')+'</h3><div class="csub">一个端口（同一协议）不许同时存在允许和拒绝：已有生效的拒绝规则时不能再加允许规则，反之亦然；同动作多条规则按来源并集算。允许规则：只有来源命中的放行，其余一律拒绝；拒绝规则：只有来源命中的拒绝，其余一律放行；没有规则的端口防火墙不管。内网、回环与信任名单永远豁免。封禁一律永久，直到规则删除、禁用或手动解封才释放。</div>'+
   (knownKind?'':'<div class="sline fail">该节点版本较旧（规则类型 '+esc(srcKind)+'），请先升级节点再编辑；卡片上的启用开关仍可用。</div>')+
   '<div class="fld"><label>网络连接</label><select id="fwNet"><option value="all">全部（所有网卡入站连接）</option></select><div class="hint">规则适用于全部网卡的入站连接</div></div>'+
   '<div class="fld"><label>通信协议</label><select id="fwProto"><option value="all">全部</option><option value="tcp">TCP</option><option value="udp">UDP</option></select></div>'+
   '<div class="fld"><label>端口</label><input id="fwPorts" placeholder="如 80,443 或 8000-8010" value="'+esc(rule?rule.portText||'':'')+'"><div class="hint">单个、逗号分隔、或范围（如 1-65535）</div></div>'+
   '<div class="fld"><label>来源范围</label><select id="fwSrcKind"><option value="custom_ip">自定义 IP</option><option value="all_v4">全部 IPv4</option><option value="all_v6">全部 IPv6</option><option value="cn_in">中国大陆境内</option><option value="cn_out">中国大陆境外</option><option value="custom_cn">自定义位置（中国）</option><option value="custom_foreign">自定义位置（海外）</option><option value="all">全部 IP</option></select><div class="hint">中国大陆境内 = 国家是中国且省份不在香港、澳门、台湾；境外模式下港澳台可访问；自定义位置（中国）只含大陆省市，港澳台请到自定义位置（海外）里选</div></div>'+
-  '<div class="fld" id="fwIpRow"><label>IP 或 CIDR</label><input id="fwCidr" placeholder="如 0.0.0.0/0 或 8.8.8.8" value="'+esc(srcCidr)+'"></div>'+
+  '<div class="fld" id="fwIpRow"><label>IP 或 CIDR</label><input id="fwCidr" placeholder="如 8.8.8.8, 1.2.3.0/24（多个逗号分隔）" value="'+esc(srcCidr)+'"></div>'+
   '<div id="fwCnRow">'+
   '<div class="fld"><label>省市自治区（多选）</label><div class="mselpair"><div class="msel"><div id="fwProvField" class="msel-field" tabindex="0"><span>选择省份…</span></div><div id="fwProvDrop" class="msel-drop"><input id="fwProvSearch" class="msel-search" placeholder="搜索省份…"><div id="fwProvList" class="msel-list"></div></div></div>'+
   '<div class="msel"><div id="fwCityField" class="msel-field" tabindex="0"><span>选择城市…</span></div><div id="fwCityDrop" class="msel-drop"><input id="fwCitySearch" class="msel-search" placeholder="搜索城市或省份，如 南京、江苏…"><div id="fwCityList" class="msel-list"></div></div></div></div></div>'+

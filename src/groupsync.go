@@ -137,6 +137,12 @@ func handleGroupSyncSettings(w http.ResponseWriter, r *http.Request) {
 		saveGroupSyncLocked()
 		startGroupSyncTickerLocked()
 		gsMu.Unlock()
+		// 保存后立即同步一次(已开启的组): 不等 ticker 最长 60 秒后的第一趟,
+		// 用户点保存就能亲眼看到同步生效; 异步跑, 不阻塞保存返回。
+		// 定时同步继续按新间隔走, 本次同步成功后上次时间推进, ticker 自动顺延。
+		if in.Enabled {
+			runGroupSyncAsync(in.Group)
+		}
 		writeJSON(w, 200, groupSyncPublic())
 	default:
 		errJSON(w, 405, "method")
@@ -393,6 +399,54 @@ func markGroupSyncResult(group string, ok, total int, detail string) {
 	saveGroupSyncLocked()
 }
 
+// runGroupSyncOnce: 同步一组并记结果, 返回(成功数, 总数, 明细)。
+// 黑名单先做并集合并再推, 白名单只推; 上次同步时间只在全成功时推进,
+// 部分失败留待下次 ticker 补推, 不谎报成功。
+func runGroupSyncOnce(group string) (int, int, string) {
+	var ok, total int
+	var detail string
+	if group == "blacklist" {
+		ok, total, detail = syncBlacklistToAllOnline()
+	} else {
+		ok, total, detail = syncGroupToAllOnline(group)
+	}
+	markGroupSyncResult(group, ok, total, detail)
+	return ok, total, detail
+}
+
+// gsSyncing: 异步同步(保存触发、ticker)的执行权, 防同一组叠加跑。
+// 立即同步按钮是用户显式动作, 保持同步直跑、不抢这把锁(与异步跑重叠时
+// 两边都是幂等推送, 结果以后写者为准, 不 corrupt)。
+var gsSyncing = map[string]bool{}
+
+// tryBeginAsyncGroupSync: 抢到同一组的异步执行权才返回 true。
+func tryBeginAsyncGroupSync(group string) bool {
+	gsMu.Lock()
+	defer gsMu.Unlock()
+	if gsSyncing[group] {
+		return false
+	}
+	gsSyncing[group] = true
+	return true
+}
+
+func endAsyncGroupSync(group string) {
+	gsMu.Lock()
+	defer gsMu.Unlock()
+	delete(gsSyncing, group)
+}
+
+// runGroupSyncAsync: 异步同步一组(保存触发与 ticker 共用); 已有同组同步在跑时直接跳过。
+func runGroupSyncAsync(group string) {
+	if !tryBeginAsyncGroupSync(group) {
+		return
+	}
+	go func() {
+		defer endAsyncGroupSync(group)
+		runGroupSyncOnce(group)
+	}()
+}
+
 func handleGroupSyncNow(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		errJSON(w, 405, "method")
@@ -411,14 +465,7 @@ func handleGroupSyncNow(w http.ResponseWriter, r *http.Request) {
 	}
 	// 黑名单同步先做并集合并（从各在线节点吸入主服务器没有的 IP），
 	// 再推给全部在线节点；白名单仍以主服务器为唯一源。
-	var ok, total int
-	var detail string
-	if in.Group == "blacklist" {
-		ok, total, detail = syncBlacklistToAllOnline()
-	} else {
-		ok, total, detail = syncGroupToAllOnline(in.Group)
-	}
-	markGroupSyncResult(in.Group, ok, total, detail)
+	ok, total, detail := runGroupSyncOnce(in.Group)
 	writeJSON(w, 200, map[string]any{
 		"ok": true, "synced": ok, "total": total, "detail": detail,
 		"settings": groupSyncPublic(),
@@ -499,15 +546,14 @@ func startGroupSyncTickerLocked() {
 				if g.cfg.LastSyncAt > 0 && now-g.cfg.LastSyncAt < int64(g.cfg.IntervalMin)*60 {
 					continue
 				}
-				// 黑名单 ticker 同样先合并再推；白名单只推。
-				var ok, total int
-				var detail string
-				if g.name == "blacklist" {
-					ok, total, detail = syncBlacklistToAllOnline()
-				} else {
-					ok, total, detail = syncGroupToAllOnline(g.name)
+				// 黑名单 ticker 同样先合并再推；白名单只推。异步跑, 同组已有同步在跑时跳过。
+				if !tryBeginAsyncGroupSync(g.name) {
+					continue
 				}
-				markGroupSyncResult(g.name, ok, total, detail)
+				go func(name string) {
+					defer endAsyncGroupSync(name)
+					runGroupSyncOnce(name)
+				}(g.name)
 			}
 		}
 	}()

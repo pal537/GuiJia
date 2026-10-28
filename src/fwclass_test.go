@@ -68,9 +68,9 @@ func TestFWSourceMatchMatrix(t *testing.T) {
 		{"中国城市南京不命中苏州", FWSource{Kind: "custom_cn", Locations: []GuardLocation{{Kind: "city", Name: "南京", Province: "江苏"}}}, ip4, GeoInfo{Country: "中国", Province: "江苏省", City: "苏州市"}, false},
 	}
 	for _, c := range cases {
-		// custom_ip 的 cidrNet 需预解析(其余 kind 不用)
+		// custom_ip 的 cidrNets 需预解析(其余 kind 不用)
 		if c.src.Kind == "custom_ip" {
-			c.src.cidrNet = parseCIDRNet(c.src.CIDR)
+			c.src.cidrNets, _ = parseCIDRNets(c.src.CIDR)
 		}
 		if got := fwSourceMatch(c.src, c.ip, c.geo); got != c.want {
 			t.Errorf("%s: fwSourceMatch = %v, want %v (geo=%+v)", c.name, got, c.want, c.geo)
@@ -91,7 +91,8 @@ func TestFWSourceMatchMatrix(t *testing.T) {
 		{"0.0.0.0/0", "8.8.8.8", true}, // 全网段等价于全部 IPv4
 	}
 	for _, c := range cidrCases {
-		src := FWSource{Kind: "custom_ip", CIDR: c.cidr, cidrNet: parseCIDRNet(c.cidr)}
+		nets, _ := parseCIDRNets(c.cidr)
+		src := FWSource{Kind: "custom_ip", CIDR: c.cidr, cidrNets: nets}
 		if got := fwSourceMatch(src, net.ParseIP(c.ip), GeoInfo{}); got != c.want {
 			t.Errorf("CIDR %s 对 %s = %v, want %v", c.cidr, c.ip, got, c.want)
 		}

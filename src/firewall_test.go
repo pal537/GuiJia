@@ -118,9 +118,35 @@ func TestFirewallAPIValidation(t *testing.T) {
 	if code := post(`{"portText":"8000-8010","proto":"all","source":{"kind":"cn_in"},"action":"allow","banHours":24}`); code != 400 {
 		t.Fatalf("完全相同规则应 400, 实际 %d", code)
 	}
-	// 只撞端口、来源不同 -> 200(多规则同端口合法)
-	if code := post(`{"portText":"8000-8010","proto":"all","source":{"kind":"cn_out"},"action":"deny","banHours":24}`); code != 200 {
-		t.Fatalf("来源不同的同端口规则应 200, 实际 %d", code)
+	// 一个端口一条规则: 只撞端口、来源不同也 400(允许+拒绝同端口就是逻辑冲突)
+	if code := post(`{"portText":"8000-8010","proto":"all","source":{"kind":"cn_out"},"action":"deny","banHours":24}`); code != 400 {
+		t.Fatalf("同端口不同来源/动作也应 400, 实际 %d", code)
+	}
+	// 端口范围相交且动作相反也算冲突: 8005 落在 8000-8010 内
+	if code := post(`{"portText":"8005","proto":"all","source":{"kind":"all"},"action":"deny"}`); code != 400 {
+		t.Fatalf("端口范围相交反动作应 400, 实际 %d", code)
+	}
+	// 端口范围相交但同动作是并集: 8005 允许应 200
+	if code := post(`{"portText":"8005","proto":"all","source":{"kind":"all"},"action":"allow"}`); code != 200 {
+		t.Fatalf("端口范围相交同动作应 200, 实际 %d", code)
+	}
+	// 协议不相交不冲突: 同端口 TCP 与 UDP 各一条可以共存
+	if code := post(`{"portText":"9000","proto":"tcp","source":{"kind":"all"},"action":"allow"}`); code != 200 {
+		t.Fatalf("TCP 规则应 200, 实际 %d", code)
+	}
+	if code := post(`{"portText":"9000","proto":"udp","source":{"kind":"all"},"action":"deny"}`); code != 200 {
+		t.Fatalf("UDP 规则与 TCP 规则不冲突应 200, 实际 %d", code)
+	}
+	// 全部协议与 TCP 相交: 9000 已有 TCP 规则, 再建 all 规则应 400
+	if code := post(`{"portText":"9000","proto":"all","source":{"kind":"all"},"action":"allow"}`); code != 400 {
+		t.Fatalf("全部协议与 TCP 规则相交应 400, 实际 %d", code)
+	}
+	// 自定义 IP 多个逗号分隔: 合法应 200, 其中一个非法应 400
+	if code := post(`{"portText":"9100","proto":"all","source":{"kind":"custom_ip","cidr":"8.8.8.8, 1.2.3.0/24"},"action":"allow"}`); code != 200 {
+		t.Fatalf("多 IP 自定义应 200, 实际 %d", code)
+	}
+	if code := post(`{"portText":"9101","proto":"all","source":{"kind":"custom_ip","cidr":"8.8.8.8, 999.1.1.1"},"action":"allow"}`); code != 400 {
+		t.Fatalf("多 IP 中有非法应 400, 实际 %d", code)
 	}
 	// 留空时长 = 24 小时(沿用旧语义: 前端留空传 0 时后端按 0 存? 这里验证
 	// parseFWRuleInput 对 0 的处理: 0=永久, 与"留空"区分在前端换算层)

@@ -66,11 +66,11 @@ type GuardLocation struct {
 // 自定义位置(海外), 只含国家与地区代码(Countries, 含港澳台 HK/MO/TW)。
 type FWSource struct {
 	Kind      string          `json:"kind"`                // custom_ip | all_v4 | all_v6 | cn_in | cn_out | custom_cn | custom_foreign | all
-	CIDR      string          `json:"cidr,omitempty"`      // custom_ip: IP 或 CIDR(原样存, 匹配用解析后的 cidrNet)
+	CIDR      string          `json:"cidr,omitempty"`      // custom_ip: IP 或 CIDR, 多个逗号分隔(原样存, 匹配用解析后的 cidrNets)
 	Countries []string        `json:"countries,omitempty"` // custom_foreign: 国家与地区代码(新); 迁移进来的旧字符串原样保留作回退匹配
 	Locations []GuardLocation `json:"locations,omitempty"` // custom_cn: 省市多选(任一命中即命中)
 
-	cidrNet *net.IPNet // CIDR 解析结果(load 与校验时填充, 不落盘)
+	cidrNets []*net.IPNet // CIDR 解析结果(load 与校验时填充, 不落盘)
 }
 
 // PortGuardRule 防火墙规则。ranges 由 PortText 解析而来(不落盘, load 与
@@ -120,7 +120,7 @@ func loadPortGuard() {
 					var r PortGuardRule
 					if json.Unmarshal(item, &r) == nil {
 						r.ranges, _ = parsePortRanges(r.PortText)
-						r.Source.cidrNet = parseCIDRNet(r.Source.CIDR)
+						r.Source.cidrNets, _ = parseCIDRNets(r.Source.CIDR)
 						// v1.0.9 的 custom_loc 已拆: 省市分大陆与港澳台两拨,
 						// 大陆省市 -> custom_cn, 国家 + 港澳台省市 -> custom_foreign;
 						// 两边都有按同端口/协议/动作/时长/生效态拆成两条(新 ID 由
@@ -220,9 +220,136 @@ func loadPortGuard() {
 	if pgRules == nil {
 		pgRules = []*PortGuardRule{}
 	}
+	// 一个端口一种动作的旧数据迁移(顺序不能乱):
+	//  1. 先清动作冲突: 后建且动作相反的生效规则改禁用并释放其封禁(同动作并集保留);
+	//  2. 再清拒绝规则端口上的旧默认封禁(旧语义下拒绝端口的未命中来源也被默认封禁,
+	//     新语义下一律放行, 留着等于旧规则阴魂不散, 新规则永不生效);
+	//  3. 最后按现行规则归一化剩余旧封禁(原有 migrateFwBansLocked)。
+	if migrateFwRuleOverlapLocked() {
+		savePortGuardLocked()
+	}
+	migrateFwDefaultBanOnDenyLocked()
 	// 防火墙封禁改永久: 升级后首次加载, 把现存生效中的防火墙封禁
 	// 转永久并挂到现行规则上, 无规则覆盖的予以释放(记录保留)。
 	migrateFwBansLocked()
+}
+
+// migrateFwRuleOverlapLocked: 一个端口一种动作的旧数据迁移(调用方须已持 pgMu)。
+// 旧版本允许多规则同端口(拒绝优先暗箱裁决), 新语义下允许与拒绝共存才是逻辑冲突:
+// 按创建顺序, 每组重叠的已生效规则只保留最早一条的动作, 后建且动作相反的改禁用并
+// 释放它们产生的封禁(releaseRuleBans: 只摘该规则的作用域, 记录保留); 同动作的后建
+// 规则保留(来源并集, 如 v1.0.9 custom_loc 拆分对); 停用的旧规则原样保留可见,
+// 但启用时会被启用关拦截, 直到冲突的生效规则被停用或删掉。
+// 幂等: 迁移后不存在动作混杂的重叠生效规则, 再跑即空转。返回是否改动过规则。
+func migrateFwRuleOverlapLocked() bool {
+	kept := []*PortGuardRule{}
+	changed := false
+	disabled := []string{}
+	for _, r := range pgRules {
+		if !r.Enabled {
+			continue
+		}
+		conflict := false
+		for _, k := range kept {
+			if k.Proto != "all" && r.Proto != "all" && k.Proto != r.Proto {
+				continue
+			}
+			if k.Action == r.Action {
+				continue
+			}
+			for _, a := range k.ranges {
+				for _, b := range r.ranges {
+					if a[0] <= b[1] && b[0] <= a[1] {
+						conflict = true
+					}
+				}
+			}
+		}
+		if conflict {
+			r.Enabled = false
+			disabled = append(disabled, r.ID)
+			changed = true
+			continue
+		}
+		kept = append(kept, r)
+	}
+	for _, id := range disabled {
+		releaseRuleBans(id)
+	}
+	return changed
+}
+
+// migrateFwDefaultBanOnDenyLocked: 拒绝规则端口上旧默认封禁的清理(调用方须已持 pgMu,
+// 且须在 migrateFwBansLocked 之前跑, 看的是原始作用域)。
+// 旧语义下拒绝规则端口上的未命中来源也会被默认封禁; 新语义下拒绝规则只封命中来源,
+// 未命中一律放行——旧默认封禁若留着, 新规则对这些 IP 永不生效。
+// 只动能确证的: 原因以“防火墙默认封禁”开头、且唯一作用域规则为现行已生效拒绝规则的封禁,
+// 或端口全落在同一条现行已生效拒绝规则范围内的旧 Ports 封禁; 允许规则端口上的默认封禁
+// 在新语义下依然该封, 原样保留; 作用域混杂的保守不动, 交给后续归一化处理。
+// 记录保留(只改状态), 内核集合同步删除。
+func migrateFwDefaultBanOnDenyLocked() {
+	denyRanges := map[string][][2]int{}
+	for _, r := range pgRules {
+		if r.Enabled && r.Action == "deny" {
+			denyRanges[r.ID] = r.ranges
+		}
+	}
+	if len(denyRanges) == 0 {
+		return
+	}
+	banMu.Lock()
+	defer banMu.Unlock()
+	now := time.Now().Unix()
+	changed := false
+	for _, b := range bans {
+		if b.Source != "portguard" {
+			continue
+		}
+		normBanStatus(b, now)
+		if b.Status != BanActive || !b.enforced(now) {
+			continue
+		}
+		if !strings.HasPrefix(b.Reason, "防火墙默认封禁") {
+			continue
+		}
+		release := false
+		if len(b.Scopes) == 1 && len(b.Ports) == 0 {
+			if _, ok := denyRanges[b.Scopes[0].RuleID]; ok {
+				release = true
+			}
+		} else if len(b.Scopes) == 0 && len(b.Ports) > 0 {
+			for _, rs := range denyRanges {
+				all := true
+				for _, p := range b.Ports {
+					if !rangeCovers(rs, p) {
+						all = false
+						break
+					}
+				}
+				if all {
+					release = true
+					break
+				}
+			}
+		}
+		if !release {
+			continue
+		}
+		for _, p := range b.Ports {
+			pgDelElement(b.IP, p)
+		}
+		for _, s := range b.Scopes {
+			fwDelElement(b.IP, s.RuleID)
+		}
+		b.Ports = nil
+		b.Scopes = nil
+		b.Status = BanReleased
+		b.ReleasedAt = now
+		changed = true
+	}
+	if changed {
+		saveBans()
+	}
 }
 
 // migrateFwBansLocked 防火墙封禁永久化迁移(调用方须已持 pgMu)。
@@ -664,6 +791,32 @@ func parseCIDRNet(s string) *net.IPNet {
 	return &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)}
 }
 
+// parseCIDRNets: 逗号分隔的多个 IP/CIDR 转网段表(一个端口一条规则后,
+// 多 IP 允许要写进同一条规则)。任一非法即整体失败; 去重后返回。
+func parseCIDRNets(s string) ([]*net.IPNet, error) {
+	parts := strings.FieldsFunc(s, func(r rune) bool {
+		return r == ',' || r == '，' || r == '、'
+	})
+	nets := []*net.IPNet{}
+	seen := map[string]bool{}
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		n := parseCIDRNet(p)
+		if n == nil {
+			return nil, fmt.Errorf("IP 或 CIDR 格式不对: %s", p)
+		}
+		if seen[n.String()] {
+			continue
+		}
+		seen[n.String()] = true
+		nets = append(nets, n)
+	}
+	return nets, nil
+}
+
 // fwSourceMatch: 该来源范围是否命中(单选其一, 任一命中即命中)。
 // 未知归属地(Country=="")不命中任何国家/省份类来源, 只命中"全部 IP"
 // (与"全部 IPv4/IPv6"按地址族判定, 与归属地无关)。
@@ -681,7 +834,12 @@ func fwSourceMatch(src FWSource, ip net.IP, geo GeoInfo) bool {
 		// 境外 = 非大陆: 外国 + 港澳台(港澳台不算大陆, 故可访问); 未知与私网不命中
 		return geo.Country != "" && !geo.Private && !geoIsMainland(geo)
 	case "custom_ip":
-		return src.cidrNet != nil && src.cidrNet.Contains(ip)
+		for _, n := range src.cidrNets {
+			if n != nil && n.Contains(ip) {
+				return true
+			}
+		}
+		return false
 	case "custom_cn":
 		// 自定义位置(中国): 省市任一命中即命中, 港澳台不在此列。
 		return guardLocationAllowed(src.Locations, geo)
@@ -1149,6 +1307,14 @@ func reconcileFirewall() {
 
 // portGuardCheck 新连接的防火墙检查(采集循环调用, proto 为 tcp|udp)。
 // 顺序: 拒绝命中 > 允许命中 > 默认封禁; 内网/回环/保留段/信任/已封禁直接放过。
+// portGuardCheck: 防火墙命中判定——一个端口只能有一种动作, 语义只有两种, 没有第三态:
+//   - 允许规则: 任一来源命中 → 放行; 全不命中 → 拒绝(永久封禁, 作用域为规则端口)。
+//   - 拒绝规则: 任一来源命中 → 拒绝(永久封禁); 全不命中 → 放行。
+//   - 端口上没有任何生效规则 → 防火墙不管(原样放行, 不封禁)。
+//
+// 同动作多条规则按来源并集算(拆分对、跨类型多源都靠它); 允许与拒绝共存的旧数据
+// 靠加载迁移清掉(见 migrateFwRuleOverlapLocked); 万一仍有动作混杂(手改 JSON),
+// 取创建顺序第一条的动作, 绝不搞“拒绝优先”这种暗箱裁决。
 func portGuardCheck(srcIP string, dstPort int, proto string) {
 	rules := fwRulesFor(dstPort, proto)
 	if len(rules) == 0 {
@@ -1168,44 +1334,40 @@ func portGuardCheck(srcIP string, dstPort int, proto string) {
 	if geo.Private {
 		return
 	}
-	var denyRule *PortGuardRule
-	allowHit := false
-	for _, r := range rules {
-		if !fwSourceMatch(r.Source, pip, geo) {
-			continue
-		}
-		if r.Action == "deny" && denyRule == nil {
-			denyRule = r
-		}
-		if r.Action == "allow" {
-			allowHit = true
-		}
-	}
 	// 展示用归属地: 库查不到国家时记"归属地未知", 绝不静默当成某国;
 	// 查得到时用 geo.Text(已含" · ISP", 如 Bangladesh · Cloudflare)。
 	geoDisp := geo.Text
 	if geo.Country == "" {
 		geoDisp = "归属地未知"
 	}
-	if denyRule != nil {
-		reason := "防火墙拒绝：" + fwRuleDesc(denyRule) + "，来源" + geoDisp
-		ensureFWRule(denyRule)
-		_, fresh, err := applyRuleBan(srcIP, reason, "portguard", denyRule.ID, denyRule.ranges)
+	r := rules[0]
+	matched := false
+	for _, rr := range rules {
+		if fwSourceMatch(rr.Source, pip, geo) {
+			matched = true
+			break
+		}
+	}
+	if r.Action == "allow" {
+		if matched {
+			return
+		}
+		reason := "防火墙拒绝：未命中允许规则（规则：" + fwRuleDesc(r) + "），来源" + geoDisp
+		ensureFWRule(r)
+		_, fresh, err := applyRuleBan(srcIP, reason, "portguard", r.ID, r.ranges)
 		if err != nil || !fresh {
 			return
 		}
 		emit(Event{Type: "portguard_ban", IP: srcIP, Port: dstPort, Detail: reason}, settings.AlertPortGuardBan)
 		return
 	}
-	if allowHit {
+	// deny: 命中才拒绝, 未命中一律放行。
+	if !matched {
 		return
 	}
-	// 默认封禁: 首个生效覆盖规则(创建顺序)提供作用域; 封禁永久, 直到
-	// 规则删除/禁用或手动解封才释放。
-	first := rules[0]
-	reason := "防火墙默认封禁：未命中允许规则（规则：" + fwRuleDesc(first) + "），来源" + geoDisp
-	ensureFWRule(first)
-	_, fresh, err := applyRuleBan(srcIP, reason, "portguard", first.ID, first.ranges)
+	reason := "防火墙拒绝：" + fwRuleDesc(r) + "，来源" + geoDisp
+	ensureFWRule(r)
+	_, fresh, err := applyRuleBan(srcIP, reason, "portguard", r.ID, r.ranges)
 	if err != nil || !fresh {
 		return
 	}
@@ -1261,11 +1423,11 @@ func parseFWRuleInput(portText, proto string, src FWSource, action string, banHo
 		if src.CIDR == "" {
 			return nil, fmt.Errorf("请填写 IP 或 CIDR")
 		}
-		n := parseCIDRNet(src.CIDR)
-		if n == nil {
+		nets, err := parseCIDRNets(src.CIDR)
+		if err != nil || len(nets) == 0 {
 			return nil, fmt.Errorf("IP 或 CIDR 格式不对")
 		}
-		src.cidrNet = n
+		src.cidrNets = nets
 		src.Countries = nil
 		src.Locations = nil
 	case "all_v4", "all_v6", "cn_in", "cn_out", "all":
@@ -1331,7 +1493,8 @@ func parseFWRuleInput(portText, proto string, src FWSource, action string, banHo
 	return &PortGuardRule{PortText: portText, Proto: proto, Source: src, Action: action, BanHours: hours, ranges: ranges}, nil
 }
 
-// fwRuleDup: 与已有规则完全相同(端口范围+协议+来源+动作)即判重复(生效态不计)。
+// fwRuleDup: 与已有规则完全相同(端口范围+协议+动作+来源)即判重复(生效态不计)。
+// 精确重复与动作冲突互斥: 重复是同动作, 冲突是反动作, 两关并列。
 func fwRuleDup(r *PortGuardRule, skipID string) bool {
 	pgMu.Lock()
 	defer pgMu.Unlock()
@@ -1379,6 +1542,58 @@ func fwRuleDupLocked(r *PortGuardRule, skipID string) bool {
 	return false
 }
 
+// fwRuleConflict: 新规则是否与已有生效规则在端口与协议上重叠且动作相反
+// (一个端口只能有一种动作: 允许与拒绝绝不共存, 这才是真正的逻辑冲突;
+// 同动作多条规则按来源并集算, 不冲突——如 v1.0.9 custom_loc 拆分对,
+// 以及“江苏 + 美国”这种跨类型多源允许, 都靠并集表达)。
+// 只与生效规则比: 停用的规则不是该端口现行设置, 不挡新建; 启用时再拦一次。
+// skipID: 编辑时跳过自身。返回冲突的那条规则(用于报错里点名), 无冲突返回 nil。
+func fwRuleConflict(r *PortGuardRule, skipID string) *PortGuardRule {
+	pgMu.Lock()
+	defer pgMu.Unlock()
+	return fwRuleConflictLocked(r, skipID)
+}
+
+// fwRuleConflictLocked: 调用方已持 pgMu 时用。
+func fwRuleConflictLocked(r *PortGuardRule, skipID string) *PortGuardRule {
+	for _, x := range pgRules {
+		if x.ID == skipID || !x.Enabled {
+			continue
+		}
+		if x.Action == r.Action {
+			continue
+		}
+		if x.Proto != "all" && r.Proto != "all" && x.Proto != r.Proto {
+			continue
+		}
+		overlap := false
+		for _, a := range x.ranges {
+			for _, b := range r.ranges {
+				if a[0] <= b[1] && b[0] <= a[1] {
+					overlap = true
+					break
+				}
+			}
+			if overlap {
+				break
+			}
+		}
+		if overlap {
+			return x
+		}
+	}
+	return nil
+}
+
+// fwConflictErr: 动作冲突报错文案, 点名冲突规则(端口 + 协议 + 动作 + 来源)。
+func fwConflictErr(x *PortGuardRule) string {
+	act := "允许"
+	if x.Action == "deny" {
+		act = "拒绝"
+	}
+	return "端口已有生效的" + act + "规则（" + fwRuleDesc(x) + "），一个端口上不许同时存在允许和拒绝；想换动作请先停用或删除旧规则"
+}
+
 func handlePortGuard(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
@@ -1410,6 +1625,10 @@ func handlePortGuard(w http.ResponseWriter, r *http.Request) {
 		}
 		if fwRuleDup(rule, "") {
 			errJSON(w, 400, "已存在相同规则")
+			return
+		}
+		if x := fwRuleConflict(rule, ""); x != nil {
+			errJSON(w, 400, fwConflictErr(x))
 			return
 		}
 		rule.ID = newPortGuardRuleID()
@@ -1456,6 +1675,15 @@ func handlePortGuardItem(w http.ResponseWriter, r *http.Request) {
 			errJSON(w, 404, "规则不存在")
 			return
 		}
+		if in.Enabled != nil && *in.Enabled && !rule.Enabled {
+			// 启用开关：只与已生效且动作相反的规则比（迁移遗留的动作冲突对就靠这一关拦住；
+			// 同动作重叠是并集，不拦）。
+			if x := fwRuleConflictLocked(&PortGuardRule{Proto: rule.Proto, Action: rule.Action, ranges: rule.ranges}, id); x != nil {
+				pgMu.Unlock()
+				errJSON(w, 400, fwConflictErr(x))
+				return
+			}
+		}
 		if in.Enabled != nil {
 			rule.Enabled = *in.Enabled
 		}
@@ -1483,6 +1711,11 @@ func handlePortGuardItem(w http.ResponseWriter, r *http.Request) {
 			if fwRuleDupLocked(nr, id) {
 				pgMu.Unlock()
 				errJSON(w, 400, "已存在相同规则")
+				return
+			}
+			if x := fwRuleConflictLocked(nr, id); x != nil {
+				pgMu.Unlock()
+				errJSON(w, 400, fwConflictErr(x))
 				return
 			}
 			rule.PortText, rule.Proto, rule.Source, rule.Action, rule.BanHours, rule.ranges = nr.PortText, nr.Proto, nr.Source, nr.Action, nr.BanHours, nr.ranges

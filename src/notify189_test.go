@@ -78,7 +78,7 @@ func TestPortGuardItemEdit(t *testing.T) {
 		t.Fatalf("重复失败后规则不应被改: %+v", pgRules[0])
 	}
 	pgMu.Unlock()
-	// 只撞端口、来源不同 -> 200(多规则同端口合法, 拒绝优先于允许)
+	// 只撞端口、来源不同 -> 200(同动作重叠按并集, 不冲突)
 	if code := put("g1", `{"portText":"4000","source":{"kind":"custom_cn","locations":[{"kind":"province","name":"江苏"}]},"banHours":24}`); code != 200 {
 		t.Fatalf("来源不同的同端口规则应 200, 实际 %d", code)
 	}
