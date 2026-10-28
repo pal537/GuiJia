@@ -432,7 +432,8 @@ func hubRegisteredCount() int {
 
 // handleSetupJoinHub: 已登录管理员把独立面板转为被控节点（设置页“接入主服务器”弹窗）。
 // 未登录由中间件挡（不在 authPublic 里）；被控节点由中间件先 403，这里再防一层。
-// 流程与首次加入一致：先同步校验配对码（错码模式不动）→ 通过才翻转模式并起拨号器，本地数据不动。
+// 流程与首次加入一致：先同步校验配对码（错码模式不动、凭证不动）→ 通过才翻转模式并起拨号器，
+// 接入同时立即取消本地登录凭证（密码与 2FA 清掉）；防护数据不动。
 // 本机已有已登记子服务器时直接拒绝：接入后原有子服务器会失去主服务器，不许静默孤儿化。
 func handleSetupJoinHub(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
@@ -494,6 +495,9 @@ func handleSetupJoinHub(w http.ResponseWriter, r *http.Request) {
 	settings.HubID = ""
 	saveSettings()
 	mu.Unlock()
+	// 加入即取消本地登录凭证：密码与 2FA 立即清掉（现存 session 一并作废），
+	// 被控期间本地无登录入口；脱离后无密码回落，须重新设置密码。
+	clearLocalCredentialsForManaged()
 	// 码已被主服务器接受并消耗（pending 已建），本地不再留盘；
 	// 拨号器凭指纹 hello 即回 pending，等确认。
 	setLinkState("joining", "")

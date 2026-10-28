@@ -60,6 +60,22 @@ func hasPassword() bool {
 	return auth.PassHash != ""
 }
 
+// clearLocalCredentialsForManaged: 独立面板转为被控节点时立即取消本地登录凭证。
+// 密码哈希、2FA（密钥/开关/恢复码）与全部信任设备一并清除，代次 +1 废掉全部现存 session。
+// 被控期间本地没有任何登录入口；脱离回落（RunMode 清空且无密码）后须重新设置密码才能独立使用。
+// 只动面板登录凭证：防护数据、节点身份、TG 配置、急救超级密码（TG 破坏性动作确认用，不是面板登录凭证）一律不动。
+func clearLocalCredentialsForManaged() {
+	authMu.Lock()
+	auth.PassHash = ""
+	auth.TOTPSecret = ""
+	auth.TOTPEnabled = false
+	auth.RecoveryCodes = nil
+	auth.SessionGen++
+	saveAuthLocked()
+	authMu.Unlock()
+	clearDeviceTrusts()
+}
+
 // ---------- 强密码规则 ----------
 
 // checkStrongPassword: 12 位起 + 大写 + 小写 + 数字 + 符号, 不满足返回原因。

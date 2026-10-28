@@ -1,14 +1,16 @@
 package main
 
 // 设置页群控模块单测：已独立的面板可经“接入主服务器”弹窗转为被控节点。
-// 锁住：standalone→managed 成功且本地数据不动、错码模式不变、
-// 已有子服务器时接入被拒、被控后管理接口只读、生成配对码接口与原来一致、
-// 设置页新模块结构（两按钮弹窗、旧卡内生成区消失）。
+// 锁住：standalone→managed 成功且防护数据不动、接入同时立即取消本地登录凭证
+// （密码与 2FA 清掉、现存 session 作废、信任设备清空；错码时凭证不动）、
+// 脱离回落后无密码须重新设置密码、已有子服务器时接入被拒、被控后管理接口只读、
+// 生成配对码接口与原来一致、设置页新模块结构（两按钮弹窗、旧卡内生成区消失）。
 
 import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -200,4 +202,130 @@ func TestJoinHubUI(t *testing.T) {
 			t.Errorf("旧卡内生成区应已搬进弹窗, 不应再有 %q", s)
 		}
 	}
+}
+
+func TestSetupJoinHubClearsCredentials(t *testing.T) {
+	defer setupNodeTest(t)()
+	dir := t.TempDir()
+	oldDataDir, oldAuthFile := dataDir, authFile
+	dataDir, authFile = dir, filepath.Join(dir, "auth.json")
+	defer func() { dataDir, authFile = oldDataDir, oldAuthFile }()
+	oldTrusts, oldLoaded := deviceTrusts, deviceTrustLoaded
+	defer func() { deviceTrusts, deviceTrustLoaded = oldTrusts, oldLoaded }()
+	deviceTrusts = []*deviceTrust{{Hash: "h", IP: "1.2.3.4", Expires: time.Now().Add(time.Hour).Unix()}}
+	deviceTrustLoaded = true
+	oldSessions := sessions
+	sessions = map[string]*session{"tok": {token: "tok", gen: 0, expires: time.Now().Add(time.Hour)}}
+	defer func() { sessions = oldSessions }()
+	auth.PassHash = "pbkdf2-sha256$1$abc$def"
+	auth.TOTPSecret = "SECRET"
+	auth.TOTPEnabled = true
+	auth.RecoveryCodes = []string{"aa", "bb"}
+	auth.SessionGen = 0
+	hubSrv := fakeJoinHub(t, nil)
+	defer hubSrv.Close()
+	loadNodeIdentity()
+	settings.RunMode = "standalone"
+	settings.ServerName = "B机"
+	req := httptest.NewRequest("POST", "/api/setup/join-hub",
+		strings.NewReader(`{"hubUrl":"`+hubSrv.URL+`","code":"GOOD"}`))
+	rec := httptest.NewRecorder()
+	handleSetupJoinHub(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("接入应成功: code=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if settings.RunMode != "managed" {
+		t.Fatalf("接入后模式应为 managed, 得到 %q", settings.RunMode)
+	}
+	// 本地登录凭证立即取消：密码、2FA、恢复码全清，代次 +1 废掉旧 session。
+	if auth.PassHash != "" || auth.TOTPSecret != "" || auth.TOTPEnabled || len(auth.RecoveryCodes) != 0 {
+		t.Fatalf("接入应清掉密码与 2FA, 得到 passHash=%q totp=%q enabled=%v recovery=%d",
+			auth.PassHash, auth.TOTPSecret, auth.TOTPEnabled, len(auth.RecoveryCodes))
+	}
+	if auth.SessionGen != 1 {
+		t.Fatalf("接入应抬代次废掉现存 session, 得到 gen=%d", auth.SessionGen)
+	}
+	if _, ok := sessions["tok"]; ok {
+		// 旧 session 代次已不符：sessionOf 视角下它已失效（map 里残留无妨，gen 对不上）。
+		r := httptest.NewRequest("GET", "/", nil)
+		r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "tok"})
+		if sessionOf(r) != nil {
+			t.Fatalf("旧 session 在代次抬升后应失效")
+		}
+	}
+	if len(deviceTrusts) != 0 {
+		t.Fatalf("接入应清空信任设备, 剩余 %d 条", len(deviceTrusts))
+	}
+	// 防护数据不动：服务器名原样保留。
+	if settings.ServerName != "B机" {
+		t.Fatalf("接入不应改动防护数据, 得到 name=%q", settings.ServerName)
+	}
+	stopLinkLoop(t)
+}
+
+func TestSetupJoinHubBadCodeKeepsCredentials(t *testing.T) {
+	defer setupNodeTest(t)()
+	auth.PassHash = "pbkdf2-sha256$1$abc$def"
+	auth.TOTPEnabled = true
+	auth.TOTPSecret = "SECRET"
+	hubSrv := fakeJoinHub(t, nil)
+	defer hubSrv.Close()
+	loadNodeIdentity()
+	settings.RunMode = "standalone"
+	req := httptest.NewRequest("POST", "/api/setup/join-hub",
+		strings.NewReader(`{"hubUrl":"`+hubSrv.URL+`","code":"BAD"}`))
+	rec := httptest.NewRecorder()
+	handleSetupJoinHub(rec, req)
+	if rec.Code != 400 {
+		t.Fatalf("错码应 400: code=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if auth.PassHash == "" || !auth.TOTPEnabled || auth.TOTPSecret == "" {
+		t.Fatalf("错码时凭证必须不动, 得到 passHash=%q totp=%v secret=%q", auth.PassHash, auth.TOTPEnabled, auth.TOTPSecret)
+	}
+}
+
+// TestJoinHubDetachRequiresPassword: 走完整链路——加入时凭证已清，
+// 随后被主服务器移除，回落为未定模式且无密码——选独立使用必须重新设置密码。
+func TestJoinHubDetachRequiresPassword(t *testing.T) {
+	defer setupNodeTest(t)()
+	auth.PassHash = "pbkdf2-sha256$1$abc$def"
+	auth.TOTPEnabled = true
+	auth.TOTPSecret = "SECRET"
+	hubSrv := fakeJoinHub(t, nil)
+	defer hubSrv.Close()
+	loadNodeIdentity()
+	settings.RunMode = "standalone"
+	req := httptest.NewRequest("POST", "/api/setup/join-hub",
+		strings.NewReader(`{"hubUrl":"`+hubSrv.URL+`","code":"GOOD"}`))
+	rec := httptest.NewRecorder()
+	handleSetupJoinHub(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("接入应成功: code=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if hasPassword() || auth.TOTPEnabled {
+		t.Fatalf("加入后凭证应已清, 得到 passHash=%q totp=%v", auth.PassHash, auth.TOTPEnabled)
+	}
+	// 主服务器移除 → 节点自动脱离（不翻模式：回落断言就看这次翻转）。
+	rollbackJoin("revoked")
+	if effectiveRunMode() != "" {
+		t.Fatalf("脱离后无密码应回未定模式, 得到 %q", effectiveRunMode())
+	}
+	if hasPassword() {
+		t.Fatalf("脱离后应无密码")
+	}
+	if !(!hasPassword() && effectiveRunMode() != "managed") {
+		t.Fatalf("脱离后应满足 setupRequired（须重新设置密码）")
+	}
+	// 等拨号器自行退出（模式已不是 managed，不用 stopLinkLoop 翻模式）。
+	deadline := time.Now().Add(8 * time.Second)
+	for time.Now().Before(deadline) {
+		linkRunMu.Lock()
+		running := linkRunning
+		linkRunMu.Unlock()
+		if !running {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("拨号器在脱离后 8 秒内未退出")
 }

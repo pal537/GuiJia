@@ -2421,7 +2421,7 @@ async function loadUpCard(){
   }
 }
 /* 群控模块: 设置页 → 面板设置卡正下方; 仅本机视图, 看节点时隐藏(群控是本机动作, 只走 apiLocal)。
-   两个按钮都开弹窗: 接入主服务器调 POST api/setup/join-hub(主服务器地址 + 配对码, 错码弹窗内报错、模式不动);
+   两个按钮都开弹窗: 接入主服务器调 POST api/setup/join-hub(主服务器地址 + 配对码, 错码弹窗内报错、模式与凭证不动; 成功后本地密码与 2FA 立即取消);
    生成配对码调 POST api/nodes/pairing-code(返回 code、expiresAt 秒)。待添加来自 GET api/nodes/servers 的 pending 字段;
    确认/拒绝调 POST api/nodes/approve、reject(传 fingerprint)。全部反馈只在卡内或弹窗内, 不弹顶部提示。 */
 let pairBusy=false;
@@ -2499,7 +2499,7 @@ function openPairGenModal(){
   };
 }
 function openJoinHubModal(){
-  openCModal('<h3 class="mtitle">接入主服务器（被控）</h3><div class="csub">接入后，本机面板变为只读状态页，全部管理都在主服务器上进行；本机原有防护数据不动，防护继续在本机生效。脱离办法：主服务器上移除管理（本机恢复成本地独立面板），或主服务器彻底没了时用本机命令 guijia leave 兜底。本机如已有子服务器，接入会被拒绝，请先移除全部子服务器。</div>'+
+  openCModal('<h3 class="mtitle">接入主服务器（被控）</h3><div class="csub">接入后，本机面板变为只读状态页，全部管理都在主服务器上进行；本机原有防护数据不动，防护继续在本机生效。注意：接入会立即取消本机登录密码与 2FA（现存登录一并失效）。脱离办法：主服务器上移除管理（本机回到模式选择页，选独立使用需重新设置密码），或主服务器彻底没了时用本机命令 guijia leave 兜底。本机如已有子服务器，接入会被拒绝，请先移除全部子服务器。</div>'+
     '<div class="fld"><label>主服务器地址</label><input id="cmJoinUrl" placeholder="如 https://主服务器IP:59188"></div>'+
     '<div class="fld"><label>配对码</label><input id="cmJoinCode" placeholder="主服务器面板生成的配对码"></div>'+
     '<div class="sline fail" id="cmJoinMsg" style="display:none"></div>'+
