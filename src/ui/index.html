@@ -233,8 +233,11 @@ textarea.ta{width:calc(100% - 36px);margin:6px 18px 0;min-height:92px;resize:ver
 .cmcard h3{font-size:15px;font-weight:700;margin-bottom:4px}
 .cmcard .csub{color:var(--mut);font-size:12.5px;margin-bottom:14px;line-height:1.6}
 .cmcard .fld{margin-bottom:12px}
-.cmcard .fld label{display:block;font-size:12px;color:var(--mut);margin-bottom:4px}
-.cmcard .fld input,.cmcard .fld select,.cmcard .fld textarea{width:100%}
+/* 防火墙下拉行(.msel-row)不受 .fld 宽泛规则覆盖: v1.0.11 教训——
+   .cmcard .fld label/input 特异性高于 .msel-row, 曾让 grid 左列规则全程失效,
+   之后任何 .fld 宽泛规则都必须用 :not() 排除 .msel-row 与复选框/单选框。 */
+.cmcard .fld label:not(.msel-row){display:block;font-size:12px;color:var(--mut);margin-bottom:4px}
+.cmcard .fld input:not([type=checkbox]):not([type=radio]),.cmcard .fld select,.cmcard .fld textarea{width:100%}
 .cmcard .fld .hint{color:var(--mut);font-size:12px;margin-top:4px}
 .cmcard .cfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
 .msgbox{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.6;min-height:20px}
