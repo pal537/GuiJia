@@ -354,11 +354,26 @@ func upgradeHasServiceUnit() bool {
 	return exec.Command("systemctl", "cat", "guijia").Run() == nil
 }
 
+// restartKilledBySignal: 重启命令是否死于信号。systemd 模式下, systemctl restart
+// 会随服务 cgroup 一起被 SIGTERM: 子进程死于信号不代表重启失败,
+// 而是重启正在进行(新进程随后由 systemd 拉起), 绝不能据此写 failed。
+func restartKilledBySignal(err error) bool {
+	var ee *exec.ExitError
+	if !errors.As(err, &ee) {
+		return false
+	}
+	ws, ok := ee.ProcessState.Sys().(syscall.WaitStatus)
+	return ok && ws.Signaled()
+}
+
 // upgradeRestartFunc: 触发重启(默认有单元走 systemctl, 否则自身重执行; 测试可拦截)。
 // systemd 模式下命令返回即由服务管理器接管; 重执行模式下成功不再返回。
 var upgradeRestartFunc = func() error {
 	if upgradeHasServiceUnit() {
-		return exec.Command("systemctl", "restart", "guijia").Run()
+		// 必须 --no-block: 同步等重启完成时, systemctl 客户端随服务 cgroup
+		// 一起被 SIGTERM, 误报“重启失败”(2026-10-28 假失败根因之一);
+		// --no-block 立即返回, 重启成败由看门狗/启动核对按实际版本判定。
+		return exec.Command("systemctl", "--no-block", "restart", "guijia").Run()
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -466,16 +481,38 @@ func pruneUpgradeBackups(keep int) {
 	if err != nil {
 		return
 	}
-	var names []string
-	for _, e := range ents {
-		if !e.IsDir() && strings.HasPrefix(e.Name(), "guijia-") {
-			names = append(names, e.Name())
-		}
+	// 只认版本备份 guijia-v*, 看门狗副本 guijia-watch-copy-* 另有 24 小时清理,
+	// 不许占保留名额。按修改时间留最新 keep 份(同时间按名字倒序):
+	// 旧版按文件名排序, v1.0.10 的名字排在 v1.0.7 前面, 刚写好的新备份
+	// 当场被删、真要回滚时无备份可用(2026-10-28 假失败的直接原因之一)。
+	type bk struct {
+		name string
+		mod  time.Time
 	}
-	sort.Strings(names)
-	for len(names) > keep {
-		os.Remove(filepath.Join(upgradeBackupDir(), names[0]))
-		names = names[1:]
+	var list []bk
+	for _, e := range ents {
+		// 备份名是 guijia-<运行版>-<时间戳>, 运行版在发布包里带 v 前缀、
+		// 开发版可能不带, 故只排除看门狗副本, 不按 guijia-v 卡死。
+		if e.IsDir() || !strings.HasPrefix(e.Name(), "guijia-") ||
+			strings.HasPrefix(e.Name(), "guijia-watch-copy-") {
+			continue
+		}
+		mod := time.Time{}
+		if fi, err := e.Info(); err == nil {
+			mod = fi.ModTime()
+		}
+		list = append(list, bk{name: e.Name(), mod: mod})
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if !list[i].mod.Equal(list[j].mod) {
+			return list[i].mod.After(list[j].mod)
+		}
+		return list[i].name > list[j].name
+	})
+	if len(list) > keep {
+		for _, b := range list[keep:] {
+			os.Remove(filepath.Join(upgradeBackupDir(), b.name))
+		}
 	}
 }
 
@@ -602,11 +639,28 @@ func cliUpgradeWatch(markerPath string) int {
 	return code
 }
 
+// reconcileFailedUpgradeStatusByVersion: 失败状态按实际版本复核(根治 2026-10-28 假失败)。
+// 旧进程重启时被 SIGTERM 误判写下的 failed, 若运行中二进制已是 target,
+// 说明升级实际成功, 自动纠正为 done 并清空错误; 版本对不上则原样保留
+// (真失败必须继续显示, 不许掩盖)。与 marker 逻辑无关, 必须每次启动都跑:
+// marker 被消费后, 这条错误记录否则永远得不到纠正。
+func reconcileFailedUpgradeStatusByVersion() {
+	st := loadUpgradeStatus()
+	if st.State != "failed" || st.Target == "" {
+		return
+	}
+	if c, err := compareVersions(appVersion, st.Target); err == nil && c == 0 {
+		setUpgradeStatus("done", st.Target, "", "")
+	}
+}
+
 // upgradeReconcileOnStart: 启动时收尾上次升级留下的 marker。
 // marker 新鲜(看门狗可能还活着)不动; 陈旧(看门狗已死)则按当前版定 done/failed 并删 marker。
 // 顺带清理 24 小时以上的看门狗残留副本(被杀掉的看门狗留下的); 现行看门狗最长存活
 // 约超时+重启余量(默认 60 秒级), 24 小时阈值绝不会误删活着的看门狗副本。
+// 另: 无论 marker 在不在, 先按实际版本复核一次失败状态(见上)。
 func upgradeReconcileOnStart() {
+	reconcileFailedUpgradeStatusByVersion()
 	if names, err := os.ReadDir(upgradeBackupDir()); err == nil {
 		for _, n := range names {
 			if !strings.HasPrefix(n.Name(), "guijia-watch-copy-") {
@@ -723,8 +777,20 @@ func runUpgradeApply(target string) {
 		return
 	}
 	if err := upgradeRestartFunc(); err != nil {
-		// 重执行失败 = 旧进程还在, 当场还原, 看门狗见 marker 消失会静默退出。
-		_ = restoreUpgradeBackup(backup, exe)
+		if restartKilledBySignal(err) {
+			// 重启命令死于信号 = 服务停止正在杀 cgroup, 不是重启失败:
+			// 不写 failed、不删 marker、不还原, 状态保持 applying,
+			// 看门狗或新进程启动核对按实际版本收尾。
+			return
+		}
+		// 真正的重启失败: 旧进程还在, 尝试还原; 只有还原成功才称已回滚,
+		// 还原失败必须如实写回滚失败, 禁止在未还原时宣称回滚。
+		if rerr := restoreUpgradeBackup(backup, exe); rerr != nil {
+			os.Remove(upgradeMarkerPath())
+			setUpgradeStatus("failed", latest, "重启失败, 回滚失败: "+rerr.Error(), rel.HTMLURL)
+			return
+		}
+		// 还原成功, 看门狗见 marker 消失会静默退出。
 		os.Remove(upgradeMarkerPath())
 		setUpgradeStatus("failed", latest, "重启失败, 已回滚: "+err.Error(), rel.HTMLURL)
 		return
