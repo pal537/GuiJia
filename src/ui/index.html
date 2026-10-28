@@ -597,13 +597,8 @@ body.auth #loginView{margin:auto}
       <div class="sline" id="panelPortHint" style="margin-top:8px;display:none"></div>
     </div>
     <div class="panel" style="margin-bottom:14px" id="pairCard">
-      <div class="ph"><h2 class="mtitle">生成配对码</h2><span class="hint">给新服务器加入本机（主服务器）用</span></div>
-      <div class="hint">配对码一次性、30 分钟有效、用完即废。把码填到新服务器首次打开面板的“连接到主服务器”里；节点加入后在下方待添加列表点确认，确认后首页出现该服务器卡片。</div>
-      <div class="frow"><div class="fl">配对码<div class="d">点生成后显示，有效期 30 分钟</div></div><div class="fv"><button class="btn primary" id="btnPairGen">生成配对码</button></div></div>
-      <div id="pairCodeBox" style="display:none">
-        <div class="frow"><div class="fl">新配对码</div><div class="fv"><span class="mono" id="pairCodeTx" style="font-size:16px;letter-spacing:1px"></span><button class="btn" id="btnPairCopy">复制</button></div></div>
-        <div class="frow"><div class="fl">有效期至</div><div class="fv"><span class="mono" id="pairCodeExp"></span></div></div>
-      </div>
+      <div class="ph"><h2 class="mtitle">群控设置</h2><span class="hint">接入主服务器（被控）或生成配对码（控制子服务器）</span></div>
+      <div class="frow"><div class="fl">多服务器<div class="d">本机可接入主服务器成为被控节点，也可作为主服务器生成配对码接纳子服务器</div></div><div class="fv"><button class="btn" id="btnJoinHub">接入主服务器（被控）</button><button class="btn primary" id="btnPairGen2">生成配对码（控制子服务器）</button></div></div>
       <div class="hint" id="pairMsg" style="margin:0 0 10px"></div>
       <div style="border-top:1px solid var(--line);margin:6px 0 0"></div>
       <div class="frow"><div class="fl">待添加节点<div class="d">节点填码加入后出现在这里，点确认即登记上线</div></div><div class="fv"><button class="btn" id="btnPairRefresh">刷新</button></div></div>
@@ -2425,9 +2420,10 @@ async function loadUpCard(){
     else{upSetMsg('');}
   }
 }
-/* 配对卡: 设置页 → 面板设置卡正下方; 仅本机视图, 看节点时隐藏(配对是主服务器本地动作, 只走 apiLocal)。
-   生成码调 POST api/nodes/pairing-code(返回 code、expiresAt 秒); 待添加来自 GET api/nodes/servers 的 pending 字段;
-   确认/拒绝调 POST api/nodes/approve、reject(传 fingerprint)。全部反馈只在卡内, 不弹顶部提示。 */
+/* 群控模块: 设置页 → 面板设置卡正下方; 仅本机视图, 看节点时隐藏(群控是本机动作, 只走 apiLocal)。
+   两个按钮都开弹窗: 接入主服务器调 POST api/setup/join-hub(主服务器地址 + 配对码, 错码弹窗内报错、模式不动);
+   生成配对码调 POST api/nodes/pairing-code(返回 code、expiresAt 秒)。待添加来自 GET api/nodes/servers 的 pending 字段;
+   确认/拒绝调 POST api/nodes/approve、reject(传 fingerprint)。全部反馈只在卡内或弹窗内, 不弹顶部提示。 */
 let pairBusy=false;
 /* 配对卡状态文字统一走状态线样式(第 2 项) */
 function pairSetMsg(t){const el=$('#pairMsg');if(!t){el.textContent='';el.className='hint';return;}
@@ -2466,40 +2462,62 @@ async function pairDecide(fp,ok){
     await refreshHomeNav();
   }catch(e){pairPendMsg((ok?'确认失败：':'拒绝失败：')+e.message,true);}
 }
-let pairExpSec=0, pairHasCode=false;
 async function loadPairCard(){
   const card=$('#pairCard');
   if(curServer){card.style.display='none';return;}
   card.style.display='';
-  // 已生成的码过期后提示重生成(反馈只在卡内)。
-  if(pairHasCode&&pairExpSec&&Date.now()/1000>pairExpSec){
-    $('#pairCodeExp').textContent='已过期，请重新生成';
-    pairSetMsg('配对码已过期，请重新生成。');
-  }
   await loadPairPending();
 }
-$('#btnPairGen').onclick=async()=>{
-  if(pairBusy)return;pairBusy=true;
-  const b=$('#btnPairGen');b.disabled=true;const old=b.textContent;b.textContent='正在生成…';pairSetMsg('');
-  try{
-    const d=await apiLocal('POST','api/nodes/pairing-code',{});
-    $('#pairCodeTx').textContent=d.code;
-    $('#pairCodeExp').textContent=fmtTs(d.expiresAt*1000);
-    $('#pairCodeBox').style.display='';
-    pairExpSec=d.expiresAt;pairHasCode=true;
-    pairSetMsg('配对码已生成，30 分钟内有效，用完即废。');
-    b.textContent='重新生成';
-    await loadPairPending();
-  }catch(e){pairSetMsg('生成失败：'+e.message);b.textContent=old;}
-  b.disabled=false;pairBusy=false;
-};
-$('#btnPairCopy').onclick=async()=>{
-  const code=$('#pairCodeTx').textContent;if(!code)return;
-  let ok=false;
-  try{await navigator.clipboard.writeText(code);ok=true;}
-  catch(e){const ta=document.createElement('textarea');ta.value=code;document.body.appendChild(ta);ta.select();try{ok=document.execCommand('copy');}catch(e2){}ta.remove();}
-  pairSetMsg(ok?'已复制到剪贴板。':'复制失败，请手动选中复制。');
-};
+/* 弹窗内反馈统一走这条(空 = 隐藏, ok = 绿线, 否则红线), 绝不弹顶部提示。 */
+function cmMsg(id,t,ok){const el=$(id);if(!el)return;if(!t){el.style.display='none';el.textContent='';return;}el.textContent=t;el.className=ok?'sline ok':'sline fail';el.style.display='';}
+function openPairGenModal(){
+  openCModal('<h3 class="mtitle">生成配对码（控制子服务器）</h3><div class="csub">配对码一次性、30 分钟有效、用完即废。把码填到新服务器的“接入主服务器”里；节点加入后在本页下方待添加列表点确认，确认后首页出现该服务器卡片。</div>'+
+    '<div class="fld"><label>配对码</label><div style="display:flex;gap:8px;align-items:center"><span class="mono" id="cmPairCode" style="font-size:16px;letter-spacing:1px">点生成后显示</span><button class="btn" id="cmPairCopy">复制</button></div></div>'+
+    '<div class="fld"><label>有效期至</label><span class="mono" id="cmPairExp">—</span></div>'+
+    '<div class="sline" id="cmPairMsg" style="display:none"></div>'+
+    '<div style="display:flex;gap:10px"><button class="btn" id="cmPairClose">关闭</button><button class="btn primary" id="cmPairGen">生成配对码</button></div>');
+  $('#cmPairClose').onclick=closeCModal;
+  $('#cmPairGen').onclick=async()=>{
+    if(pairBusy)return;pairBusy=true;
+    const b=$('#cmPairGen');b.disabled=true;const old=b.textContent;b.textContent='正在生成…';cmMsg('#cmPairMsg','');
+    try{
+      const d=await apiLocal('POST','api/nodes/pairing-code',{});
+      $('#cmPairCode').textContent=d.code;
+      $('#cmPairExp').textContent=fmtTs(d.expiresAt*1000);
+      cmMsg('#cmPairMsg','配对码已生成，30 分钟内有效，用完即废。',true);
+      b.textContent='重新生成';
+      await loadPairPending();
+    }catch(e){cmMsg('#cmPairMsg','生成失败：'+e.message,false);b.textContent=old;}
+    b.disabled=false;pairBusy=false;
+  };
+  $('#cmPairCopy').onclick=async()=>{
+    const code=$('#cmPairCode').textContent;if(!code||code==='点生成后显示')return;
+    let ok=false;
+    try{await navigator.clipboard.writeText(code);ok=true;}
+    catch(e){const ta=document.createElement('textarea');ta.value=code;document.body.appendChild(ta);ta.select();try{ok=document.execCommand('copy');}catch(e2){}ta.remove();}
+    cmMsg('#cmPairMsg',ok?'已复制到剪贴板。':'复制失败，请手动选中复制。',ok);
+  };
+}
+function openJoinHubModal(){
+  openCModal('<h3 class="mtitle">接入主服务器（被控）</h3><div class="csub">接入后，本机面板变为只读状态页，全部管理都在主服务器上进行；本机原有防护数据不动，防护继续在本机生效。脱离办法：主服务器上移除管理（本机恢复成本地独立面板），或主服务器彻底没了时用本机命令 guijia leave 兜底。本机如已有子服务器，接入会被拒绝，请先移除全部子服务器。</div>'+
+    '<div class="fld"><label>主服务器地址</label><input id="cmJoinUrl" placeholder="如 https://主服务器IP:59188"></div>'+
+    '<div class="fld"><label>配对码</label><input id="cmJoinCode" placeholder="主服务器面板生成的配对码"></div>'+
+    '<div class="sline fail" id="cmJoinMsg" style="display:none"></div>'+
+    '<div style="display:flex;gap:10px"><button class="btn" id="cmJoinCancel">取消</button><button class="btn primary" id="cmJoinOk">确认接入</button></div>');
+  $('#cmJoinCancel').onclick=closeCModal;
+  $('#cmJoinOk').onclick=async()=>{
+    const hubUrl=$('#cmJoinUrl').value.trim();const code=$('#cmJoinCode').value.trim();
+    if(!hubUrl||!code){cmMsg('#cmJoinMsg','主服务器地址与配对码不能为空',false);return;}
+    const b=$('#cmJoinOk');b.disabled=true;const old=b.textContent;b.textContent='正在校验配对码…';cmMsg('#cmJoinMsg','');
+    try{
+      await apiLocal('POST','api/setup/join-hub',{hubUrl,code});
+      cmMsg('#cmJoinMsg','已接入，主服务器确认后本机面板变为只读状态页，正在刷新…',true);
+      setTimeout(()=>{location.reload();},1500);
+    }catch(e){cmMsg('#cmJoinMsg',e.message,false);b.disabled=false;b.textContent=old;}
+  };
+}
+$('#btnPairGen2').onclick=()=>{openPairGenModal();};
+$('#btnJoinHub').onclick=()=>{openJoinHubModal();};
 $('#btnPairRefresh').onclick=()=>{loadPairPending();};
 $('#btnUpCheck').onclick=async()=>{
   if(upBusy)return;

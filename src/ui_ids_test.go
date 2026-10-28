@@ -28,10 +28,10 @@ func TestUIIDs(t *testing.T) {
 		"btnPanelPortSave",      // 设置页面板端口保存按钮
 		"panelPortHint",         // 面板端口提示行
 		"pairCard",              // 设置页生成配对码卡片(面板设置卡正下方)
-		"btnPairGen",            // 生成配对码按钮
-		"pairCodeTx",            // 生成的配对码显示
-		"pairCodeExp",           // 配对码有效期显示
-		"btnPairCopy",           // 配对码复制按钮
+		"btnPairGen2",           // 生成配对码按钮(弹窗入口, 群控模块)
+		"cmPairCode",            // 生成配对码弹窗内码显示
+		"cmPairExp",             // 生成配对码弹窗内有效期显示
+		"cmPairCopy",            // 生成配对码弹窗内复制按钮
 		"pairMsg",               // 配对卡内状态行
 		"pairPending",           // 待添加节点列表区
 		"pairPendingMsg",        // 待添加区状态行
@@ -69,7 +69,9 @@ func TestUIIDs(t *testing.T) {
 		"已添加 ",                  // 批准成功提示文案
 		"点击首页可查看管理",             // 批准成功提示文案
 		"重新生成",                  // 配对码二次生成按钮文案
-		"已过期，请重新生成",             // 配对码过期提示
+		"btnJoinHub",                // 接入主服务器按钮(弹窗入口, 群控模块)
+		"openJoinHubModal",          // 接入主服务器弹窗构建函数
+		"openPairGenModal",          // 生成配对码弹窗构建函数
 		"设置归属地",                 // 卡片设置菜单内归属地项(原卡片按钮已改菜单)
 		"移除管理",                  // 卡片设置菜单内移除项(原卡片按钮已改菜单)
 		`data-act="menu"`,       // 卡片左下角设置菜单按钮

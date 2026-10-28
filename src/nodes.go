@@ -417,6 +417,90 @@ func handleSetupMode(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// hubRegisteredCount: 本机作为主服务器已登记的子服务器数（待添加不算）。
+func hubRegisteredCount() int {
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	n := 0
+	for _, s := range hubServers {
+		if s != nil {
+			n++
+		}
+	}
+	return n
+}
+
+// handleSetupJoinHub: 已登录管理员把独立面板转为被控节点（设置页“接入主服务器”弹窗）。
+// 未登录由中间件挡（不在 authPublic 里）；被控节点由中间件先 403，这里再防一层。
+// 流程与首次加入一致：先同步校验配对码（错码模式不动）→ 通过才翻转模式并起拨号器，本地数据不动。
+// 本机已有已登记子服务器时直接拒绝：接入后原有子服务器会失去主服务器，不许静默孤儿化。
+func handleSetupJoinHub(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	mode := effectiveRunMode()
+	if mode == "managed" {
+		errJSON(w, 403, "本机已被主服务器群控，管理请去主服务器面板")
+		return
+	}
+	if mode == "" {
+		errJSON(w, 400, "请先选择运行模式")
+		return
+	}
+	if hubRegisteredCount() > 0 {
+		errJSON(w, 400, "请先移除全部子服务器")
+		return
+	}
+	var in struct {
+		HubURL string `json:"hubUrl"`
+		Code   string `json:"code"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	hubURL := strings.TrimSpace(in.HubURL)
+	code := strings.TrimSpace(in.Code)
+	if hubURL == "" || code == "" {
+		errJSON(w, 400, "主服务器地址与配对码不能为空")
+		return
+	}
+	if len(hubURL) > 512 || len(code) > 128 {
+		errJSON(w, 400, "地址或配对码过长")
+		return
+	}
+	u, err := url.Parse(hubURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		errJSON(w, 400, "主服务器地址无效，须为 http(s) 地址")
+		return
+	}
+	hubURL = strings.TrimRight(hubURL, "/")
+	// 本次接入为准：先清掉上次回退残留的失败标记。
+	mu.Lock()
+	settings.JoinError = ""
+	saveSettings()
+	mu.Unlock()
+	// 落盘翻转模式前先向主服务器同步校验一次码：错码直接回错误，
+	// 不写 managed 模式，弹窗 inline 显示错误、可无限重输。
+	if _, err := validatePairingCode(hubURL, code); err != nil {
+		errJSON(w, 400, err.Error())
+		return
+	}
+	mu.Lock()
+	settings.RunMode = "managed"
+	settings.HubURL = hubURL
+	settings.HubName = ""
+	settings.HubID = ""
+	saveSettings()
+	mu.Unlock()
+	// 码已被主服务器接受并消耗（pending 已建），本地不再留盘；
+	// 拨号器凭指纹 hello 即回 pending，等确认。
+	setLinkState("joining", "")
+	startLinkLoop() // 本进程内立即起拨号器，不等重启
+	writeJSON(w, 200, map[string]any{"ok": true, "linkState": "joining"})
+}
+
 // handleNodeStatus 被群控节点的只读状态页数据(公开接口, 无管理操作)。
 func handleNodeStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {

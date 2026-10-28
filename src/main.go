@@ -570,6 +570,7 @@ func main() {
 	mux.HandleFunc("/api/auth/totp/disable", handleAuthTOTPDisable)
 	mux.HandleFunc("/api/auth/totp/verify", handleAuthTOTPVerify)
 	mux.HandleFunc("/api/setup/mode", handleSetupMode)
+	mux.HandleFunc("/api/setup/join-hub", handleSetupJoinHub)
 	mux.HandleFunc("/api/node/status", handleNodeStatus)
 	mux.HandleFunc("/api/nodes/pairing-code", handlePairingCode)
 	mux.HandleFunc("/api/nodes/servers", handleNodeServers)
