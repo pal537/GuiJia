@@ -2,6 +2,12 @@
 
 Linux 公网服务器（VPS / 云服务器）的安全防护面板：实时连接监控、入侵防护、蜜罐诱捕、多服务器群控。Go 单二进制 + nftables，systemd 或 Docker 运行。
 
+## 一键安装
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/pal537/GuiJia/main/install-remote.sh | sudo bash
+```
+
 > 本仓库是通用版，与飞牛 fnOS 版彻底分开。飞牛版独立维护，不在这里。
 >
 > 下面的截图全部来自本地演示实例与假数据（演示服务器名、文档段 IP、example.com 域名），不是生产面板截图。公开仓库里不放任何真实服务器信息。
@@ -265,34 +271,6 @@ systemctl restart guijia
 
 装完必验：`sha256sum /usr/local/bin/guijia` 与 releases 一致，`systemctl is-active guijia` 为 active，面板本地 `curl http://127.0.0.1:59188/login` 为 200。
 
-### Docker 方式（一键命令）
-
-前置：已装 git、Docker 与 compose 插件，root（或 docker 组）运行。仓库目前没有发布 Docker Hub 镜像，所以 Docker 方式是本地构建，一条命令拉仓库 + 构建 + 启动：
-
-```bash
-git clone https://github.com/pal537/GuiJia.git && cd GuiJia && docker compose up -d --build
-```
-
-这条命令会：克隆仓库 → 本地多阶段构建镜像（golang 构建，标准库 only）→ host 网络 + NET_ADMIN 启动容器。装完打开 `http://服务器IP:59188`，设管理员密码后二选一（独立用 / 进群控），与 systemd 方式一致。
-
-可配（`docker compose up -d` 前传环境变量）：
-
-```bash
-GUIJIA_PORT=59188 GUIJIA_DATA_DIR=/srv/guijia docker compose up -d --build
-```
-
-默认数据在仓库目录下的 `guijia-data`；端口默认 59188（host 网络下即宿主机端口）。
-
-管理（在 GuiJia 目录下执行）：
-
-```bash
-docker compose logs -f
-docker restart guijia
-docker compose down
-```
-
-注意：不要与 systemd 双跑（同一台机上双跑会抢端口与 nft 表）。Docker 方式下宿主机 SSH 日志探测与蜜罐容器探测受限（容器默认读容器内 `/var/log`，未挂 docker.sock），细节见 `INSTALL.md`。
-
 ### 注意
 
 - 面板重启后内存 session 清空，需重新登录
@@ -307,7 +285,6 @@ docker compose down
 - **节点离线了，防护还在吗？** 在。节点防护全独立、数据全在各台本地，主服务器挂了不影响节点防护；节点事件会本地攒着，重连后补推。
 - **被自己封在外面了？** 内网永远是活路；TG /rescue 可解封（破坏性动作要超级密码）；TG 也救不了时，SSH 上去改 bans.json 或清 nft 规则。
 - **重点端口显示 0 是什么意思？** 重点端口恒 0 的常见原因：反代连接是 nginx 从回环发起、采集层过滤回环；443 为多站共用，TCP 层无法识别用途。
-- **Docker 方式下 SSH 日志探测不到？** 容器默认读容器内 `/var/log`，宿主机 SSH 日志需另行只读挂载 `-v /var/log:/var/log:ro`（默认不挂）。
 
 ## 作者
 
