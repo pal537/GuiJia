@@ -14,6 +14,8 @@ body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;backg
 svg{display:block}
 button{font-family:inherit;cursor:pointer}
 input,select,textarea{font-family:inherit;font-size:13.5px;color:var(--txt);background:#fff;border:1px solid var(--line);border-radius:9px;padding:7px 10px;outline:none;transition:border-color .15s, box-shadow .15s}
+/* 全站选择框与输入框同高(36px): 复选框/单选/文件框/多行框除外, 登录页 44px 高 inputs 靠更高特异性覆盖 */
+input:not([type=checkbox]):not([type=radio]):not([type=file]),select{height:36px;box-sizing:border-box}
 input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(37,99,235,.18)}
 .top{display:flex;align-items:center;gap:12px;padding:2px 2px 14px}
 .logo{width:42px;height:42px;border-radius:11px;overflow:hidden;flex:0 0 auto}.logo img{width:42px;height:42px;display:block}
@@ -151,8 +153,8 @@ tr.trusted td{background:#f7f9fc;opacity:.72}
 .ops{display:flex;gap:8px;white-space:nowrap}
 .trustedlab{font-size:12.5px;color:var(--mut);display:inline-flex;align-items:center;gap:5px}
 .bannedlab{font-size:12.5px;color:var(--red);font-weight:600}
-#pop{position:absolute;width:320px;background:var(--card);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadowPop);padding:14px 16px 13px;z-index:60;display:none}
-#pop:before{content:"";position:absolute;top:-6px;width:11px;height:11px;background:var(--card);border-left:1px solid var(--line);border-top:1px solid var(--line);transform:rotate(45deg)}
+#pop{position:absolute;width:320px;background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadowPop);padding:14px 16px 13px;z-index:60;display:none}
+#pop:before{content:"";position:absolute;top:-6px;width:11px;height:11px;background:#fff;border-left:1px solid var(--line);border-top:1px solid var(--line);transform:rotate(45deg)}
 #pop.up:before{top:auto;bottom:-6px;transform:rotate(225deg)}
 #pop .pt{font-size:13.5px;font-weight:700}
 #pop .pw{color:var(--mut);font-size:12px;margin:3px 0 11px;font-variant-numeric:tabular-nums}
@@ -202,11 +204,11 @@ tr.trusted td{background:#f7f9fc;opacity:.72}
 .msel.open .msel-drop{display:block}
 .msel-search{width:100%;margin-bottom:6px;box-sizing:border-box}
 .msel-list{max-height:260px;overflow:auto}
-.msel-row{display:flex;gap:8px;align-items:center;padding:7px 8px;font-size:13.5px;border-radius:8px;cursor:pointer}
+.msel-row{display:grid;grid-template-columns:20px 1fr;gap:8px;align-items:center;padding:7px 8px;font-size:13.5px;border-radius:8px;cursor:pointer}
 .msel-row:hover{background:rgba(37,99,235,.07)}
-.msel-row input[type=checkbox]{flex:0 0 auto;width:auto;min-width:0;margin:0;accent-color:var(--blue2)}
+.msel-row input[type=checkbox]{grid-column:1;width:16px;height:16px;min-width:0;margin:0;accent-color:var(--blue2)}
 .msel-row input[type=checkbox]:checked+span{color:var(--blue2);font-weight:600}
-.msel-row span{flex:1;min-width:0;text-align:left}
+.msel-row span{grid-column:2;min-width:0;text-align:left}
 .msel-row span i{font-style:normal;color:var(--mut);font-weight:400}
 .scard .savebar{padding:10px 18px 0;display:flex;align-items:center;gap:10px}
 .savedtip{color:var(--green);font-size:12px;display:none}
@@ -227,7 +229,7 @@ textarea.ta{width:calc(100% - 36px);margin:6px 18px 0;min-height:92px;resize:ver
 /* 居中弹窗(反代新增/编辑/删除确认): 不用原生 prompt/confirm */
 #cmodal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:80;padding:16px}
 #cmodal.open{display:flex}
-.cmcard{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadowPop);width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:18px 20px 16px}
+.cmcard{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadowPop);width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:18px 20px 16px}
 .cmcard h3{font-size:15px;font-weight:700;margin-bottom:4px}
 .cmcard .csub{color:var(--mut);font-size:12.5px;margin-bottom:14px;line-height:1.6}
 .cmcard .fld{margin-bottom:12px}
@@ -235,7 +237,7 @@ textarea.ta{width:calc(100% - 36px);margin:6px 18px 0;min-height:92px;resize:ver
 .cmcard .fld input,.cmcard .fld select,.cmcard .fld textarea{width:100%}
 .cmcard .fld .hint{color:var(--mut);font-size:12px;margin-top:4px}
 .cmcard .cfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
-.msgbox{border:1px solid var(--line);background:#f6f8fb;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.6;min-height:20px}
+.msgbox{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.6;min-height:20px}
 .msgbox.ok{border-color:#bfe3d0;background:#eefaf3;color:#137a4b}
 .msgbox.err{border-color:#f0c2bd;background:#fdf0ee;color:#b3261e}
 .cmcard .cfoot .btn{padding:7px 16px}
@@ -287,10 +289,25 @@ body.auth #loginView{margin:auto}
 .seg button.sel,.fchip.on{box-shadow:0 4px 14px rgba(37,99,235,.35)}
 /* 开关只统一外观(焦点柔光), 语义与事件一律不动 */
 .sw input:focus-visible + i{box-shadow:0 0 0 3px rgba(37,99,235,.18)}
-/* 弹窗: 按钮 pill 由 .btn 覆盖; 输入框/下拉框/textarea 圆角 + 聚焦柔光由全局规则覆盖; 弹窗卡片同款玻璃 */
-.cmcard{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 14px 34px rgba(16,24,40,.18)}
-#pop{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 14px 34px rgba(16,24,40,.18)}
-#pop:before{background:color-mix(in srgb, var(--card) 88%, transparent)}
+/* 弹窗: 按钮 pill 由 .btn 覆盖; 输入框/下拉框/textarea 圆角 + 聚焦柔光由全局规则覆盖; 弹窗卡片一律纯白底色(绝不用毛玻璃透底, 否则在遮罩上发灰) */
+.cmcard{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadowPop)}
+#pop{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadowPop)}
+#pop:before{background:#fff}
+/* 弹窗内文字对比度: 白底上标签深色、正文深灰, 不用过浅的灰 */
+.cmcard .fld label{color:#3f4c5f;font-weight:600;font-size:13px}
+.cmcard .csub,.cmcard .fld .hint{color:#5b6b80}
+.cmcard .msel-row span i{color:#5b6b80}
+.cmcard input::placeholder,.cmcard textarea::placeholder{color:#7c8798}
+#pop .fld label{color:#3f4c5f;font-weight:600}
+#pop .pw{color:#5b6b80}
+/* 弹窗内表单行: 标签左、控件右, 与页内 .frow 同语言 */
+.cmrow{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.cmrow:last-of-type{border-bottom:none}
+.cmrow .cml{flex:1;min-width:0;font-weight:600;font-size:13.5px}
+.cmrow .cml .d{display:block;font-weight:400;color:#5b6b80;font-size:12px;margin-top:2px}
+.cmrow .cmv{flex:0 0 auto;display:flex;align-items:center;gap:8px}
+/* 版本与升级底部在线节点小框 */
+.statbox{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--blue2);background:rgba(37,99,235,.08);border:1px solid var(--line);border-radius:999px;padding:5px 12px}
 /* 登录按钮同样 pill 化 */
 #loginView .btn.primary{border-radius:999px}
 /* 减动效: 全站悬停抬升与过渡一并关闭(首页与菜单已有规则, 这里补其余) */
@@ -508,7 +525,7 @@ body.auth #loginView{margin:auto}
         <div class="frow"><div class="fl">命中 N 次即封</div><div class="fv"><input type="number" id="hpN" min="1"><span class="mono">次（默认 1 次即封）</span></div></div>
         <div class="frow"><div class="fl">封禁时长 T</div><div class="fv"><input type="number" id="hpT" min="1"><span class="mono">小时（默认 24 小时，不永久）</span></div></div>
         <div class="frow"><div class="fl">自动拉黑<div class="d">默认关；关时命中只记录 + 报警；开时达 N 次走蜜罐封禁（不走递进阶梯）</div></div><div class="fv"><label class="sw"><input type="checkbox" id="hpAuto"><i></i></label></div></div>
-        <div class="frow"><div class="fl">命中报警<div class="d">已移到设置 → 报警项目里统一管理</div></div><div class="fv"><span class="mono">设置 → 报警项目 → 蜜罐命中报警</span></div></div>
+        <div class="frow"><div class="fl">命中报警<div class="d">已移到通知方式 → 通知配置里统一管理</div></div><div class="fv"><span class="mono">设置 → 通知方式 → 通知配置 → 蜜罐命中报警</span></div></div>
         <div class="frow"><div class="fl">今日蜜罐封禁</div><div class="fv"><span class="mono" id="hpBansToday">—</span><span class="mono">（今日拉黑的蜜罐明细）</span></div></div>
         <div id="hpStatusRows"></div>
         <div class="savebar"><button class="btn primary" id="btnHpSave">保存蜜罐设置</button><span class="savedtip">已保存</span></div>
@@ -597,6 +614,7 @@ body.auth #loginView{margin:auto}
         <div class="frow"><div class="fl">Bot Token</div><div class="fv"><input id="sTgToken" type="password" placeholder="123456:ABC-..."></div></div>
         <div class="frow"><div class="fl">Chat ID<div class="d">只认这个会话的拉黑回调</div></div><div class="fv"><input id="sTgChat" placeholder="例如 123456789"></div></div>
         <div class="frow"><div class="fl">连通性测试<div class="d">用当前填写的值发送，无需先保存</div></div><div class="fv"><button class="btn" id="btnTgTest">发送测试消息</button></div></div>
+        <div class="frow"><div class="fl">通知配置<div class="d">报警项目开关：SSH 登录、爆破、连接、面板登录、重点端口、防火墙封禁、蜜罐、新监听等</div></div><div class="fv"><button class="btn" id="btnAlertCfg">通知配置</button></div></div>
         <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
       </div>
 
@@ -606,14 +624,9 @@ body.auth #loginView{margin:auto}
         <div class="frow" id="ntTokenRow"><div class="fl">独立 Bot Token<div class="d">仅独立模式用；只存本机 0600 文件，面板不回显明文</div></div><div class="fv"><input id="ntToken" type="password" placeholder="123456:ABC-..."></div></div>
         <div class="frow" id="ntChatRow"><div class="fl">独立 Chat ID<div class="d">只认这个会话的拉黑回调</div></div><div class="fv"><input id="ntChat" placeholder="例如 123456789"></div></div>
         <div class="frow" id="ntTestRow"><div class="fl">连通性测试<div class="d" id="ntTestDesc">用当前填写的值发送，无需先保存</div></div><div class="fv"><button class="btn" id="btnNtTest">发送测试消息</button></div></div>
+        <div class="frow"><div class="fl">通知配置<div class="d">本节点报警项目开关（走代理接口，与本机视图同一弹窗）</div></div><div class="fv"><button class="btn" id="btnNodeAlertCfg">通知配置</button></div></div>
         <div class="sline" id="ntMsg" style="margin-top:8px;display:none"></div>
         <div class="savebar"><button class="btn primary" id="btnNtSave">保存节点 TG 设置</button></div>
-      </div>
-
-      <div class="scard">
-        <h3 class="mtitle">报警项目</h3>
-        <div id="alertRows"></div>
-        <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
       </div>
 
       <div class="scard">
@@ -642,20 +655,12 @@ body.auth #loginView{margin:auto}
 
       <div class="scard">
         <h3 class="mtitle">数据清理</h3>
-        <div class="frow"><div class="fl">清理范围<div class="d">清空后不可恢复</div></div><div class="fv">
-          <button class="btn danger" data-clear="events">清空事件与统计</button>
-          <button class="btn danger" data-clear="bans">清空黑名单</button>
-          <button class="btn danger" data-clear="ledger">清空流量账本</button>
-          <button class="btn danger" data-clear="all">全部清空</button></div></div>
+        <div class="frow"><div class="fl">数据清理<div class="d">清空事件与统计、黑名单、流量账本；清空后不可恢复</div></div><div class="fv"><button class="btn danger" id="btnCleanupCfg">数据清理</button></div></div>
       </div>
 
       <div class="scard">
         <h3 class="mtitle">备份与恢复</h3>
-        <div class="hint">设置备份 = 全部配置（设置 + 端口 + 蜜罐），不含数据；数据备份 = 黑名单 + 统计 + 事件 + 流量账本。只恢复设置不会带回黑名单，要黑名单必须恢复数据。恢复前自动拍当前快照（data/snapshots，每种最新 5 份，可用同样入口导回）；恢复数据后立即重做 nft 对账。</div>
-        <div class="frow"><div class="fl">备份设置<div class="d">一个 JSON 下载；含 TG 机器人 token，妥善保管、勿外传</div></div><div class="fv"><button class="btn" id="btnDlSettings">下载设置备份</button></div></div>
-        <div class="frow"><div class="fl">备份数据<div class="d">一个 zip 下载，Windows 可直接打开看</div></div><div class="fv"><button class="btn" id="btnDlData">下载数据备份</button></div></div>
-        <div class="frow"><div class="fl">恢复设置<div class="d">上传设置备份 JSON；版本不匹配会先警告</div></div><div class="fv"><input type="file" id="upSettings" accept=".json" style="display:none"><button class="btn" id="btnUpSettings">选择文件恢复</button></div></div>
-        <div class="frow"><div class="fl">恢复数据<div class="d">上传数据备份 zip；黑名单随数据一起回来</div></div><div class="fv"><input type="file" id="upData" accept=".zip" style="display:none"><button class="btn" id="btnUpData">选择文件恢复</button></div></div>
+        <div class="frow"><div class="fl">备份与恢复<div class="d">设置备份、数据备份、恢复设置、恢复数据</div></div><div class="fv"><button class="btn" id="btnBackupCfg">备份与恢复</button></div></div>
       </div>
     <div class="panel" style="margin-bottom:14px" id="upCard">
       <div class="ph"><h2 class="mtitle">版本与升级</h2><span class="hint">升级会重启面板，重启后请重新登录</span></div>
@@ -1901,7 +1906,7 @@ async function loadPortGuard(){
     let mid,actions;
     if(r.source){
       const portTx=(r.portText||'').trim()==='1-65535'?'全部端口':(r.portText||'');
-      mid='<span class="st">端口 '+esc(portTx)+'</span><span class="dt">'+fwProtoLabel(r.proto)+'</span><span class="dt">'+esc(fwSourceSummary(r.source))+'</span><span class="dt"'+(r.action==='deny'?' style="color:var(--red)"':'')+'>'+(r.action==='deny'?'拒绝':'允许')+'</span><span class="dt">'+(r.banHours>0?('封 '+r.banHours+' 小时'):'永久封禁')+'</span>';
+      mid='<span class="st">端口 '+esc(portTx)+'</span><span class="dt">'+fwProtoLabel(r.proto)+'</span><span class="dt">'+esc(fwSourceSummary(r.source))+'</span><span class="dt"'+(r.action==='deny'?' style="color:var(--red)"':'')+'>'+(r.action==='deny'?'拒绝':'允许')+'</span>';
       actions='<button class="btn sm" data-fwedit="'+r.id+'">编辑</button>';
     }else{
       // 旧格式(混用版本节点视图): 只读展示, 无编辑(编辑需新版后端)
@@ -1924,7 +1929,7 @@ async function openFwDialog(rule){
   fwSelForeign=rule&&rule.source&&rule.source.kind==='custom_foreign'?[...(rule.source.countries||[])]:[];
   fwSelLocs=rule&&rule.source&&rule.source.kind==='custom_cn'?(rule.source.locations||[]).map(l=>{const d=fwLocDisplay(l);return {kind:l.kind,name:l.name,province:l.province||'',display:d}}):[];
   const srcCidr=rule&&rule.source?rule.source.cidr||'':'';
-  const html='<h3 class="mtitle">'+(isNew?'添加规则':'编辑规则')+'</h3><div class="csub">端口被任一生效规则覆盖即受防护；多条命中时拒绝优先于允许；无规则命中时按受防护端口默认封禁；内网、回环与信任名单永远豁免。</div>'+
+  const html='<h3 class="mtitle">'+(isNew?'添加规则':'编辑规则')+'</h3><div class="csub">端口被任一生效规则覆盖即受防护；多条命中时拒绝优先于允许；无规则命中时按受防护端口默认封禁；内网、回环与信任名单永远豁免。拒绝命中与默认封禁一律永久封禁，直到规则删除、禁用或手动解封才释放。</div>'+
   (knownKind?'':'<div class="sline fail">该节点版本较旧（规则类型 '+esc(srcKind)+'），请先升级节点再编辑；卡片上的启用开关仍可用。</div>')+
   '<div class="fld"><label>网络连接</label><select id="fwNet"><option value="all">全部（所有网卡入站连接）</option></select><div class="hint">规则适用于全部网卡的入站连接</div></div>'+
   '<div class="fld"><label>通信协议</label><select id="fwProto"><option value="all">全部</option><option value="tcp">TCP</option><option value="udp">UDP</option></select></div>'+
@@ -1940,7 +1945,6 @@ async function openFwDialog(rule){
   '</div>'+
   '<div class="fld"><label>动作</label><div class="seg" id="fwActionSeg"><button type="button" data-v="allow">允许</button><button type="button" data-v="deny">拒绝</button></div></div>'+
   '<div class="fld"><label>状态</label><div class="seg" id="fwEnabledSeg"><button type="button" data-v="1">生效</button><button type="button" data-v="0">禁用</button></div></div>'+
-  '<div class="fld"><label>封禁时长</label><input type="number" id="fwHours" min="0" max="8760" placeholder="24" value="'+(rule?String(rule.banHours):'')+'"><div class="hint">小时；0 = 永久，留空 = 24 小时</div></div>'+
   '<div class="sline fail" id="fwErr" style="display:none"></div>'+
   '<div class="cfoot"><button class="btn" id="fwCancel">取消</button><button class="btn primary" id="fwOk"'+(knownKind?'':' disabled')+'>'+(isNew?'添加':'保存')+'</button></div>';
   openCModal(html);
@@ -1977,14 +1981,11 @@ async function openFwDialog(rule){
     }
     const action=$('#fwActionSeg button.sel').dataset.v;
     const enabled=$('#fwEnabledSeg button.sel').dataset.v==='1';
-    const hv=$('#fwHours').value.trim();
-    const banHours=hv==='' ? 24 : +hv;
-    if(!(banHours>=0&&banHours<=8760))return fail('封禁时长须在 0-8760 小时之间（0 = 永久）');
     try{
       if(isNew){
-        await api('POST','api/portguard',{portText,proto,source:src,action,banHours});
+        await api('POST','api/portguard',{portText,proto,source:src,action});
       }else{
-        await api('PUT','api/portguard/'+rule.id,{portText,proto,source:src,action,banHours,enabled});
+        await api('PUT','api/portguard/'+rule.id,{portText,proto,source:src,action,enabled});
       }
       closeCModal();toast(isNew?'规则已添加':'规则已修改');loadPortGuard();
     }catch(e){fail(e.message)}
@@ -2260,12 +2261,11 @@ const ALERTROWS=[
  ['sAlHpHit','alertHoneypotHit','蜜罐命中报警','蜜罐端口被命中、触发封禁时推送；同一 IP 10 分钟内命中只报一次'],
  ['sAlLis','alertNewListener','新监听端口出现','新端口持续出现后推送'],
  ['sAlMute','alertMuteInternal','内网访问不通知','开启后内网来源只记录、不推送（默认关）']];
-$('#alertRows').innerHTML=ALERTROWS.map(r=>'<div class="frow"><div class="fl">'+r[2]+'<div class="d">'+r[3]+'</div></div><div class="fv"><label class="sw"><input type="checkbox" id="'+r[0]+'"><i></i></label></div></div>').join('');
 let setLoaded=null;
 function fillSettings(s){
   setLoaded=s;
   $('#sTgOn').checked=!!s.tgEnabled;$('#sTgToken').value=s.tgBotToken||'';$('#sTgChat').value=s.tgChatId||'';
-  ALERTROWS.forEach(r=>{$('#'+r[0]).checked=!!s[r[1]]});
+  // 报警项目不在页内平铺, 由通知配置弹窗从 setLoaded 取值(见 openAlertModal), 这里不碰页内元素。
   $('#sAbOn').checked=!!s.autoBanEnabled;$('#sAbWin').value=s.bruteWindowMin;$('#sAbThr').value=s.bruteThreshold;
   $('#sFldOn').checked=!!s.floodEnabled;$('#sFldWin').value=s.floodWindowMin||1;$('#sFldIPs').value=s.floodDistinctIps||30;$('#sFldClose').value=s.floodCloseMin||60;
   $('#sScanOn').checked=!!s.scanEnabled;$('#sScanAlert').checked=s.alertScan!==false;$('#sScanAuto').checked=!!s.scanAutoBan;$('#sScanWin').value=s.scanWindowMin||5;$('#sScanThr').value=s.scanDistinctPorts||5;
@@ -2281,7 +2281,7 @@ function fillSettings(s){
 function collectSettings(){
   const s=Object.assign({},setLoaded||{});
   s.tgEnabled=$('#sTgOn').checked;s.tgBotToken=$('#sTgToken').value.trim();s.tgChatId=$('#sTgChat').value.trim();
-  ALERTROWS.forEach(r=>{s[r[1]]=$('#'+r[0]).checked});
+  // 报警键不在页内收集: 通知配置弹窗只 PUT 报警键, 其余保存走 setLoaded 原值(设置 PUT 缺失键保留)。
   s.autoBanEnabled=$('#sAbOn').checked;s.bruteWindowMin=+$('#sAbWin').value||10;s.bruteThreshold=+$('#sAbThr').value||5;
   s.floodEnabled=$('#sFldOn').checked;s.floodWindowMin=+$('#sFldWin').value||1;s.floodDistinctIps=+$('#sFldIPs').value||30;s.floodCloseMin=+$('#sFldClose').value||60;
   s.scanEnabled=$('#sScanOn').checked;s.alertScan=$('#sScanAlert').checked;s.scanAutoBan=$('#sScanAuto').checked;s.scanWindowMin=+$('#sScanWin').value||5;s.scanDistinctPorts=+$('#sScanThr').value||5;
@@ -2329,7 +2329,7 @@ function upSetMsg(t){const el=$('#upMsg');if(!t){el.textContent='';el.className=
   el.textContent=t;
   el.className=/失败/.test(t)?'sline fail':(/完成|已升级/.test(t)?'sline ok':'sline run');
 }
-function upSetPushMsg(t){const el=$('#upPushMsg');el.innerHTML='';el.textContent=t||'';el.className='hint';}
+function upSetPushMsg(t){const el=$('#upPushMsg');if(!t){el.innerHTML='';el.className='hint';return}el.className='';el.innerHTML='<span class="statbox">'+esc(t)+'</span>';}
 /* 推送升级状态轮询(第 1 项): 推送后每 5 秒查各节点任务, 逐条推进到成功/失败;
    节点重启期间短暂离线不算失败(后端 120 秒宽限), 5 分钟未到目标版判失败 */
 let upPushPoll=null;
@@ -2370,7 +2370,7 @@ function upStartPoll(){
 async function upRefreshPushHint(){
   try{const d=await apiLocal('GET','api/nodes/servers');
     const on=(d.servers||[]).filter(s=>s.status==='online');
-    upSetPushMsg(on.length?('当前 '+on.length+' 台在线节点'):('暂无在线节点'));
+    upSetPushMsg(on.length?('在线节点 '+on.length+' 台'):('暂无在线节点'));
   }catch(e){upSetPushMsg('');}
 }
 /* 版本自动检查(第 3 项 a): 设置页加载时自动查一次最新版本, 结果缓存 1 小时(防抖);
@@ -2649,61 +2649,106 @@ function renderGeoCard(){
   btns.innerHTML='<button class="btn sm" id="btnGeoChk">检查更新</button>';
   geoChkBtn('6','#btnGeoChk');
 }
-$$('[data-clear]').forEach(b=>b.onclick=()=>{
-  const scope=b.dataset.clear;
-  const afterClear=()=>{toast('已清空');if(curTab==='set')loadOverview();if(curTab==='bans')loadBans();};
-  if(scope==='bans'){
-    // 黑名单单独确认: 这是唯一会删除黑名单记录的操作
-    confirmPop(b,'清空黑名单','将解封全部 IP，并删除全部黑名单记录（生效中/已过期/已解封都会清掉）。这是唯一会删记录的操作，确定执行吗？','释放并清空',async()=>{
-      await api('POST','api/data/clear',{scope,confirm:'YES',releaseBans:true});afterClear();
-    });
-    return;
-  }
-  if(scope==='all'){
-    // 全部清空必须单独问黑名单: 不释放则记录与封禁完全不碰
-    openPop(b,'<div class="pt">全部清空</div><div class="pw" style="white-space:normal;font-size:12.5px">清空事件、统计与流量账本。<b>黑名单是否一起释放？</b><br>保留黑名单：记录和封禁完全不动；释放：全部解封并删除记录。</div>'+
-     '<div class="pops"><button class="btn" id="popCancel">取消</button><button class="btn" id="popKeep">保留黑名单</button><button class="btn dangerfill" id="popWipe">释放并清空</button></div>',true);
-    pop.querySelector('#popCancel').onclick=closePop;
-    pop.querySelector('#popKeep').onclick=async()=>{try{await api('POST','api/data/clear',{scope,confirm:'YES',releaseBans:false});closePop();afterClear()}catch(e){toast(e.message)}};
-    pop.querySelector('#popWipe').onclick=async()=>{try{await api('POST','api/data/clear',{scope,confirm:'YES',releaseBans:true});closePop();afterClear()}catch(e){toast(e.message)}};
-    return;
-  }
-  const names={events:'清空全部事件与统计数据',ledger:'清空流量账本（累计总量与每日明细）'};
-  confirmPop(b,'数据清理',names[scope]+'，清空后不可恢复。确定执行吗？','确认清空',async()=>{
-    await api('POST','api/data/clear',{scope,confirm:'YES'});afterClear();
+/* ---------- 通知配置弹窗(报警项目: 原设置页独立模块已并入通知方式) ---------- */
+function cmConfirmView(title, bodyHtml, okLabel, okClass, onOk, onCancel){
+  openCModal('<h3 class="mtitle">'+title+'</h3><div class="csub">'+bodyHtml+'</div><div class="cfoot"><button class="btn" id="cmCfCancel">取消</button><button class="btn '+okClass+'" id="cmCfOk">'+okLabel+'</button></div>');
+  $('#cmCfCancel').onclick=onCancel;
+  $('#cmCfOk').onclick=onOk;
+}
+async function openAlertModal(){
+  if(!setLoaded){try{await loadSettings()}catch(e){openCModal('<h3 class="mtitle">通知配置</h3><div class="sline fail">读取失败：'+esc(e.message)+'</div>');return}}
+  const s=setLoaded;
+  openCModal('<h3 class="mtitle">通知配置</h3><div class="csub">报警项目开关；保存后立即生效，只改报警相关项。</div>'+
+    ALERTROWS.map(r=>'<div class="cmrow"><div class="cml">'+r[2]+'<div class="d">'+r[3]+'</div></div><div class="cmv"><label class="sw"><input type="checkbox" id="cm'+r[0]+'"'+(s[r[1]]?' checked':'')+'><i></i></label></div></div>').join('')+
+    '<div class="sline" id="cmAlertMsg" style="display:none;margin-top:10px"></div>'+
+    '<div class="cfoot"><button class="btn" id="cmAlertCancel">取消</button><button class="btn primary" id="cmAlertSave">保存</button></div>');
+  $('#cmAlertCancel').onclick=closeCModal;
+  $('#cmAlertSave').onclick=async()=>{
+    const body={};ALERTROWS.forEach(r=>{body[r[1]]=$('#cm'+r[0]).checked});
+    const msg=$('#cmAlertMsg');
+    try{await api('PUT','api/settings',body);setLoaded=Object.assign({},setLoaded,body);msg.className='sline ok';msg.style.display='';msg.textContent='已保存';}
+    catch(e){msg.className='sline fail';msg.style.display='';msg.textContent=e.message;}
+  };
+}
+$('#btnAlertCfg').onclick=openAlertModal;
+$('#btnNodeAlertCfg').onclick=openAlertModal;
+/* ---------- 数据清理弹窗(原平铺内容已收进弹窗, 二次确认仍在弹窗内) ---------- */
+function openCleanupModal(status, statusOk){
+  openCModal('<h3 class="mtitle">数据清理</h3><div class="csub">清空后不可恢复。</div>'+
+    '<div class="cmrow"><div class="cml">清空事件与统计</div><div class="cmv"><button class="btn danger" data-cmclear="events">清空</button></div></div>'+
+    '<div class="cmrow"><div class="cml">清空黑名单<div class="d">解封全部 IP，并删除全部黑名单记录（生效中/已过期/已解封都会清掉）。这是唯一会删记录的操作。</div></div><div class="cmv"><button class="btn danger" data-cmclear="bans">清空</button></div></div>'+
+    '<div class="cmrow"><div class="cml">清空流量账本<div class="d">累计总量与每日明细</div></div><div class="cmv"><button class="btn danger" data-cmclear="ledger">清空</button></div></div>'+
+    '<div class="cmrow"><div class="cml">全部清空<div class="d">清空事件、统计与流量账本；黑名单可选择保留或一起释放</div></div><div class="cmv"><button class="btn danger" data-cmclear="all">全部清空</button></div></div>'+
+    (status?'<div class="sline '+(statusOk?'ok':'fail')+'" style="margin-top:10px">'+esc(status)+'</div>':'')+
+    '<div class="cfoot"><button class="btn" id="cmCleanClose">关闭</button></div>');
+  $('#cmCleanClose').onclick=closeCModal;
+  const afterClear=()=>{if(curTab==='set')loadOverview();if(curTab==='bans')loadBans();};
+  const run=async(scope,releaseBans)=>{
+    try{
+      const body={scope,confirm:'YES'};if(releaseBans!==undefined)body.releaseBans=releaseBans;
+      await api('POST','api/data/clear',body);afterClear();openCleanupModal('已清空',true);
+    }catch(e){openCleanupModal(e.message,false);}
+  };
+  document.querySelectorAll('[data-cmclear]').forEach(b=>b.onclick=()=>{
+    const scope=b.dataset.cmclear;
+    if(scope==='bans'){
+      cmConfirmView('清空黑名单','将解封全部 IP，并删除全部黑名单记录（生效中/已过期/已解封都会清掉）。这是唯一会删记录的操作，确定执行吗？','释放并清空','dangerfill',()=>run('bans',true),()=>openCleanupModal());
+      return;
+    }
+    if(scope==='all'){
+      openCModal('<h3 class="mtitle">全部清空</h3><div class="csub">清空事件、统计与流量账本。<b>黑名单是否一起释放？</b><br>保留黑名单：记录和封禁完全不动；释放：全部解封并删除记录。</div><div class="cfoot"><button class="btn" id="cmCfCancel">取消</button><button class="btn" id="cmCfKeep">保留黑名单</button><button class="btn dangerfill" id="cmCfWipe">释放并清空</button></div>');
+      $('#cmCfCancel').onclick=()=>openCleanupModal();
+      $('#cmCfKeep').onclick=()=>run('all',false);
+      $('#cmCfWipe').onclick=()=>run('all',true);
+      return;
+    }
+    const names={events:'清空全部事件与统计数据',ledger:'清空流量账本（累计总量与每日明细）'};
+    cmConfirmView('数据清理',names[scope]+'，清空后不可恢复。确定执行吗？','确认清空','dangerfill',()=>run(scope),()=>openCleanupModal());
   });
-});
-/* ---------- 备份与恢复(第 9 项) ---------- */
+}
+$('#btnCleanupCfg').onclick=()=>openCleanupModal();
+/* ---------- 备份与恢复弹窗(原平铺内容已收进弹窗) ---------- */
 function dlViaA(url){const a=document.createElement('a');a.href=url;document.body.appendChild(a);a.click();a.remove()}
-/* 备份下载防窜(第 9 项): 查看节点时走主服务器按指纹路由的节点备份端点,
+/* 备份下载防窜: 查看节点时走主服务器按指纹路由的节点备份端点,
    文件名带服务器名、内容确为该节点数据; 本机视图仍走本机端点。
    旧写法在节点视图也点本机相对地址, 下的是主服务器自己的备份, 是真窜。 */
 function nodeBackupUrl(kind){
   if(!curServer)return 'api/backup/'+kind;
   return 'api/nodes/backup-download?fp='+encodeURIComponent(curServer)+'&kind='+kind;
 }
-$('#btnDlSettings').onclick=e=>{
-  confirmPop(e.currentTarget,'下载设置备份','设置备份里含 TG 机器人 token，请妥善保管、勿外传。确认下载吗？','确认下载',()=>dlViaA(nodeBackupUrl('settings')));
-};
-$('#btnDlData').onclick=()=>dlViaA(nodeBackupUrl('data'));
-async function restoreUpload(kind,file,confirm){
-  if(curServer)throw new Error('备份恢复暂不支持跨节点，请先切换回本机');
+function openBackupModal(status, statusOk){
+  openCModal('<h3 class="mtitle">备份与恢复</h3><div class="csub">设置备份 = 全部配置（设置 + 端口 + 蜜罐），不含数据；数据备份 = 黑名单 + 统计 + 事件 + 流量账本。只恢复设置不会带回黑名单，要黑名单必须恢复数据。恢复前自动拍当前快照（data/snapshots，每种最新 5 份，可用同样入口导回）；恢复数据后立即重做 nft 对账。</div>'+
+    '<div class="cmrow"><div class="cml">备份设置<div class="d">一个 JSON 下载；含 TG 机器人 token，妥善保管、勿外传</div></div><div class="cmv"><button class="btn" id="cmDlSettings">下载设置备份</button></div></div>'+
+    '<div class="cmrow"><div class="cml">备份数据<div class="d">一个 zip 下载，Windows 可直接打开看</div></div><div class="cmv"><button class="btn" id="cmDlData">下载数据备份</button></div></div>'+
+    '<div class="cmrow"><div class="cml">恢复设置<div class="d">上传设置备份 JSON；版本不匹配会先警告</div></div><div class="cmv"><input type="file" id="cmUpSettings" accept=".json" style="display:none"><button class="btn" id="cmBtnUpSettings">选择文件恢复</button></div></div>'+
+    '<div class="cmrow"><div class="cml">恢复数据<div class="d">上传数据备份 zip；黑名单随数据一起回来</div></div><div class="cmv"><input type="file" id="cmUpData" accept=".zip" style="display:none"><button class="btn" id="cmBtnUpData">选择文件恢复</button></div></div>'+
+    (status?'<div class="sline '+(statusOk?'ok':'fail')+'" style="margin-top:10px">'+esc(status)+'</div>':'')+
+    '<div class="cfoot"><button class="btn" id="cmBkClose">关闭</button></div>');
+  $('#cmBkClose').onclick=closeCModal;
+  $('#cmDlSettings').onclick=()=>{
+    cmConfirmView('下载设置备份','设置备份里含 TG 机器人 token，请妥善保管、勿外传。确认下载吗？','确认下载','primary',()=>{dlViaA(nodeBackupUrl('settings'));openBackupModal('已开始下载',true);},()=>openBackupModal());
+  };
+  $('#cmDlData').onclick=()=>{dlViaA(nodeBackupUrl('data'));openBackupModal('已开始下载',true);};
+  $('#cmBtnUpSettings').onclick=()=>$('#cmUpSettings').click();
+  $('#cmBtnUpData').onclick=()=>$('#cmUpData').click();
+  $('#cmUpSettings').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)restoreUploadModal('settings',f,false);};
+  $('#cmUpData').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)restoreUploadModal('data',f,false);};
+}
+async function restoreUploadModal(kind,file,confirm){
+  if(curServer){openBackupModal('备份恢复暂不支持跨节点，请先切换回本机',false);return;}
   const fd=new FormData();fd.append('file',file);if(confirm)fd.append('confirm','1');
-  const r=await fetch('api/backup/restore/'+kind,{method:'POST',body:fd});
-  const j=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(j.error||('恢复失败('+r.status+')'));
+  let r,j;
+  try{r=await fetch('api/backup/restore/'+kind,{method:'POST',body:fd});j=await r.json().catch(()=>({}));}
+  catch(e){openBackupModal(e.message,false);return;}
+  if(!r.ok){openBackupModal(j.error||('恢复失败('+r.status+')'),false);return;}
   if(j.needConfirm){
-    confirmPop(kind==='settings'?$('#btnUpSettings'):$('#btnUpData'),'版本警告',(j.warnings||[]).join('；')+'。确认继续恢复吗？','确认恢复',async()=>{
-      await restoreUpload(kind,file,true);toast('已恢复');loadSettings();loadBans();loadOverview();
-    });
+    cmConfirmView('版本警告',(j.warnings||[]).join('；')+'。确认继续恢复吗？','确认恢复','primary',async()=>{await restoreUploadModal(kind,file,true);},()=>openBackupModal());
     return;
   }
-  toast('已恢复');loadSettings();loadBans();loadOverview();
+  loadSettings();loadBans();loadOverview();
+  openBackupModal('已恢复',true);
 }
-$('#btnUpSettings').onclick=()=>$('#upSettings').click();
-$('#btnUpData').onclick=()=>$('#upData').click();
-$('#upSettings').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)restoreUpload('settings',f,false).catch(err=>toast(err.message))};
-$('#upData').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)restoreUpload('data',f,false).catch(err=>toast(err.message))};
+$('#btnBackupCfg').onclick=()=>openBackupModal();
 /* ---------- 登录鉴权 ---------- */
 // 加入等待态：码已消耗、等主服务器确认期间留在加入页，不进状态页。
 let joinPoll=null;

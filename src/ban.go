@@ -36,8 +36,9 @@ type Ban struct {
 }
 
 // BanScope: 一条防火墙规则在某封禁记录上的作用域。Ranges 是该规则
-// 封禁时(或编辑后, 以最新规则为准)的端口范围; 规则删除后 Ranges 仍
-// 在记录里, 内核对齐不依赖规则存在, 删除规则不自动解封。
+// 封禁时(或编辑后, 以最新规则为准)的端口范围。规则删除或禁用时, 该规则
+// 的作用域从全部记录里摘掉(见 releaseRuleBans); 摘后无任何作用域且无
+// Ports 的记录改为 released, 仅余其他规则作用域的记录保持生效。
 type BanScope struct {
 	RuleID string   `json:"ruleId"`
 	Ranges [][2]int `json:"ranges"`
@@ -525,11 +526,11 @@ func upsertBanLocked(ip, reason, source string, hours int) *Ban {
 
 // upsertRuleBanLocked 按防火墙规则封禁(调用方须持有 banMu)。
 // 返回 (记录, 是否新封): 已全局生效的 IP 直接返回旧记录、不重复封
-// (全局更广)。同一规则已生效则只刷新时长与原因, 不重复事件;
+// (全局更广)。同一规则已生效则只刷新范围与原因, 不重复事件;
 // 同一 IP 被另一规则封则追加 Scopes(多规则并存, 不新开记录)。
-// 只改状态与封禁字段。ranges 是规则当时的端口范围(存入记录, 规则
-// 删除后仍可对齐, 删除规则不自动解封)。
-func upsertRuleBanLocked(ip, reason, source string, hours int, ruleID string, ranges [][2]int) (*Ban, bool) {
+// 防火墙封禁一律永久(Until=0), 直到规则删除/禁用或手动解封才释放;
+// ranges 是规则当时的端口范围(存入记录)。
+func upsertRuleBanLocked(ip, reason, source string, ruleID string, ranges [][2]int) (*Ban, bool) {
 	now := time.Now()
 	var b *Ban
 	for _, x := range bans {
@@ -551,7 +552,7 @@ func upsertRuleBanLocked(ip, reason, source string, hours int, ruleID string, ra
 	fresh := true
 	for i, s := range b.Scopes {
 		if s.RuleID == ruleID {
-			// 同规则已在记录里: 刷新范围与时长, 不算新封(避免重复事件/TG)
+			// 同规则已在记录里: 刷新范围与原因, 不算新封(避免重复事件/TG)
 			b.Scopes[i].Ranges = append([][2]int{}, ranges...)
 			fresh = false
 			break
@@ -561,22 +562,20 @@ func upsertRuleBanLocked(ip, reason, source string, hours int, ruleID string, ra
 		b.Scopes = append(b.Scopes, BanScope{RuleID: ruleID, Ranges: append([][2]int{}, ranges...)})
 	}
 	b.Reason, b.Source, b.CreatedAt = reason, source, now.Unix()
+	// 防火墙封禁一律永久: Until 恒为 0, 内核超时兜底见 banKernelTimeout(30 天, 应用活着时 reconcile 补齐)。
 	b.Status, b.ReleasedAt, b.Until = BanActive, 0, 0
-	if hours > 0 {
-		b.Until = now.Add(time.Duration(hours) * time.Hour).Unix()
-	}
 	fwAddElement(ip, ruleID, banKernelTimeout(b, now.Unix()))
 	saveBans()
 	return b, fresh
 }
 
-func applyRuleBan(ip, reason, source string, hours int, ruleID string, ranges [][2]int) (*Ban, bool, error) {
+func applyRuleBan(ip, reason, source string, ruleID string, ranges [][2]int) (*Ban, bool, error) {
 	if ok, why := bannable(ip); !ok {
 		return nil, false, fmt.Errorf("%s", why)
 	}
 	banMu.Lock()
 	defer banMu.Unlock()
-	b, fresh := upsertRuleBanLocked(ip, reason, source, hours, ruleID, ranges)
+	b, fresh := upsertRuleBanLocked(ip, reason, source, ruleID, ranges)
 	return b, fresh, nil
 }
 
@@ -624,6 +623,45 @@ func applyAutoBan(ip, reason string) (*Ban, error) {
 
 // releaseBan 解封: 只改状态为已解封并摘除内核元素, 记录保留。
 // 返回该 IP 是否有记录(没有记录才算未找到)。
+// releaseRuleBans 释放某条防火墙规则产生的所有封禁: 从全部记录里摘掉
+// 该规则的作用域; 摘后无任何作用域且无 Ports 的记录改为 released 并从
+// 该规则集合里删掉该 IP; 仍有其他作用域或 Ports 的记录保持生效, 仅从
+// 该规则集合里删掉该 IP。记录本身永不删除。
+func releaseRuleBans(ruleID string) {
+	banMu.Lock()
+	defer banMu.Unlock()
+	now := time.Now().Unix()
+	changed := false
+	for _, b := range bans {
+		found := false
+		kept := []BanScope{}
+		for _, s := range b.Scopes {
+			if s.RuleID == ruleID {
+				found = true
+				continue
+			}
+			kept = append(kept, s)
+		}
+		if !found {
+			continue
+		}
+		normBanStatus(b, now)
+		was := b.enforced(now)
+		b.Scopes = kept
+		if len(kept) == 0 && len(b.Ports) == 0 && b.Status == BanActive {
+			b.Status = BanReleased
+			b.ReleasedAt = now
+		}
+		if was {
+			fwDelElement(b.IP, ruleID)
+		}
+		changed = true
+	}
+	if changed {
+		saveBans()
+	}
+}
+
 func releaseBan(ip string) bool {
 	banMu.Lock()
 	defer banMu.Unlock()

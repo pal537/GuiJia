@@ -59,15 +59,15 @@ func TestPortGuardItemEdit(t *testing.T) {
 		handlePortGuardItem(rec, req)
 		return rec.Code
 	}
-	// 整条编辑: 端口 + 省市 + 时长
+	// 整条编辑: 端口 + 省市(时长已废弃: 传了也忽略, 存量随编辑归一化为永久 0)
 	if code := put("g1", `{"portText":"3006","source":{"kind":"custom_cn","locations":[{"kind":"province","name":"江苏"}]},"banHours":48}`); code != 200 {
 		t.Fatalf("编辑应 200, 实际 %d", code)
 	}
 	pgMu.Lock()
 	r := pgRules[0]
 	pgMu.Unlock()
-	if r.PortText != "3006" || len(r.ranges) != 1 || r.ranges[0] != [2]int{3006, 3006} || r.BanHours != 48 {
-		t.Fatalf("编辑未生效: %+v", r)
+	if r.PortText != "3006" || len(r.ranges) != 1 || r.ranges[0] != [2]int{3006, 3006} || r.BanHours != 0 {
+		t.Fatalf("编辑未生效(时长应归一化为永久 0): %+v", r)
 	}
 	// 与另一条规则完全相同 -> 400, 且原规则不动
 	if code := put("g1", `{"portText":"4000","source":{"kind":"custom_cn","locations":[{"kind":"province","name":"浙江"}]},"banHours":24}`); code != 400 {

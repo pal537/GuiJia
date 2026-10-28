@@ -32,7 +32,8 @@ func unifyMustNot(t *testing.T, html string, subs ...string) {
 	}
 }
 
-// TestUIUnifyGlass: 总览统计卡 / 分区卡片 / 弹窗卡片与首页同款玻璃(52% 通透 + blur 24px + 内高光)。
+// TestUIUnifyGlass: 总览统计卡 / 分区卡片与首页同款玻璃(52% 通透 + blur 24px + 内高光)。
+// 弹窗卡片例外: 一律纯白底色(毛玻璃透底在遮罩上发灰, PAPA 明确不要)。
 // 首页 .srv-card 本体与悬停回弹由 tenten_front_test.go 锁定, 这里只锁新统一的部分。
 func TestUIUnifyGlass(t *testing.T) {
 	html := unifyHTML(t)
@@ -41,7 +42,8 @@ func TestUIUnifyGlass(t *testing.T) {
 		".stat.click:hover{transform:translateY(-6px) scale(1.015)",
 		".panel{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px)",
 		".scard{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px)",
-		".cmcard{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px)",
+		".cmcard{background:#fff",
+		"#pop{position:absolute;width:320px;background:#fff",
 		"inset 0 1px 0 rgba(255,255,255,.65),0 12px 32px rgba(37,99,235,.12)",
 	)
 	unifyMustNot(t, html,
@@ -49,6 +51,8 @@ func TestUIUnifyGlass(t *testing.T) {
 		".panel{background:var(--card)",
 		".scard{background:var(--card)",
 		".stat.click:hover{transform:translateY(-1px)",
+		".cmcard{background:color-mix",
+		"#pop{background:color-mix",
 	)
 }
 
@@ -92,7 +96,8 @@ func TestUIUnifyHintWalls(t *testing.T) {
 		`<div class="hint">名单内 IP 不报警`,
 		`<div class="hint">建议修改默认的 SSH 端口`,
 		`<div class="hint">证书只有两个来源`,
-		`<div class="hint">设置备份 = 全部配置`,
+		// 备份说明已收进备份与恢复弹窗(csub), 不再平铺在设置页。
+		`设置备份 = 全部配置（设置 + 端口 + 蜜罐），不含数据`,
 	)
 }
 

@@ -220,6 +220,119 @@ func loadPortGuard() {
 	if pgRules == nil {
 		pgRules = []*PortGuardRule{}
 	}
+	// 防火墙封禁改永久: 升级后首次加载, 把现存生效中的防火墙封禁
+	// 转永久并挂到现行规则上, 无规则覆盖的予以释放(记录保留)。
+	migrateFwBansLocked()
+}
+
+// migrateFwBansLocked 防火墙封禁永久化迁移(调用方须已持 pgMu)。
+// 只动 Source=portguard 且状态为 active 的记录: 按其端口找现行已启用
+// 规则, 优先拒绝规则、其次首个覆盖规则(先全覆盖、后部分覆盖); 找到则
+// Until=0 并挂该规则的完整范围(内核集合本就是按规则整组封禁, 与
+// 作用域口径一致); 找不到则释放(状态 released, 从内核集合里删掉)。
+// 转换量 = 封禁数 × 规则数, 毫秒级, 不阻塞启动。
+func migrateFwBansLocked() {
+	banMu.Lock()
+	defer banMu.Unlock()
+	now := time.Now().Unix()
+	changed := false
+	for _, b := range bans {
+		if b.Source != "portguard" {
+			continue
+		}
+		normBanStatus(b, now)
+		if b.Status != BanActive {
+			continue
+		}
+		ports := map[int]bool{}
+		for _, s := range b.Scopes {
+			for _, r := range s.Ranges {
+				for p := r[0]; p <= r[1]; p++ {
+					ports[p] = true
+				}
+			}
+		}
+		for _, p := range b.Ports {
+			ports[p] = true
+		}
+		if len(ports) == 0 {
+			b.Status = BanReleased
+			b.ReleasedAt = now
+			b.Scopes = nil
+			b.Ports = nil
+			changed = true
+			continue
+		}
+		var full, part *PortGuardRule
+		for _, r := range pgRules {
+			if !r.Enabled {
+				continue
+			}
+			all, any := true, false
+			for p := range ports {
+				if ruleCoversPort(r, p) {
+					any = true
+				} else {
+					all = false
+				}
+			}
+			if !any {
+				continue
+			}
+			if all {
+				if r.Action == "deny" {
+					full = r
+					break
+				}
+				if full == nil {
+					full = r
+				}
+			} else {
+				// 部分覆盖: 拒绝优先于允许, 同类取首个。
+				if part == nil || (r.Action == "deny" && part.Action != "deny") {
+					part = r
+				}
+			}
+		}
+		chosen := full
+		if chosen == nil {
+			chosen = part
+		}
+		if chosen == nil {
+			for _, s := range b.Scopes {
+				fwDelElement(b.IP, s.RuleID)
+			}
+			for _, p := range b.Ports {
+				pgDelElement(b.IP, p)
+			}
+			b.Status = BanReleased
+			b.ReleasedAt = now
+			b.Scopes = nil
+			b.Ports = nil
+			changed = true
+			continue
+		}
+		if b.Until != 0 || len(b.Scopes) != 1 || b.Scopes[0].RuleID != chosen.ID {
+			changed = true
+		}
+		b.Until = 0
+		b.Scopes = []BanScope{{RuleID: chosen.ID, Ranges: append([][2]int{}, chosen.ranges...)}}
+		b.Ports = nil
+		fwAddElement(b.IP, chosen.ID, permBanBackstopSec)
+	}
+	if changed {
+		saveBans()
+	}
+}
+
+// ruleCoversPort: 规则的端口范围是否含指定端口。
+func ruleCoversPort(r *PortGuardRule, port int) bool {
+	for _, rg := range r.ranges {
+		if port >= rg[0] && port <= rg[1] {
+			return true
+		}
+	}
+	return false
 }
 
 func savePortGuardLocked() { saveJSON(portGuardFile(), pgRules) }
@@ -964,8 +1077,8 @@ func fwDelElement(ip string, ruleID string) {
 }
 
 // reconcileFirewall fw 集合与 Scopes 记录对齐: 生效中必封、非生效中必不在集合。
-// 规则删除后仍按记录里的范围对齐(先重建集合与规则, 再对成员); 现存规则
-// 按自身协议重建, 已删规则按双协议重建。
+// 规则删除/禁用时会先经 releaseRuleBans 摘掉该规则的作用域, 故对齐时已无
+// 活跃记录指向已删规则; 下面已删规则重建分支仅作历史遗留记录的安全网。
 func reconcileFirewall() {
 	if dryBan {
 		return
@@ -1077,7 +1190,7 @@ func portGuardCheck(srcIP string, dstPort int, proto string) {
 	if denyRule != nil {
 		reason := "防火墙拒绝：" + fwRuleDesc(denyRule) + "，来源" + geoDisp
 		ensureFWRule(denyRule)
-		_, fresh, err := applyRuleBan(srcIP, reason, "portguard", denyRule.BanHours, denyRule.ID, denyRule.ranges)
+		_, fresh, err := applyRuleBan(srcIP, reason, "portguard", denyRule.ID, denyRule.ranges)
 		if err != nil || !fresh {
 			return
 		}
@@ -1087,11 +1200,12 @@ func portGuardCheck(srcIP string, dstPort int, proto string) {
 	if allowHit {
 		return
 	}
-	// 默认封禁: 首个生效覆盖规则(创建顺序)提供时长与作用域
+	// 默认封禁: 首个生效覆盖规则(创建顺序)提供作用域; 封禁永久, 直到
+	// 规则删除/禁用或手动解封才释放。
 	first := rules[0]
 	reason := "防火墙默认封禁：未命中允许规则（规则：" + fwRuleDesc(first) + "），来源" + geoDisp
 	ensureFWRule(first)
-	_, fresh, err := applyRuleBan(srcIP, reason, "portguard", first.BanHours, first.ID, first.ranges)
+	_, fresh, err := applyRuleBan(srcIP, reason, "portguard", first.ID, first.ranges)
 	if err != nil || !fresh {
 		return
 	}
@@ -1281,13 +1395,15 @@ func handlePortGuard(w http.ResponseWriter, r *http.Request) {
 			Proto    string   `json:"proto"`
 			Source   FWSource `json:"source"`
 			Action   string   `json:"action"`
-			BanHours int      `json:"banHours"`
+			// BanHours 仅线上传输兼容(旧节点缺省 0=永久), 引擎不再使用:
+			// 防火墙封禁一律永久, 直到规则删除/禁用或手动解封。
+			BanHours int `json:"banHours"`
 		}
 		if json.NewDecoder(r.Body).Decode(&in) != nil {
 			errJSON(w, 400, "请求无效")
 			return
 		}
-		rule, err := parseFWRuleInput(in.PortText, in.Proto, in.Source, in.Action, in.BanHours)
+		rule, err := parseFWRuleInput(in.PortText, in.Proto, in.Source, in.Action, 0)
 		if err != nil {
 			errJSON(w, 400, err.Error())
 			return
@@ -1313,7 +1429,8 @@ func handlePortGuardItem(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/api/portguard/")
 	switch r.Method {
 	case "PUT":
-		// 开关切换只传 enabled；整条编辑传 portText(+proto+source+action+banHours)，两者可同传。
+		// 开关切换只传 enabled；整条编辑传 portText(+proto+source+action)，两者可同传。
+		// banHours 已废弃: 传了也忽略, 封禁一律永久。
 		var in struct {
 			Enabled  *bool     `json:"enabled"`
 			PortText *string   `json:"portText"`
@@ -1356,11 +1473,8 @@ func handlePortGuardItem(w http.ResponseWriter, r *http.Request) {
 			if in.Action != nil {
 				action = *in.Action
 			}
-			hours := rule.BanHours
-			if in.BanHours != nil {
-				hours = *in.BanHours
-			}
-			nr, err := parseFWRuleInput(*in.PortText, proto, src, action, hours)
+			// banHours 已废弃, 一律按永久处理(旧节点缺省 0=永久, 与新语义一致)。
+			nr, err := parseFWRuleInput(*in.PortText, proto, src, action, 0)
 			if err != nil {
 				pgMu.Unlock()
 				errJSON(w, 400, err.Error())
@@ -1380,6 +1494,10 @@ func handlePortGuardItem(w http.ResponseWriter, r *http.Request) {
 			// 旧范围规则删掉重建, 集合成员保留, 已封禁随新规则走
 			fwDeleteRules(id)
 			ensureFWRule(rule)
+		}
+		if in.Enabled != nil && !*in.Enabled {
+			// 规则禁用即释放该规则产生的全部封禁(记录保留); 重启用后下次命中再封禁。
+			releaseRuleBans(id)
 		}
 		writeJSON(w, 200, rule)
 	case "DELETE":
@@ -1401,8 +1519,8 @@ func handlePortGuardItem(w http.ResponseWriter, r *http.Request) {
 		pgRules = kept
 		savePortGuardLocked()
 		pgMu.Unlock()
-		// 注意: 删除规则不自动解封其已封禁(封禁记录独立管理, 到期或 TG/应用解封);
-		// 集合与规则保留, 看门狗按记录里的范围对齐。
+		// 规则删除即释放该规则产生的全部封禁(记录保留, 集合与规则由看门狗对齐)。
+		releaseRuleBans(id)
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	default:
 		errJSON(w, 405, "method")

@@ -223,7 +223,7 @@ func TestRuleBanScope(t *testing.T) {
 
 	ip := "203.0.113.60"
 	ranges := [][2]int{{45167, 45167}, {3004, 3004}}
-	b, fresh, err := applyRuleBan(ip, "防火墙测试", "portguard", 24, "gtest", ranges)
+	b, fresh, err := applyRuleBan(ip, "防火墙测试", "portguard", "gtest", ranges)
 	if err != nil || !fresh || b == nil {
 		t.Fatalf("applyRuleBan = %v, %v, %v", b, fresh, err)
 	}
@@ -237,7 +237,7 @@ func TestRuleBanScope(t *testing.T) {
 		t.Fatal("按规则封禁不算全局封禁")
 	}
 	// 同一 IP 再命中另一规则: 追加 Scopes, 不新开记录
-	b2, fresh2, err := applyRuleBan(ip, "防火墙测试2", "portguard", 24, "gtest2", [][2]int{{56806, 56806}})
+	b2, fresh2, err := applyRuleBan(ip, "防火墙测试2", "portguard", "gtest2", [][2]int{{56806, 56806}})
 	if err != nil || !fresh2 {
 		t.Fatalf("追加规则封禁失败: %v, %v, %v", b2, fresh2, err)
 	}
@@ -245,7 +245,7 @@ func TestRuleBanScope(t *testing.T) {
 		t.Fatalf("追加后应为 2 条 Scopes: %+v", b2)
 	}
 	// 同规则再命中: 只刷新, 不重复事件(返回 fresh=false)
-	_, fresh3, _ := applyRuleBan(ip, "防火墙测试3", "portguard", 24, "gtest", ranges)
+	_, fresh3, _ := applyRuleBan(ip, "防火墙测试3", "portguard", "gtest", ranges)
 	if fresh3 {
 		t.Fatal("同规则再命中不应算新封")
 	}
@@ -273,7 +273,7 @@ func TestRuleBanScope(t *testing.T) {
 	banMu.Lock()
 	upsertBanLocked(ip, "手动拉黑", "manual", 24)
 	banMu.Unlock()
-	_, fresh4, _ := applyRuleBan(ip, "防火墙", "portguard", 24, "gtest", ranges)
+	_, fresh4, _ := applyRuleBan(ip, "防火墙", "portguard", "gtest", ranges)
 	if fresh4 {
 		t.Fatal("已全局封禁时按规则不应重复封禁")
 	}
@@ -346,14 +346,19 @@ func TestPortGuardCheckEndToEnd(t *testing.T) {
 	}
 	banMu.Lock()
 	var reason string
+	var until int64
 	for _, b := range bans {
 		if b.IP == "114.114.114.114" {
 			reason = b.Reason
+			until = b.Until
 		}
 	}
 	banMu.Unlock()
 	if !strings.Contains(reason, "防火墙拒绝") {
 		t.Fatalf("拒绝原因应含'防火墙拒绝', 得到 %q", reason)
+	}
+	if until != 0 {
+		t.Fatalf("拒绝命中封禁必须永久(Until=0), 得到 %d", until)
 	}
 	// 拒绝优先于允许: 允许江苏 + 拒绝全部 IP 同时命中 -> 仍封禁
 	releaseBan("114.114.114.114")
