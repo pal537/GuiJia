@@ -61,11 +61,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 .srv-card .srv-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.15)}
 .srv-card.offline .srv-dot{background:#9aa5b1;box-shadow:0 0 0 3px rgba(154,165,177,.15)}
 .srv-card .srv-tag{font-size:12px;color:var(--mut);margin-left:auto;flex:0 0 auto}
-.srv-card .srv-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;margin-top:10px}
+.srv-card .srv-numsbox{border:1px solid var(--line);background:rgba(255,255,255,.4);border-radius:12px;height:56px;display:flex;align-items:center;margin-top:10px}
+.srv-card .srv-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;flex:1}
 .srv-card .srv-num{font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;min-height:24px}
 .srv-card .srv-lab{color:var(--mut);font-size:12px;margin-top:3px}
 .srv-card .srv-foot{color:var(--mut);font-size:12px;margin-top:12px;min-height:16px}
-.srv-card .srv-meta{color:var(--mut);font-size:12.5px;margin-top:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srv-card .srv-meta{color:var(--mut);font-size:12.5px;margin-top:0;min-height:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .srv-card .srv-meta b{color:var(--txt);font-weight:600}
 .srv-card .srv-meta2{font-size:12px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
 /* 卡片底部: 左下角设置按钮 + 右下角系统 LOGO(系统文字行已删, 全集成到 LOGO 的 title 里) */
@@ -711,7 +712,7 @@ let homeAlertFps=[];
 async function refreshHomeNav(){
   let list=null;
   try{const d=await apiLocal('GET','api/nodes/servers');list=d.servers||[];}catch(e){return homeServers;}
-  homeServers=list.map(s=>({fp:s.fingerprint,name:s.name,online:s.status==='online',last:s.lastSeen,created:s.createdAt,ver:s.version||'',ip:s.ip||'',ip6:s.ip6||'',os:s.os||'',arch:s.arch||'',location:s.location||'未知',country:s.country||'',flag:s.flag||'',countryCode:s.countryCode||'',manualLocation:s.manualLocation||''}));
+  homeServers=list.map(s=>({fp:s.fingerprint,name:s.name,online:s.status==='online',last:s.lastSeen,created:s.createdAt,ver:s.version||'',uptime:s.uptime||0,ip:s.ip||'',ip6:s.ip6||'',os:s.os||'',arch:s.arch||'',location:s.location||'未知',country:s.country||'',flag:s.flag||'',countryCode:s.countryCode||'',manualLocation:s.manualLocation||''}));
   $('#navHome').style.display=homeServers.length?'':'none';
   if(curServer&&!homeServers.some(s=>s.fp===curServer)){curServer='';gotoTab('ov');}
   else if(curTab==='home'&&!homeServers.length)gotoTab('ov');
@@ -781,7 +782,7 @@ function homeCardHTML(fp,name,online,tag,foot,animate,delay,meta){
   const ip=esc(m.ip||'未知');
   const logo=osLogo(m.os,m.arch);
   const menu='<div class="srv-foot2"><button class="btn sm" data-act="menu" data-fp="'+fp+'">设置</button>'+logo+'</div>';
-  return '<div class="srv-card'+(online?'':' offline')+(animate?' srv-in':'')+(((fp&&fp===curServer)||(!fp&&managingLocal))?' managing':'')+'" data-fp="'+fp+'"'+(animate?' style="animation-delay:'+delay+'ms"':'')+'><div class="srv-top"><span class="srv-dot"></span><span class="srv-name">'+esc(name)+'</span><span class="srv-tag">'+tag+'</span></div><div class="srv-meta" data-k="loc">'+loc+' · <b>'+ip+'</b>'+(m.ip6?'<div class="srv-meta2">'+esc(m.ip6)+'</div>':'')+'</div><div class="srv-nums"><div><div class="srv-num" data-k="conns">…</div><div class="srv-lab">当前连接</div></div><div><div class="srv-num" data-k="bans">…</div><div class="srv-lab">今日拉黑</div></div><div><div class="srv-num" data-k="ports">…</div><div class="srv-lab">监听端口</div></div><div><div class="srv-num" data-k="blist" title="黑名单：生效 / 全部记录">…</div><div class="srv-lab">黑名单</div></div></div><div class="srv-foot">'+esc(foot)+'</div>'+menu+'</div>';
+  return '<div class="srv-card'+(online?'':' offline')+(animate?' srv-in':'')+(((fp&&fp===curServer)||(!fp&&managingLocal))?' managing':'')+'" data-fp="'+fp+'"'+(animate?' style="animation-delay:'+delay+'ms"':'')+'><div class="srv-top"><span class="srv-dot"></span><span class="srv-name">'+esc(name)+'</span><span class="srv-tag">'+tag+'</span></div><div class="srv-meta" data-k="loc">'+loc+' · <b>'+ip+'</b>'+(m.ip6?'<div class="srv-meta2">'+esc(m.ip6)+'</div>':'')+'</div><div class="srv-numsbox"><div class="srv-nums"><div><div class="srv-num" data-k="conns">…</div><div class="srv-lab">当前连接</div></div><div><div class="srv-num" data-k="bans">…</div><div class="srv-lab">今日拉黑</div></div><div><div class="srv-num" data-k="ports">…</div><div class="srv-lab">监听端口</div></div><div><div class="srv-num" data-k="blist" title="黑名单：生效 / 全部记录">…</div><div class="srv-lab">黑名单</div></div></div></div><div class="srv-foot">'+esc(foot)+'</div>'+menu+'</div>';
 }
 function homeSetMeta(fp,m){
   const c=homeCardEl(fp);if(!c||!m)return;

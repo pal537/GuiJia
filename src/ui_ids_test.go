@@ -273,15 +273,24 @@ func TestCertRowButtons(t *testing.T) {
 	}
 }
 
-// 首页卡片: 映射必须带 ip6(否则 IPv6 第二行永远不显示),
-// IP 行与数据行间距加大、卡片底部压缩(用户 2026-10-29 反馈)。
+// 首页卡片: 映射必须带 ip6 与 uptime(否则 IPv6 第二行与子服务器开机时间永远不显示),
+// meta 预留 v6 行高度(有无 v6 时数据行位置一致)、数据行加框固定高度(用户 2026-10-29 反馈)。
 func TestHomeCardLayout(t *testing.T) {
 	html := string(indexHTML)
 	if !strings.Contains(html, "ip6:s.ip6") {
 		t.Errorf("首页卡片映射应含 ip6:s.ip6, 否则节点 IPv6 不显示")
 	}
-	if !strings.Contains(html, ".srv-card .srv-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;margin-top:10px}") {
-		t.Errorf("数据行应与 IP 行拉开间距(margin-top:10px)")
+	if !strings.Contains(html, "uptime:s.uptime") {
+		t.Errorf("首页卡片映射应含 uptime:s.uptime, 否则子服务器开机时间不显示")
+	}
+	if !strings.Contains(html, ".srv-card .srv-meta{color:var(--mut);font-size:12.5px;margin-top:0;min-height:34px;") {
+		t.Errorf("meta 应预留 v6 行高度(min-height:34px), 否则有无 v6 时数据行位置不一")
+	}
+	if !strings.Contains(html, "srv-numsbox") {
+		t.Errorf("数据行应用框包起来(srv-numsbox)")
+	}
+	if !strings.Contains(html, ".srv-card .srv-numsbox{border:1px solid var(--line);background:rgba(255,255,255,.4);border-radius:12px;height:56px;display:flex;align-items:center;margin-top:10px}") {
+		t.Errorf("数据框应固定高度 56px、与 IP 行拉开间距(margin-top:10px)")
 	}
 	if !strings.Contains(html, "padding:18px 18px 8px;cursor:pointer") {
 		t.Errorf("卡片底部应压缩(padding-bottom 8px)")
