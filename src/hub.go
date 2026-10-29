@@ -219,11 +219,14 @@ func hubServerPublic(s *hubServer) map[string]any {
 	}
 }
 
-// resolveNodeIP 决定节点 IP 的最终值: 拨入优先于自报, 按地址族分别决策。
-// 返回 (v4, v6): 某族为空表示该族拿不到公网, 调用方保留旧值不动。
+// resolveNodeIP 决定节点 IP 的最终值: 拨入优先, 其次节点探测公网 IP,
+// 最后自报, 按地址族分别决策。
+// 返回 (v4, v6): 某族为空表示该族拿不到公网, 调用方保留公网旧值不动、
+// 清掉私网旧值(私网值当公网显示永远是错的, 不如不显示)。
 // remoteAddr 为拨入连接的 RemoteAddr("IP:port" 形式, 节点直连无反代, 即节点出口公网 IP, 可信)。
-// 自报私网一律不采纳: 老节点只发私网 in.IP 时, 新 hub 靠 RemoteAddr 照样纠正; 老 hub 忽略新增字段。
-func resolveNodeIP(remoteAddr, selfIP, selfIP6 string) (string, string) {
+// pubIP 为节点经外网回显服务探测到的自身公网 IP(节点 hello/ping 附带, 可能为空)。
+// 自报私网一律不采纳: 老节点只发私网 in.IP 时, 新 hub 靠 RemoteAddr 或探测 IP 照样纠正; 老 hub 忽略新增字段。
+func resolveNodeIP(remoteAddr, selfIP, selfIP6, pubIP string) (string, string) {
 	var v4, v6 string
 	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
 		remoteAddr = host
@@ -237,6 +240,15 @@ func resolveNodeIP(remoteAddr, selfIP, selfIP6 string) (string, string) {
 			v6 = rip.String()
 		}
 	}
+	if pub := net.ParseIP(strings.TrimSpace(pubIP)); pub != nil && isPublicIP(pub) {
+		if pub.To4() != nil {
+			if v4 == "" {
+				v4 = pub.String()
+			}
+		} else if v6 == "" {
+			v6 = pub.String()
+		}
+	}
 	if v4 == "" {
 		if ip := net.ParseIP(strings.TrimSpace(selfIP)); ip != nil && ip.To4() != nil && isPublicIP(ip) {
 			v4 = ip.String()
@@ -248,6 +260,25 @@ func resolveNodeIP(remoteAddr, selfIP, selfIP6 string) (string, string) {
 		}
 	}
 	return v4, v6
+}
+
+// applyNodeIP 把解析结果写回节点记录: 有新公网就覆盖; 某族拿不到新公网时,
+// 公网旧值保留(防拨入地址族抖动导致闪烁), 私网旧值清掉(私网值当公网显示永远是错的)。
+func applyNodeIP(s *hubServer, v4, v6 string) {
+	if v4 != "" {
+		s.IP = v4
+	} else if s.IP != "" {
+		if ip := net.ParseIP(s.IP); ip == nil || !isPublicIP(ip) {
+			s.IP = ""
+		}
+	}
+	if v6 != "" {
+		s.IPv6 = v6
+	} else if s.IPv6 != "" {
+		if ip := net.ParseIP(s.IPv6); ip == nil || !isPublicIP(ip) {
+			s.IPv6 = ""
+		}
+	}
 }
 
 // serverLocationCode 卡片国旗图用国家代码(小写, flagcdn 用):
@@ -524,7 +555,7 @@ func handleLocalInfo(w http.ResponseWriter, r *http.Request) {
 	mu.Unlock()
 	loc, country, flag := serverLocationDisplay(manual, ip)
 	writeJSON(w, 200, map[string]any{
-		"name": nodeDisplayName(), "ip": ip, "os": osName, "arch": arch,
+		"name": nodeDisplayName(), "ip": ip, "ip6": primaryIPv6(), "os": osName, "arch": arch,
 		"uptimeSec": sysUptimeSec(),
 		"location": loc, "country": country, "flag": flag,
 		"countryCode":    serverLocationCode(manual, ip),
@@ -642,6 +673,7 @@ func handleNodeHello(w http.ResponseWriter, r *http.Request) {
 		Code        string `json:"code"`
 		IP          string `json:"ip"`
 		IPv6        string `json:"ip6"`
+		PubIP       string `json:"pubIP"`
 		OS          string `json:"os"`
 		Arch        string `json:"arch"`
 	}
@@ -667,16 +699,11 @@ func handleNodeHello(w http.ResponseWriter, r *http.Request) {
 	defer hubMu.Unlock()
 	if s := findHubServer(fp); s != nil {
 		// 已登记节点每次 hello 都同步名称与系统信息(改名、换 IP 即随下次 hello/ping 同步)。
-		// IP 以 hub 观测为准: 拨入 RemoteAddr 优先于自报, 自报私网不覆盖已存值。
+		// IP 以 hub 观测为准: 拨入优先, 其次节点探测公网 IP, 最后自报;
+		// 某族拿不到新公网时公网旧值保留、私网旧值清掉。
 		s.Name = name
-		if v4, v6 := resolveNodeIP(r.RemoteAddr, in.IP, in.IPv6); v4 != "" || v6 != "" {
-			if v4 != "" {
-				s.IP = v4
-			}
-			if v6 != "" {
-				s.IPv6 = v6
-			}
-		}
+		v4, v6 := resolveNodeIP(r.RemoteAddr, in.IP, in.IPv6, in.PubIP)
+		applyNodeIP(s, v4, v6)
 		if in.OS != "" {
 			s.OS = in.OS
 		}
@@ -796,6 +823,7 @@ func handleNodePing(w http.ResponseWriter, r *http.Request) {
 		Name    string `json:"name"`
 		IP      string `json:"ip"`
 		IPv6    string `json:"ip6"`
+		PubIP   string `json:"pubIP"`
 		Uptime  int64  `json:"uptime"`
 		OS      string `json:"os"`
 		Arch    string `json:"arch"`
@@ -812,14 +840,8 @@ func handleNodePing(w http.ResponseWriter, r *http.Request) {
 		s.Name = n
 	}
 	// IP 以 hub 观测为准(与 hello 同规则), 开机时长随 ping 刷新(老节点不发则保持旧值)。
-	if v4, v6 := resolveNodeIP(r.RemoteAddr, in.IP, in.IPv6); v4 != "" || v6 != "" {
-		if v4 != "" {
-			s.IP = v4
-		}
-		if v6 != "" {
-			s.IPv6 = v6
-		}
-	}
+	v4, v6 := resolveNodeIP(r.RemoteAddr, in.IP, in.IPv6, in.PubIP)
+	applyNodeIP(s, v4, v6)
 	if in.Uptime > 0 {
 		s.UptimeSec = in.Uptime
 	}

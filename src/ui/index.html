@@ -47,7 +47,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 #tab-home>.home-wash{position:absolute;left:-16px;right:-16px;top:-8px;height:460px;pointer-events:none;z-index:0;background:radial-gradient(420px 260px at 12% 0%, rgba(186,230,253,.85), transparent 70%),radial-gradient(460px 280px at 88% 30%, rgba(165,243,252,.8), transparent 70%),radial-gradient(360px 220px at 55% 100%, rgba(219,234,254,.7), transparent 70%);filter:blur(24px)}
 /* 首页卡片: 强毛玻璃(更通透 + 更高 blur + 内高光 + 柔和蓝影), 悬停弹一下(overshoot 回弹);
    绝不用紫色渐变; prefers-reduced-motion 时关动画 */
-.srv-card{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 12px 32px rgba(37,99,235,.12);padding:18px 18px 12px;cursor:pointer;transition:transform .38s cubic-bezier(.34,1.56,.64,1), box-shadow .22s ease, opacity .3s ease}
+.srv-card{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 12px 32px rgba(37,99,235,.12);padding:18px 18px 8px;cursor:pointer;transition:transform .38s cubic-bezier(.34,1.56,.64,1), box-shadow .22s ease, opacity .3s ease}
 .srv-card:hover{transform:translateY(-6px) scale(1.015);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 20px 40px rgba(37,99,235,.18)}
 .srv-card.offline{opacity:.55;filter:saturate(.4);cursor:default}
 .srv-card.offline:hover{transform:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 12px 32px rgba(37,99,235,.12)}
@@ -61,7 +61,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 .srv-card .srv-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.15)}
 .srv-card.offline .srv-dot{background:#9aa5b1;box-shadow:0 0 0 3px rgba(154,165,177,.15)}
 .srv-card .srv-tag{font-size:12px;color:var(--mut);margin-left:auto;flex:0 0 auto}
-.srv-card .srv-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
+.srv-card .srv-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;margin-top:10px}
 .srv-card .srv-num{font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;min-height:24px}
 .srv-card .srv-lab{color:var(--mut);font-size:12px;margin-top:3px}
 .srv-card .srv-foot{color:var(--mut);font-size:12px;margin-top:12px;min-height:16px}
@@ -69,7 +69,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 .srv-card .srv-meta b{color:var(--txt);font-weight:600}
 .srv-card .srv-meta2{font-size:12px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
 /* 卡片底部: 左下角设置按钮 + 右下角系统 LOGO(系统文字行已删, 全集成到 LOGO 的 title 里) */
-.srv-card .srv-foot2{display:flex;align-items:center;gap:8px;margin-top:8px}
+.srv-card .srv-foot2{display:flex;align-items:center;gap:8px;margin-top:6px}
 .srv-card .srv-logo{margin-left:auto;flex:0 0 auto;line-height:0}
 .srv-card .srv-logo svg{width:28px;height:28px;display:block}
 /* 卡片国旗图: 真实国旗图片(Windows 下 emoji 旗只显示字母, 故不用 emoji) */
@@ -711,7 +711,7 @@ let homeAlertFps=[];
 async function refreshHomeNav(){
   let list=null;
   try{const d=await apiLocal('GET','api/nodes/servers');list=d.servers||[];}catch(e){return homeServers;}
-  homeServers=list.map(s=>({fp:s.fingerprint,name:s.name,online:s.status==='online',last:s.lastSeen,created:s.createdAt,ver:s.version||'',ip:s.ip||'',os:s.os||'',arch:s.arch||'',location:s.location||'未知',country:s.country||'',flag:s.flag||'',countryCode:s.countryCode||'',manualLocation:s.manualLocation||''}));
+  homeServers=list.map(s=>({fp:s.fingerprint,name:s.name,online:s.status==='online',last:s.lastSeen,created:s.createdAt,ver:s.version||'',ip:s.ip||'',ip6:s.ip6||'',os:s.os||'',arch:s.arch||'',location:s.location||'未知',country:s.country||'',flag:s.flag||'',countryCode:s.countryCode||'',manualLocation:s.manualLocation||''}));
   $('#navHome').style.display=homeServers.length?'':'none';
   if(curServer&&!homeServers.some(s=>s.fp===curServer)){curServer='';gotoTab('ov');}
   else if(curTab==='home'&&!homeServers.length)gotoTab('ov');

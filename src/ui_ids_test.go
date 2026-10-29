@@ -272,3 +272,21 @@ func TestCertRowButtons(t *testing.T) {
 		}
 	}
 }
+
+// 首页卡片: 映射必须带 ip6(否则 IPv6 第二行永远不显示),
+// IP 行与数据行间距加大、卡片底部压缩(用户 2026-10-29 反馈)。
+func TestHomeCardLayout(t *testing.T) {
+	html := string(indexHTML)
+	if !strings.Contains(html, "ip6:s.ip6") {
+		t.Errorf("首页卡片映射应含 ip6:s.ip6, 否则节点 IPv6 不显示")
+	}
+	if !strings.Contains(html, ".srv-card .srv-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;margin-top:10px}") {
+		t.Errorf("数据行应与 IP 行拉开间距(margin-top:10px)")
+	}
+	if !strings.Contains(html, "padding:18px 18px 8px;cursor:pointer") {
+		t.Errorf("卡片底部应压缩(padding-bottom 8px)")
+	}
+	if !strings.Contains(html, ".srv-card .srv-foot2{display:flex;align-items:center;gap:8px;margin-top:6px}") {
+		t.Errorf("卡片设置行间距应压缩(margin-top:6px)")
+	}
+}

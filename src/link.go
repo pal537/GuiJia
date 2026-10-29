@@ -152,7 +152,7 @@ func linkSession() error {
 	hello := func() (string, error) {
 		st, body, err := linkPost(c15, hubURL+"/api/nodes/hello", "", map[string]any{
 			"fingerprint": fp, "pubKey": pub, "name": name, "version": appVersion,
-			"code": nodePairingCode(), "ip": sysIP, "ip6": sysIP6, "os": sysOS, "arch": sysArch,
+			"code": nodePairingCode(), "ip": sysIP, "ip6": sysIP6, "pubIP": publicIPCached(), "os": sysOS, "arch": sysArch,
 		})
 		if err != nil {
 			return "", err
@@ -279,7 +279,7 @@ func linkPingLoop(client *http.Client, hubURL, token string, stop chan struct{})
 		}
 		st, body, err := linkPost(client, hubURL+"/api/nodes/ping", token, map[string]any{
 			"version": appVersion, "tgMode": nodeTGMode(), "name": nodeDisplayName(),
-			"ip": sysIP, "ip6": sysIP6, "uptime": sysUptimeSec(), "os": sysOS, "arch": sysArch,
+			"ip": sysIP, "ip6": sysIP6, "pubIP": publicIPCached(), "uptime": sysUptimeSec(), "os": sysOS, "arch": sysArch,
 		})
 		if err != nil {
 			return err

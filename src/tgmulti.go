@@ -229,7 +229,7 @@ func reportTGModeToHub() {
 	sysIP, sysOS, sysArch := nodeSysInfo()
 	linkPost(cli, hubURL+"/api/nodes/ping", tok, map[string]any{
 		"version": appVersion, "tgMode": nodeTGMode(), "name": nodeDisplayName(),
-		"ip": sysIP, "os": sysOS, "arch": sysArch,
+		"ip": sysIP, "ip6": primaryIPv6(), "pubIP": publicIPCached(), "os": sysOS, "arch": sysArch,
 	})
 }
 
