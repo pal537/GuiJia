@@ -15,6 +15,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -34,7 +35,9 @@ type hubServer struct {
 	TGMode      string `json:"tgMode"` // hub | independent
 	TokenHash   string `json:"tokenHash"`
 	CreatedAt   int64  `json:"createdAt"`
-	IP          string `json:"ip,omitempty"`       // 节点上报的主 IP, 老版本节点为空
+	IP          string `json:"ip,omitempty"`       // 节点主 IP, 以 hub 观测为准(见 resolveNodeIP)
+	IPv6        string `json:"ip6,omitempty"`      // 节点主公网 IPv6, 无则为空(卡片不显示第二行)
+	UptimeSec   int64  `json:"-"`                  // 节点开机时长(秒), 内存态, 随每次 ping 刷新
 	OS          string `json:"os,omitempty"`       // 节点上报的操作系统, 如 Debian 13
 	Arch        string `json:"arch,omitempty"`     // 节点上报的架构, 如 x86_64
 	Location    string `json:"location,omitempty"` // 手动归属地(管理员在卡片上设), 优先于自动解析
@@ -208,11 +211,43 @@ func hubServerPublic(s *hubServer) map[string]any {
 		"fingerprint": s.Fingerprint, "name": s.Name, "status": st,
 		"lastSeen": s.LastSeen, "version": s.Version, "tgMode": s.TGMode,
 		"createdAt": s.CreatedAt,
-		"ip":        s.IP, "os": s.OS, "arch": s.Arch,
+		"ip":        s.IP, "ip6": s.IPv6, "os": s.OS, "arch": s.Arch,
+		"uptime": s.UptimeSec,
 		"location": loc, "country": country, "flag": flag,
 		"countryCode":    serverLocationCode(s.Location, s.IP),
 		"manualLocation": s.Location,
 	}
+}
+
+// resolveNodeIP 决定节点 IP 的最终值: 拨入优先于自报, 按地址族分别决策。
+// 返回 (v4, v6): 某族为空表示该族拿不到公网, 调用方保留旧值不动。
+// remoteAddr 为拨入连接的 RemoteAddr("IP:port" 形式, 节点直连无反代, 即节点出口公网 IP, 可信)。
+// 自报私网一律不采纳: 老节点只发私网 in.IP 时, 新 hub 靠 RemoteAddr 照样纠正; 老 hub 忽略新增字段。
+func resolveNodeIP(remoteAddr, selfIP, selfIP6 string) (string, string) {
+	var v4, v6 string
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		remoteAddr = host
+	}
+	if rip := net.ParseIP(strings.TrimSpace(remoteAddr)); rip != nil {
+		if rip.To4() != nil {
+			if isPublicIP(rip) {
+				v4 = rip.String()
+			}
+		} else if isPublicIP(rip) {
+			v6 = rip.String()
+		}
+	}
+	if v4 == "" {
+		if ip := net.ParseIP(strings.TrimSpace(selfIP)); ip != nil && ip.To4() != nil && isPublicIP(ip) {
+			v4 = ip.String()
+		}
+	}
+	if v6 == "" {
+		if ip := net.ParseIP(strings.TrimSpace(selfIP6)); ip != nil && ip.To4() == nil && isPublicIP(ip) {
+			v6 = ip.String()
+		}
+	}
+	return v4, v6
 }
 
 // serverLocationCode 卡片国旗图用国家代码(小写, flagcdn 用):
@@ -490,6 +525,7 @@ func handleLocalInfo(w http.ResponseWriter, r *http.Request) {
 	loc, country, flag := serverLocationDisplay(manual, ip)
 	writeJSON(w, 200, map[string]any{
 		"name": nodeDisplayName(), "ip": ip, "os": osName, "arch": arch,
+		"uptimeSec": sysUptimeSec(),
 		"location": loc, "country": country, "flag": flag,
 		"countryCode":    serverLocationCode(manual, ip),
 		"manualLocation": manual,
@@ -605,6 +641,7 @@ func handleNodeHello(w http.ResponseWriter, r *http.Request) {
 		Version     string `json:"version"`
 		Code        string `json:"code"`
 		IP          string `json:"ip"`
+		IPv6        string `json:"ip6"`
 		OS          string `json:"os"`
 		Arch        string `json:"arch"`
 	}
@@ -630,9 +667,15 @@ func handleNodeHello(w http.ResponseWriter, r *http.Request) {
 	defer hubMu.Unlock()
 	if s := findHubServer(fp); s != nil {
 		// 已登记节点每次 hello 都同步名称与系统信息(改名、换 IP 即随下次 hello/ping 同步)。
+		// IP 以 hub 观测为准: 拨入 RemoteAddr 优先于自报, 自报私网不覆盖已存值。
 		s.Name = name
-		if in.IP != "" {
-			s.IP = in.IP
+		if v4, v6 := resolveNodeIP(r.RemoteAddr, in.IP, in.IPv6); v4 != "" || v6 != "" {
+			if v4 != "" {
+				s.IP = v4
+			}
+			if v6 != "" {
+				s.IPv6 = v6
+			}
 		}
 		if in.OS != "" {
 			s.OS = in.OS
@@ -752,6 +795,8 @@ func handleNodePing(w http.ResponseWriter, r *http.Request) {
 		TGMode  string `json:"tgMode"`
 		Name    string `json:"name"`
 		IP      string `json:"ip"`
+		IPv6    string `json:"ip6"`
+		Uptime  int64  `json:"uptime"`
 		OS      string `json:"os"`
 		Arch    string `json:"arch"`
 	}
@@ -766,8 +811,17 @@ func handleNodePing(w http.ResponseWriter, r *http.Request) {
 	if n := normalizeServerName(in.Name); n != "" {
 		s.Name = n
 	}
-	if in.IP != "" {
-		s.IP = in.IP
+	// IP 以 hub 观测为准(与 hello 同规则), 开机时长随 ping 刷新(老节点不发则保持旧值)。
+	if v4, v6 := resolveNodeIP(r.RemoteAddr, in.IP, in.IPv6); v4 != "" || v6 != "" {
+		if v4 != "" {
+			s.IP = v4
+		}
+		if v6 != "" {
+			s.IPv6 = v6
+		}
+	}
+	if in.Uptime > 0 {
+		s.UptimeSec = in.Uptime
 	}
 	if in.OS != "" {
 		s.OS = in.OS

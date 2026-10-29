@@ -110,7 +110,7 @@ func TestTenFrontBansPage(t *testing.T) {
 func TestTenFrontGroupSyncModal(t *testing.T) {
 	html := tenHTML(t)
 	tenMust(t, html,
-		`id="gsSave">保存群控设置`,
+		`id="gsSave">保存同步设置`,
 		"gsDirty_",
 		"$('#gsEn_'+g).onchange=dirty;",
 		"$('#gsIv_'+g).onchange=dirty;",

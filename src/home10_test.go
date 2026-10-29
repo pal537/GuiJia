@@ -57,6 +57,9 @@ func TestPingSyncsNameAndSysInfo(t *testing.T) {
 	}}
 	req := httptest.NewRequest("POST", "/api/nodes/ping", strings.NewReader(
 		`{"version":"v9","tgMode":"hub","name":"RN圣何塞","ip":"1.2.3.4","os":"Debian 13","arch":"x86_64"}`))
+	// 第 7 项后 IP 以 hub 观测为准: 拨入地址即节点 IP, 测试须显式给出拨入地址
+	// (httptest 默认 RemoteAddr 192.0.2.1 会被当成拨入公网而优先采纳)。
+	req.RemoteAddr = "1.2.3.4:54321"
 	req.Header.Set("X-Node-Fingerprint", fp)
 	req.Header.Set("X-Node-Token", "tok123")
 	rec := httptest.NewRecorder()
@@ -77,6 +80,8 @@ func TestHelloApprovedSyncsNameAndSysInfo(t *testing.T) {
 	hubServers = []*hubServer{{Fingerprint: fp, Name: "旧名字"}}
 	req := httptest.NewRequest("POST", "/api/nodes/hello", strings.NewReader(
 		`{"fingerprint":"`+fp+`","pubKey":"`+pub+`","name":"新名字","version":"v9","ip":"5.6.7.8","os":"Debian 12","arch":"arm64"}`))
+	// 第 7 项后 IP 以 hub 观测为准, 见 ping 测试同名注释。
+	req.RemoteAddr = "5.6.7.8:1234"
 	rec := httptest.NewRecorder()
 	handleNodeHello(rec, req)
 	if rec.Code != 200 {

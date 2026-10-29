@@ -47,7 +47,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 #tab-home>.home-wash{position:absolute;left:-16px;right:-16px;top:-8px;height:460px;pointer-events:none;z-index:0;background:radial-gradient(420px 260px at 12% 0%, rgba(186,230,253,.85), transparent 70%),radial-gradient(460px 280px at 88% 30%, rgba(165,243,252,.8), transparent 70%),radial-gradient(360px 220px at 55% 100%, rgba(219,234,254,.7), transparent 70%);filter:blur(24px)}
 /* 首页卡片: 强毛玻璃(更通透 + 更高 blur + 内高光 + 柔和蓝影), 悬停弹一下(overshoot 回弹);
    绝不用紫色渐变; prefers-reduced-motion 时关动画 */
-.srv-card{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 12px 32px rgba(37,99,235,.12);padding:18px;cursor:pointer;transition:transform .38s cubic-bezier(.34,1.56,.64,1), box-shadow .22s ease, opacity .3s ease}
+.srv-card{background:color-mix(in srgb, var(--card) 52%, transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.55);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 12px 32px rgba(37,99,235,.12);padding:18px 18px 12px;cursor:pointer;transition:transform .38s cubic-bezier(.34,1.56,.64,1), box-shadow .22s ease, opacity .3s ease}
 .srv-card:hover{transform:translateY(-6px) scale(1.015);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 20px 40px rgba(37,99,235,.18)}
 .srv-card.offline{opacity:.55;filter:saturate(.4);cursor:default}
 .srv-card.offline:hover{transform:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 12px 32px rgba(37,99,235,.12)}
@@ -56,7 +56,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 /* 正在管理的卡片: 蓝青色渐变闪烁边框 + 微光(绝不用紫色); 回首页(未查看节点)时不发光 */
 .srv-card.managing{border:2px solid #38bdf8;animation:glowPulse 2.2s ease-in-out infinite}
 @keyframes glowPulse{0%,100%{box-shadow:0 0 0 2px rgba(37,99,235,.35),0 0 14px rgba(34,211,238,.35)}50%{box-shadow:0 0 0 3px rgba(37,99,235,.6),0 0 26px rgba(34,211,238,.65)}}
-.srv-card .srv-top{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.srv-card .srv-top{display:flex;align-items:center;gap:8px;margin-bottom:22px}
 .srv-card .srv-name{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .srv-card .srv-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.15)}
 .srv-card.offline .srv-dot{background:#9aa5b1;box-shadow:0 0 0 3px rgba(154,165,177,.15)}
@@ -65,10 +65,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);box-shadow:0 0
 .srv-card .srv-num{font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;min-height:24px}
 .srv-card .srv-lab{color:var(--mut);font-size:12px;margin-top:3px}
 .srv-card .srv-foot{color:var(--mut);font-size:12px;margin-top:12px;min-height:16px}
-.srv-card .srv-meta{color:var(--mut);font-size:12.5px;margin-top:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srv-card .srv-meta{color:var(--mut);font-size:12.5px;margin-top:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .srv-card .srv-meta b{color:var(--txt);font-weight:600}
+.srv-card .srv-meta2{font-size:12px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
 /* 卡片底部: 左下角设置按钮 + 右下角系统 LOGO(系统文字行已删, 全集成到 LOGO 的 title 里) */
-.srv-card .srv-foot2{display:flex;align-items:center;gap:8px;margin-top:14px}
+.srv-card .srv-foot2{display:flex;align-items:center;gap:8px;margin-top:8px}
 .srv-card .srv-logo{margin-left:auto;flex:0 0 auto;line-height:0}
 .srv-card .srv-logo svg{width:28px;height:28px;display:block}
 /* 卡片国旗图: 真实国旗图片(Windows 下 emoji 旗只显示字母, 故不用 emoji) */
@@ -398,7 +399,7 @@ body.auth #loginView{margin:auto}
     <div class="home-wash" aria-hidden="true"></div>
     <div class="home-alert" id="homeAlert" style="display:none"><span id="homeAlertTx"></span><span class="sp"></span><button class="btn sm" id="btnHomeAck">知道了</button></div>
     <div class="home-grid" id="homeGrid"></div>
-    <div class="home-foot" style="display:flex;align-items:center;gap:10px;color:var(--mut);font-size:12.5px;padding:2px 4px 6px"><button class="btn sm" id="btnGroupSync">群控设置</button>点卡片切换到那台服务器的面板；离线卡片不可点。<span id="homeTime"></span><span style="flex:1"></span></div>
+    <div class="home-foot" style="display:flex;align-items:center;gap:10px;color:var(--mut);font-size:12.5px;padding:2px 4px 6px"><button class="btn sm" id="btnGroupSync">同步设置</button>点卡片切换到那台服务器的面板；离线卡片不可点。<span id="homeTime"></span><span style="flex:1"></span></div>
   </section>
 
   <div class="panel" id="rescueBanner" style="display:none;border-color:rgba(212,58,47,.5)">
@@ -531,7 +532,7 @@ body.auth #loginView{margin:auto}
         <div class="frow"><div class="fl">预置端口</div><div class="fv" id="hpPresets"></div></div>
         <div class="frow"><div class="fl">自定义端口<div class="d">英文逗号、中文逗号或斜杠分隔，如 8080,8443；与预置合并去重；含不支持的符号会报错</div></div><div class="fv"><input id="hpCustom" placeholder="8080,8443"></div></div>
         <div class="frow"><div class="fl">命中 N 次即封</div><div class="fv"><input type="number" id="hpN" min="1"><span class="mono">次（默认 1 次即封）</span></div></div>
-        <div class="frow"><div class="fl">封禁时长 T</div><div class="fv"><input type="number" id="hpT" min="1"><span class="mono">小时（默认 24 小时，不永久）</span></div></div>
+        <div class="frow"><div class="fl">封禁时长 T</div><div class="fv"><input type="number" id="hpT" min="0"><span class="mono">小时（0=永久，默认 24 小时）</span></div></div>
         <div class="frow"><div class="fl">自动拉黑<div class="d">默认关；关时命中只记录 + 报警；开时达 N 次走蜜罐封禁（不走递进阶梯）</div></div><div class="fv"><label class="sw"><input type="checkbox" id="hpAuto"><i></i></label></div></div>
         <div class="frow"><div class="fl">命中报警<div class="d">已移到通知方式 → 通知配置里统一管理</div></div><div class="fv"><span class="mono">设置 → 通知方式 → 通知配置 → 蜜罐命中报警</span></div></div>
         <div class="frow"><div class="fl">今日蜜罐封禁</div><div class="fv"><span class="mono" id="hpBansToday">—</span><span class="mono">（今日拉黑的蜜罐明细）</span></div></div>
@@ -786,17 +787,25 @@ function osLogo(os,arch){
   else svg='<svg viewBox="0 0 28 28"><rect x="2" y="2" width="24" height="24" rx="6" fill="#64748b"/><text x="14" y="19" font-size="11" font-weight="700" fill="#fff" text-anchor="middle" font-family="monospace">&gt;_</text></svg>';
   return '<span class="srv-logo" title="'+title+'">'+svg+'</span>';
 }
+/* 开机时长格式: ≥1 天显示 X天Y小时, ≥1 小时显示 X小时Y分, 否则 X分钟; 0 或无效返回 ''(不显示)。 */
+function fmtUptime(sec){
+  sec=Math.floor(sec||0);if(sec<=0)return '';
+  const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60);
+  if(d>0)return d+'天'+h+'小时';
+  if(h>0)return h+'小时'+m+'分';
+  return m+'分钟';
+}
 function homeCardHTML(fp,name,online,tag,foot,animate,delay,meta){
   const m=meta||{};
   const loc=flagImg(m.countryCode)+esc(m.location||'未知');
   const ip=esc(m.ip||'未知');
   const logo=osLogo(m.os,m.arch);
   const menu='<div class="srv-foot2"><button class="btn sm" data-act="menu" data-fp="'+fp+'">设置</button>'+logo+'</div>';
-  return '<div class="srv-card'+(online?'':' offline')+(animate?' srv-in':'')+(((fp&&fp===curServer)||(!fp&&managingLocal))?' managing':'')+'" data-fp="'+fp+'"'+(animate?' style="animation-delay:'+delay+'ms"':'')+'><div class="srv-top"><span class="srv-dot"></span><span class="srv-name">'+esc(name)+'</span><span class="srv-tag">'+tag+'</span></div><div class="srv-meta" data-k="loc">'+loc+' · <b>'+ip+'</b></div><div class="srv-nums"><div><div class="srv-num" data-k="conns">…</div><div class="srv-lab">当前连接</div></div><div><div class="srv-num" data-k="bans">…</div><div class="srv-lab">今日拉黑</div></div><div><div class="srv-num" data-k="ports">…</div><div class="srv-lab">监听端口</div></div><div><div class="srv-num" data-k="blist" title="黑名单：生效 / 全部记录">…</div><div class="srv-lab">黑名单</div></div></div><div class="srv-foot">'+esc(foot)+'</div>'+menu+'</div>';
+  return '<div class="srv-card'+(online?'':' offline')+(animate?' srv-in':'')+(((fp&&fp===curServer)||(!fp&&managingLocal))?' managing':'')+'" data-fp="'+fp+'"'+(animate?' style="animation-delay:'+delay+'ms"':'')+'><div class="srv-top"><span class="srv-dot"></span><span class="srv-name">'+esc(name)+'</span><span class="srv-tag">'+tag+'</span></div><div class="srv-meta" data-k="loc">'+loc+' · <b>'+ip+'</b>'+(m.ip6?'<div class="srv-meta2">'+esc(m.ip6)+'</div>':'')+'</div><div class="srv-nums"><div><div class="srv-num" data-k="conns">…</div><div class="srv-lab">当前连接</div></div><div><div class="srv-num" data-k="bans">…</div><div class="srv-lab">今日拉黑</div></div><div><div class="srv-num" data-k="ports">…</div><div class="srv-lab">监听端口</div></div><div><div class="srv-num" data-k="blist" title="黑名单：生效 / 全部记录">…</div><div class="srv-lab">黑名单</div></div></div><div class="srv-foot">'+esc(foot)+'</div>'+menu+'</div>';
 }
 function homeSetMeta(fp,m){
   const c=homeCardEl(fp);if(!c||!m)return;
-  const l=c.querySelector('[data-k="loc"]');if(l)l.innerHTML=flagImg(m.countryCode)+esc(m.location||'未知')+' · <b>'+esc(m.ip||'未知')+'</b>';
+  const l=c.querySelector('[data-k="loc"]');if(l)l.innerHTML=flagImg(m.countryCode)+esc(m.location||'未知')+' · <b>'+esc(m.ip||'未知')+'</b>'+(m.ip6?'<div class="srv-meta2">'+esc(m.ip6)+'</div>':'');
 }
 /* 卡片设置菜单: 左下角“设置”按钮点开的弹窗菜单; 本机卡只有设置归属地,
    节点卡另有移除管理。反馈只在弹窗内。 */
@@ -827,7 +836,7 @@ function gsSectionHTML(group,title,desc,cfg){
    前端轮询上次同步时间, 让用户亲眼看到同步生效, 不用等定时器); 点“立即同步”先保存当前表单再同步;
    点关闭直接丢弃未保存改动(什么都没存过, 无需回滚)。反馈只在弹窗内, 不弹顶部提示。 */
 async function openGroupSyncModal(){
-  let cfg;try{cfg=await apiLocal('GET','api/group-sync/settings');}catch(e){openCModal('<h3 class="mtitle">群控设置</h3><div class="sline fail">读取失败：'+esc(e.message)+'</div>');return;}
+  let cfg;try{cfg=await apiLocal('GET','api/group-sync/settings');}catch(e){openCModal('<h3 class="mtitle">同步设置</h3><div class="sline fail">读取失败：'+esc(e.message)+'</div>');return;}
   const bl=cfg.blacklist||{enabled:false,intervalMin:10}, wl=cfg.whitelist||{enabled:false,intervalMin:10};
   const pt=cfg.protection||{enabled:false,intervalMin:10,items:{}};
   const ptIt=pt.items||{};
@@ -839,12 +848,12 @@ async function openGroupSyncModal(){
   '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13px">同步间隔</span><select id="gsIv_protection">'+[5,10,30,60].map(v=>'<option value="'+v+'"'+(pt.intervalMin===v?' selected':'')+'>'+v+' 分钟</option>').join('')+'</select>'+
   '<button class="btn" id="gsNow_protection">立即同步</button></div>'+
   '<div class="'+ptStCls+'" id="gsSt_protection" style="margin-top:10px">'+ptStTx+'</div></div>';
-  openCModal('<h3 class="mtitle">群控设置</h3><div style="display:flex;flex-direction:column;gap:12px">'+
+  openCModal('<h3 class="mtitle">同步设置</h3><div style="display:flex;flex-direction:column;gap:12px">'+
     gsSectionHTML('blacklist','共享黑名单','主服务器的黑名单为源，推向各节点；只新增与改状态，绝不删记录，本机条目不动。开启后新加入节点批准后立即自动同步一次。',bl)+
     gsSectionHTML('whitelist','共享白名单','主服务器的信任名单为源，推向各节点；只动共享标记的条目，本机条目不动。开启后新加入节点批准后立即自动同步一次。',wl)+
     ptSec+
     '<div class="sline" id="gsSaveMsg" style="display:none"></div>'+
-    '<div style="display:flex;gap:8px"><button class="btn primary" id="gsSave">保存群控设置</button><button class="btn" id="gsClose">关闭</button></div></div>');
+    '<div style="display:flex;gap:8px"><button class="btn primary" id="gsSave">保存同步设置</button><button class="btn" id="gsClose">关闭</button></div></div>');
   const loaded={blacklist:{enabled:!!bl.enabled,intervalMin:bl.intervalMin},whitelist:{enabled:!!wl.enabled,intervalMin:wl.intervalMin},protection:{enabled:!!pt.enabled,intervalMin:pt.intervalMin,items:{flood:!!ptIt.flood,autoban:!!ptIt.autoban,scan:!!ptIt.scan,intel:!!ptIt.intel}}};
   const openedSync={blacklist:{at:bl.lastSyncAt||0,detail:bl.lastDetail||''},whitelist:{at:wl.lastSyncAt||0,detail:wl.lastDetail||''},protection:{at:pt.lastSyncAt||0,detail:pt.lastDetail||''}};
   const renderGsSt=(g,cfg)=>{const stEl=$('#gsSt_'+g);if(!stEl)return;
@@ -981,9 +990,11 @@ async function loadHome(){
   const prevSet=new Set(homeMounted);
   if(JSON.stringify(want)!==JSON.stringify(homeMounted)){
     $('#homeGrid').innerHTML=want.map((fp,i)=>{
-      if(!fp)return homeCardHTML('','本机',true,'本机','本机面板',!prevSet.has(''),i*60,localMeta);
+      if(!fp)return homeCardHTML('','本机',true,'本机',localMeta.uptimeSec>0?('本机面板 · 开机 '+fmtUptime(localMeta.uptimeSec)):'本机面板',!prevSet.has(''),i*60,localMeta);
       const s=homeServers.find(x=>x.fp===fp);
-      const foot=s.online?(s.ver?'版本 '+s.ver:''):(s.last?('最后在线 '+fmtTs(s.last*1000)):'未上线过');
+      let foot='';
+      if(s.online){foot=s.ver?('版本 '+s.ver):'';if(s.uptime>0)foot+=(foot?' · ':'')+'开机 '+fmtUptime(s.uptime);}
+      else foot=s.last?('最后在线 '+fmtTs(s.last*1000)):'未上线过';
       return homeCardHTML(fp,s.name,s.online,s.online?'在线':'离线',foot,!prevSet.has(fp),i*60,s);
     }).join('');
     homeMounted=want;
@@ -996,9 +1007,10 @@ async function loadHome(){
       c.querySelector('.srv-tag').textContent=s.online?'在线':'离线';
       homeSetMeta(s.fp,s);
       if(!s.online)c.querySelector('.srv-foot').textContent=s.last?('最后在线 '+fmtTs(s.last*1000)):'未上线过';
-      else if(s.ver)c.querySelector('.srv-foot').textContent='版本 '+s.ver;
+      else{let f=s.ver?('版本 '+s.ver):'';if(s.uptime>0)f+=(f?' · ':'')+'开机 '+fmtUptime(s.uptime);if(f)c.querySelector('.srv-foot').textContent=f;}
     });
     homeSetMeta('',localMeta);
+    const lc0=homeCardEl('');if(lc0&&localMeta.uptimeSec>0)lc0.querySelector('.srv-foot').textContent='本机面板 · 开机 '+fmtUptime(localMeta.uptimeSec);
   }
   // 本机数
   let local=null,localName='本机';
@@ -1756,7 +1768,7 @@ async function loadHoneypot(){
   $('#hpOn').checked=!!c.enabled;
   $('#hpAuto').checked=!!c.autoBan;
   $('#hpN').value=c.hitThreshold||1;
-  $('#hpT').value=c.banHours||24;
+  $('#hpT').value=(c.banHours==null?24:c.banHours);
   hpPresets=h.presets||[];
   const cur=new Set(c.ports||[]);
   $('#hpPresets').innerHTML=hpPresets.map(p=>'<label><input type="checkbox" data-hp="'+p.port+'"'+(cur.has(p.port)?' checked':'')+'>'+p.port+'（'+p.label+'）</label>').join('');
@@ -1812,7 +1824,7 @@ function hpCollect(){
   $$('#hpPresets [data-hp]').forEach(cb=>{if(cb.checked)ports.push(+cb.dataset.hp)});
   const cv=$('#hpCustom').value.trim();
   if(cv)parsePortList(cv).forEach(n=>{if(!ports.includes(n))ports.push(n)});
-  return {enabled:$('#hpOn').checked,ports,autoBan:$('#hpAuto').checked,hitThreshold:+$('#hpN').value||1,banHours:+$('#hpT').value||24};
+  return {enabled:$('#hpOn').checked,ports,autoBan:$('#hpAuto').checked,hitThreshold:+$('#hpN').value||1,banHours:($('#hpT').value==='' ? 24 : +$('#hpT').value)};
 }
 async function hpSave(confirm){
   let body;
@@ -2146,8 +2158,10 @@ function banPassesFilter(b,srcF,stF,q){
 let banShown=10,trustShown=10;
 function trustListArr(){return $('#sTrusted').value.split('\n').map(x=>x.trim()).filter(Boolean);}
 function trustListSync(arr){$('#sTrusted').value=arr.join('\n');}
+/* 内置公共 DNS: 只生效不显示(与内网 IP 同理); 增删保存仍走全量 #sTrusted, 渲染层过滤, 隐藏条目删不掉也清不掉。 */
+const BUILTIN_DNS=new Set(['8.8.8.8','8.8.4.4','1.1.1.1','1.0.0.1','9.9.9.9','149.112.112.112','208.67.222.222','208.67.220.220','223.5.5.5','223.6.6.6','119.29.29.29','180.76.76.76','114.114.114.114','114.114.115.115','1.2.4.8','210.2.4.8','2001:4860:4860::8888','2001:4860:4860::8844','2606:4700:4700::1111','2606:4700:4700::1001','2620:fe::9','2620:fe::fe','2400:3200::1','2400:3200:baba::1','2402:4e00::']);
 function renderTrustList(){
-  const arr=trustListArr();
+  const arr=trustListArr().filter(t=>!BUILTIN_DNS.has(t));
   $('#trustList').innerHTML=arr.slice(0,trustShown).map(t=>'<div class="trust-row"><span class="mono">'+esc(t)+'</span><button class="btn sm" data-trust-del="'+esc(t)+'">删除</button></div>').join('')||'<div class="hint" style="padding:8px 18px">暂无信任条目</div>';
   $$('#trustList [data-trust-del]').forEach(b=>b.onclick=()=>{trustListSync(trustListArr().filter(x=>x!==b.dataset.trustDel));renderTrustList();});
   const te=$('#trustExpand');
@@ -2700,7 +2714,7 @@ async function openAlertModal(){
   openCModal('<h3 class="mtitle">通知配置</h3><div class="csub">报警项目开关；保存后立即生效，只改报警相关项。</div>'+
     ALERTROWS.map(r=>'<div class="cmrow"><div class="cml">'+r[2]+'<div class="d">'+r[3]+'</div></div><div class="cmv"><label class="sw"><input type="checkbox" id="cm'+r[0]+'"'+(s[r[1]]?' checked':'')+'><i></i></label></div></div>').join('')+
     '<div class="sline" id="cmAlertMsg" style="display:none;margin-top:10px"></div>'+
-    '<div class="cfoot"><button class="btn" id="cmAlertCancel">取消</button><button class="btn primary" id="cmAlertSave">保存</button></div>');
+    '<div class="cfoot"><button class="btn" id="cmAlertCancel">关闭</button><button class="btn primary" id="cmAlertSave">保存</button></div>');
   $('#cmAlertCancel').onclick=closeCModal;
   $('#cmAlertSave').onclick=async()=>{
     const body={};ALERTROWS.forEach(r=>{body[r[1]]=$('#cm'+r[0]).checked});

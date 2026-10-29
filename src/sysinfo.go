@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -48,8 +49,15 @@ func archDisplay() string {
 	}
 }
 
-// primaryIP 本机主 IP: 取第一个启用、非回环的全局单播 IPv4;
-// 没有时返回 ""(调用方显示未知)。
+// isPublicIP 真公网地址: 全局单播且不在私网段。
+// 注意 IsGlobalUnicast 包含私网段(10/8、172.16/12、192.168/16、ULA),
+// 故必须再排除 IsPrivate; 回环/链路本地/组播已由 IsGlobalUnicast 排除。
+func isPublicIP(ip net.IP) bool {
+	return ip != nil && ip.IsGlobalUnicast() && !ip.IsPrivate()
+}
+
+// primaryIP 本机主 IP: 优先第一个真正公网 IPv4;
+// 无公网时回落第一个非回环 IPv4(私网, 如 NAT 机), 都没有返回 ""。
 func primaryIP() string {
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -75,7 +83,7 @@ func primaryIP() string {
 			if ip == nil || ip.To4() == nil {
 				continue
 			}
-			if ip.IsGlobalUnicast() {
+			if isPublicIP(ip) {
 				return ip.String()
 			}
 			if fallback == "" {
@@ -84,6 +92,63 @@ func primaryIP() string {
 		}
 	}
 	return fallback
+}
+
+// primaryIPv6 本机主公网 IPv6: 第一个公网 GUA 地址(排除 ULA、链路本地、回环);
+// 没有时返回 ""(调用方不显示 IPv6 行)。
+func primaryIPv6() string {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
+	for _, ifc := range ifaces {
+		if ifc.Flags&net.FlagUp == 0 || ifc.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := ifc.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, a := range addrs {
+			var ip net.IP
+			switch v := a.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.To4() != nil {
+				continue
+			}
+			if isPublicIP(ip) {
+				return ip.String()
+			}
+		}
+	}
+	return ""
+}
+
+// parseUptimeSeconds 解析 /proc/uptime 内容: 首字段为开机秒数(可带小数)。
+func parseUptimeSeconds(content string) int64 {
+	f := strings.Fields(content)
+	if len(f) == 0 {
+		return 0
+	}
+	sec, err := strconv.ParseFloat(f[0], 64)
+	if err != nil || sec < 0 {
+		return 0
+	}
+	return int64(sec)
+}
+
+// sysUptimeSec 系统开机时长(秒): 读 /proc/uptime; 非 Linux 或读不到返回 0,
+// 调用方不拿进程运行时长冒充(见 api overview 的 uptimeSec, 那是面板进程时长)。
+func sysUptimeSec() int64 {
+	b, err := os.ReadFile("/proc/uptime")
+	if err != nil {
+		return 0
+	}
+	return parseUptimeSeconds(string(b))
 }
 
 // nodeSysInfo 节点上报三件套: 主 IP、操作系统、架构。

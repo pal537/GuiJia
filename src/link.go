@@ -145,13 +145,14 @@ func linkSession() error {
 	pub := nodePubKeyB64()
 	name := nodeDisplayName()
 	sysIP, sysOS, sysArch := nodeSysInfo()
+	sysIP6 := primaryIPv6()
 	c15 := &http.Client{Timeout: 15 * time.Second}
 	cPoll := &http.Client{Timeout: 35 * time.Second}
 
 	hello := func() (string, error) {
 		st, body, err := linkPost(c15, hubURL+"/api/nodes/hello", "", map[string]any{
 			"fingerprint": fp, "pubKey": pub, "name": name, "version": appVersion,
-			"code": nodePairingCode(), "ip": sysIP, "os": sysOS, "arch": sysArch,
+			"code": nodePairingCode(), "ip": sysIP, "ip6": sysIP6, "os": sysOS, "arch": sysArch,
 		})
 		if err != nil {
 			return "", err
@@ -263,6 +264,7 @@ func linkSession() error {
 
 func linkPingLoop(client *http.Client, hubURL, token string, stop chan struct{}) error {
 	sysIP, sysOS, sysArch := nodeSysInfo()
+	sysIP6 := primaryIPv6()
 	// 先 ping 一次确认, 再每 30 秒一次。
 	for first := true; ; first = false {
 		if !first {
@@ -277,7 +279,7 @@ func linkPingLoop(client *http.Client, hubURL, token string, stop chan struct{})
 		}
 		st, body, err := linkPost(client, hubURL+"/api/nodes/ping", token, map[string]any{
 			"version": appVersion, "tgMode": nodeTGMode(), "name": nodeDisplayName(),
-			"ip": sysIP, "os": sysOS, "arch": sysArch,
+			"ip": sysIP, "ip6": sysIP6, "uptime": sysUptimeSec(), "os": sysOS, "arch": sysArch,
 		})
 		if err != nil {
 			return err

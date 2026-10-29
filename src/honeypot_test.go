@@ -261,3 +261,58 @@ func TestHoneypotApplyAndRollback(t *testing.T) {
 		t.Fatal("关闭后蜜罐端口应不再监听")
 	}
 }
+
+// 第 7 项回归测试: 蜜罐封禁时长 0 = 永久, 只纠负数回默认 24 小时。
+func TestHoneypotBanHoursZeroPermanent(t *testing.T) {
+	dir := t.TempDir()
+	oldFile, oldCfg := honeypotFile, honeypotCfg
+	honeypotFile = filepath.Join(dir, "honeypot.json")
+	t.Cleanup(func() {
+		honeypotMu.Lock()
+		honeypotFile, honeypotCfg = oldFile, oldCfg
+		honeypotMu.Unlock()
+	})
+	readBanHours := func() int {
+		t.Helper()
+		honeypotMu.Lock()
+		defer honeypotMu.Unlock()
+		return honeypotCfg.BanHours
+	}
+	// 落盘 0: load 不应钳回 24
+	honeypotMu.Lock()
+	honeypotCfg = HoneypotConfig{BanHours: 0}
+	honeypotMu.Unlock()
+	saveHoneypot()
+	honeypotMu.Lock()
+	honeypotCfg = HoneypotConfig{}
+	honeypotMu.Unlock()
+	loadHoneypot()
+	if got := readBanHours(); got != 0 {
+		t.Fatalf("落盘 BanHours=0 经 load 应保持 0, 实际 %d", got)
+	}
+	// 落盘负数: 纠回 24
+	honeypotMu.Lock()
+	honeypotCfg = HoneypotConfig{BanHours: -5}
+	honeypotMu.Unlock()
+	saveHoneypot()
+	honeypotMu.Lock()
+	honeypotCfg = HoneypotConfig{}
+	honeypotMu.Unlock()
+	loadHoneypot()
+	if got := readBanHours(); got != 24 {
+		t.Fatalf("落盘 BanHours=-5 经 load 应纠回 24, 实际 %d", got)
+	}
+	// apply 路径: 0 落盘保持 0, 负数纠回 24(不启用, 不监听, 不触发确认)
+	if _, _, err := honeypotApply(HoneypotConfig{BanHours: 0, HitThreshold: 1}, false); err != nil {
+		t.Fatalf("apply BanHours=0 应成功, 实际 %v", err)
+	}
+	if got := readBanHours(); got != 0 {
+		t.Fatalf("apply BanHours=0 应落盘 0, 实际 %d", got)
+	}
+	if _, _, err := honeypotApply(HoneypotConfig{BanHours: -3, HitThreshold: 1}, false); err != nil {
+		t.Fatalf("apply BanHours=-3 应成功, 实际 %v", err)
+	}
+	if got := readBanHours(); got != 24 {
+		t.Fatalf("apply BanHours=-3 应纠回 24, 实际 %d", got)
+	}
+}

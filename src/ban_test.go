@@ -229,3 +229,22 @@ func TestChinaTimezone(t *testing.T) {
 		t.Fatalf("本地时区偏移应为 +8h, 实际 %d 秒", off)
 	}
 }
+
+// 第 7 项回归测试: 封禁时长 0 = 永久(Until=0), 正数按小时算未来时间。
+func TestApplyBanZeroHoursPermanent(t *testing.T) {
+	banTestSetup(t)
+	b, err := applyBan("203.0.113.99", "测试", "manual", 0)
+	if err != nil {
+		t.Fatalf("applyBan hours=0 应成功, 实际 %v", err)
+	}
+	if b.Until != 0 {
+		t.Fatalf("hours=0 应永久 Until=0, 实际 %d", b.Until)
+	}
+	b2, err := applyBan("198.51.100.99", "测试", "manual", 24)
+	if err != nil {
+		t.Fatalf("applyBan hours=24 应成功, 实际 %v", err)
+	}
+	if b2.Until <= time.Now().Unix() {
+		t.Fatalf("hours=24 应有未来 Until, 实际 %d", b2.Until)
+	}
+}

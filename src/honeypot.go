@@ -67,7 +67,8 @@ func loadHoneypot() {
 	if honeypotCfg.HitThreshold < 1 {
 		honeypotCfg.HitThreshold = 1
 	}
-	if honeypotCfg.BanHours < 1 {
+	// 0 = 永久封禁, 只纠负数回默认 24 小时(旧配置恒 ≥1, 故 0 只代表用户新填的永久)。
+	if honeypotCfg.BanHours < 0 {
 		honeypotCfg.BanHours = 24
 	}
 }
@@ -152,7 +153,8 @@ func honeypotApply(cfg HoneypotConfig, confirm bool) (needConfirm bool, history 
 	if cfg.HitThreshold < 1 {
 		cfg.HitThreshold = 1
 	}
-	if cfg.BanHours < 1 {
+	// 0 = 永久封禁(applyBan 里 hours<=0 即 Until=0), 只纠负数回默认 24 小时。
+	if cfg.BanHours < 0 {
 		cfg.BanHours = 24
 	}
 	if cfg.Enabled {
