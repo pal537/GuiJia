@@ -6,6 +6,14 @@ Guijia is a security and monitoring panel for Linux servers (VPS / cloud): live 
 
 > The fnOS app edition is maintained separately and is not in this repo.
 
+## Screenshots
+
+![Home: multi-server control (demo data)](docs/screenshots/home.png)
+*Home: multi-server control across regions (demo data).*
+
+![Overview: live connections (demo data)](docs/screenshots/overview.png)
+*Overview: live connections, split into firewall-rule ports and other ports (demo data).*
+
 ## Features
 
 ### 📊 Overview & live connections
