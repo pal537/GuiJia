@@ -599,13 +599,13 @@ body.auth #loginView{margin:auto}
       <div class="ph"><h2 class="mtitle">面板设置</h2><span class="hint">登录封禁、改密码、面板端口</span><span class="sp"></span><button class="btn primary" id="btnPanelSave">保存面板设置</button></div>
       <div class="frow"><div class="fl">登录封禁次数<div class="d">密码连续错几次封 IP（时长固定 7 天）</div></div><div class="fv"><input type="number" id="sPanelBan" min="1" max="100" style="width:90px"></div></div>
       <div class="frow"><div class="fl">服务器名称<div class="d">TG 通知标题用；留空则使用系统主机名</div></div><div class="fv"><input id="sServerName" class="in-mid" maxlength="32" placeholder="服务器名称"></div></div>
-      <div class="frow"><div class="fl">面板端口<div class="d">改动后写环境文件并重启面板，当前页会断开，请用新端口重新打开</div></div><div class="fv"><input type="number" id="sPanelPort" class="in-mid" min="1" max="65535"><button class="btn" id="btnPanelPortSave">保存并重启</button></div></div>
+      <div class="frow"><div class="fl">面板端口<div class="d">保存后重启面板，请用新端口重新打开</div></div><div class="fv"><input type="number" id="sPanelPort" class="in-mid" min="1" max="65535"><button class="btn" id="btnPanelPortSave">保存并重启</button></div></div>
       <div class="frow" id="pwChangeRow"><div class="fl">修改密码<div class="d">改密后其他登录全部失效，当前登录保留</div></div><div class="fv"><button class="btn" id="btnPanelPwChange">修改密码</button></div></div>
       <div class="sline" id="panelPortHint" style="margin-top:8px;display:none"></div>
     </div>
     <div class="panel" style="margin-bottom:14px" id="pairCard">
       <div class="ph"><h2 class="mtitle">群控设置</h2><span class="hint">接入主服务器（被控）或生成配对码（控制子服务器）</span></div>
-      <div class="frow"><div class="fl">多服务器<div class="d">本机可接入主服务器成为被控节点，也可作为主服务器生成配对码接纳子服务器</div></div><div class="fv"><button class="btn" id="btnJoinHub">接入主服务器（被控）</button><button class="btn primary" id="btnPairGen2">生成配对码（控制子服务器）</button></div></div>
+      <div class="frow"><div class="fl">多服务器<div class="d">接入主服务器成为被控节点，或生成配对码接纳子服务器</div></div><div class="fv"><button class="btn" id="btnJoinHub">接入主服务器（被控）</button><button class="btn primary" id="btnPairGen2">生成配对码（控制子服务器）</button></div></div>
       <div class="sline run" id="pairIdentity" style="display:none"></div>
       <div class="hint" id="pairMsg" style="margin:0 0 10px"></div>
       <div style="border-top:1px solid var(--line);margin:6px 0 0"></div>
@@ -616,12 +616,7 @@ body.auth #loginView{margin:auto}
     <div class="setgrid">
       <div class="scard" id="tgCard">
         <h3 class="mtitle">通知方式 <span class="cbadge">Telegram</span></h3>
-        <div class="frow"><div class="fl">启用 TG 报警<div class="d">报警消息带一键拉黑按钮</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sTgOn"><i></i></label></div></div>
-        <div class="frow"><div class="fl">Bot Token</div><div class="fv"><input id="sTgToken" type="password" placeholder="123456:ABC-..."></div></div>
-        <div class="frow"><div class="fl">Chat ID<div class="d">只认这个会话的拉黑回调</div></div><div class="fv"><input id="sTgChat" placeholder="例如 123456789"></div></div>
-        <div class="frow"><div class="fl">连通性测试<div class="d">用当前填写的值发送，无需先保存</div></div><div class="fv"><button class="btn" id="btnTgTest">发送测试消息</button></div></div>
-        <div class="frow"><div class="fl">通知配置<div class="d">报警项目开关：SSH 登录、爆破、连接、面板登录、防火墙封禁、蜜罐、新监听等</div></div><div class="fv"><button class="btn" id="btnAlertCfg">通知配置</button></div></div>
-        <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
+        <div class="frow"><div class="fl">Telegram 设置<div class="d">报警开关、机器人、通知项目都在里面</div></div><div class="fv"><span class="mono" id="tgStatus">…</span><button class="btn primary" id="btnTgCfg">Telegram 设置</button></div></div>
       </div>
 
       <div class="scard" id="nodeTgCard" style="display:none">
@@ -636,20 +631,9 @@ body.auth #loginView{margin:auto}
       </div>
 
       <div class="scard">
-        <h3 class="mtitle">连接流量统计</h3>
-        <div class="hint">每条连接的流量数字来自内核的连接字节计数（nf_conntrack_acct）。开启后，本应用会在启动时自动打开它，任何人装上就能用，不需要改系统设置；设备重启后应用也会自动重新打开。应用退出时会把自己打开的开关恢复原样；若这个开关原本就是开着的（别的软件打开的），应用不会动它。</div>
-        <div class="frow"><div class="fl">启用流量统计<div class="d">流量列、实时速率与流量排序的数据源</div></div><div class="fv"><label class="sw"><input type="checkbox" id="sAcctOn"><i></i></label><span class="mono" id="acctStatus"></span></div></div>
-        <div class="frow"><div class="fl">累计账本<div class="d">每个对端的历次连接总量（悬停在流量上可见）：永久保留、只增不减，仅可在下方「数据清理」里手动清空</div></div><div class="fv"><span class="mono">永久</span></div></div>
-        <div class="frow"><div class="fl">每日明细保留<div class="d">每天一份「各对端当天传了多少」的明细文件</div></div><div class="fv"><input type="number" id="sLedgerKeep" min="0" max="3650"><span class="mono">天；填 0 = 永久保留</span></div></div>
-        <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
-      </div>
-
-      <div class="scard">
         <h3 class="mtitle">日报与日志</h3>
-        <div class="frow"><div class="fl">TG 日报</div><div class="fv"><label class="sw"><input type="checkbox" id="sRepOn"><i></i></label><span class="mono">每天</span><input id="sRepTime" class="short" placeholder="09:00"><span class="mono">推送当日摘要（时:分）</span></div></div>
-        <div class="frow"><div class="fl">事件日志保留</div><div class="fv"><input type="number" id="sKeep" min="1" max="365"><span class="mono">天，超期自动清理</span></div></div>
-        <div class="frow"><div class="fl">新来源事件保留<div class="d">每个新 IP 当日首次出现留一条（量大价值低，单独保留期）</div></div><div class="fv"><input type="number" id="sSrcKeep" min="0" max="365"><span class="mono">天；填 0 = 只计数、不记录</span></div></div>
-        <div class="savebar"><button class="btn primary" data-save>保存设置</button><span class="savedtip">已保存</span></div>
+        <div class="frow"><div class="fl">连接流量统计<div class="d">流量开关、账本与每日明细</div></div><div class="fv"><button class="btn" id="btnTrafficCfg">连接流量统计</button></div></div>
+        <div class="frow"><div class="fl">日报与日志<div class="d">TG 日报、事件日志保留期</div></div><div class="fv"><button class="btn" id="btnReportCfg">日报与日志</button></div></div>
       </div>
 
       <div class="scard">
@@ -660,13 +644,9 @@ body.auth #loginView{margin:auto}
       </div>
 
       <div class="scard">
-        <h3 class="mtitle">数据清理</h3>
-        <div class="frow"><div class="fl">数据清理<div class="d">清空事件与统计、黑名单、流量账本；清空后不可恢复</div></div><div class="fv"><button class="btn danger" id="btnCleanupCfg">数据清理</button></div></div>
-      </div>
-
-      <div class="scard">
-        <h3 class="mtitle">备份与恢复</h3>
-        <div class="frow"><div class="fl">备份与恢复<div class="d">设置备份、数据备份、恢复设置、恢复数据</div></div><div class="fv"><button class="btn" id="btnBackupCfg">备份与恢复</button></div></div>
+        <h3 class="mtitle">备份恢复和数据清理</h3>
+        <div class="frow"><div class="fl">备份与恢复<div class="d">设置/数据备份与恢复</div></div><div class="fv"><button class="btn" id="btnBackupCfg">备份与恢复</button></div></div>
+        <div class="frow"><div class="fl">数据清理<div class="d">清空事件、黑名单、流量账本，不可恢复</div></div><div class="fv"><button class="btn danger" id="btnCleanupCfg">数据清理</button></div></div>
       </div>
     <div class="panel" style="margin-bottom:14px" id="upCard">
       <div class="ph"><h2 class="mtitle">版本与升级</h2><span class="hint">升级会重启面板，重启后请重新登录</span></div>
@@ -2230,16 +2210,18 @@ const ALERTROWS=[
 let setLoaded=null;
 function fillSettings(s){
   setLoaded=s;
-  $('#sTgOn').checked=!!s.tgEnabled;$('#sTgToken').value=s.tgBotToken||'';$('#sTgChat').value=s.tgChatId||'';
+  {const ts=$('#tgStatus');if(ts)ts.textContent=s.tgEnabled?'已启用':'未启用';}
+  /* TG/流量/日报控件已收进弹窗: 弹窗未打开时页内无此元素, 只在存在时写值。 */
+  {const t=$('#sTgOn');if(t){t.checked=!!s.tgEnabled;$('#sTgToken').value=s.tgBotToken||'';$('#sTgChat').value=s.tgChatId||'';}}
   // 报警项目不在页内平铺, 由通知配置弹窗从 setLoaded 取值(见 openAlertModal), 这里不碰页内元素。
   $('#sAbOn').checked=!!s.autoBanEnabled;$('#sAbWin').value=s.bruteWindowMin;$('#sAbThr').value=s.bruteThreshold;
   $('#sFldOn').checked=!!s.floodEnabled;$('#sFldWin').value=s.floodWindowMin||1;$('#sFldIPs').value=s.floodDistinctIps||30;$('#sFldClose').value=s.floodCloseMin||60;
   renderFldPortsTx();
   $('#sScanOn').checked=!!s.scanEnabled;$('#sScanAlert').checked=s.alertScan!==false;$('#sScanAuto').checked=!!s.scanAutoBan;$('#sScanWin').value=s.scanWindowMin||5;$('#sScanThr').value=s.scanDistinctPorts||5;
-  $('#sAcctOn').checked=s.trafficAcct!==false;
-  $('#acctStatus').textContent=s.acctOn?(s.acctByApp?'内核计数已开启（由本应用自动打开）':'内核计数已开启'):'内核计数未开启';
-  $('#sLedgerKeep').value=(s.ledgerKeepDays==null?7:s.ledgerKeepDays);
-  $('#sRepOn').checked=!!s.reportEnabled;$('#sRepTime').value=s.reportTime||'09:00';$('#sKeep').value=s.logKeepDays;$('#sSrcKeep').value=(s.newSrcKeepDays==null?7:s.newSrcKeepDays);
+  {const a=$('#sAcctOn');if(a)a.checked=s.trafficAcct!==false;}
+  {const st=$('#acctStatus');if(st)st.textContent=s.acctOn?(s.acctByApp?'内核计数已开启（由本应用自动打开）':'内核计数已开启'):'内核计数未开启';}
+  {const lk=$('#sLedgerKeep');if(lk)lk.value=(s.ledgerKeepDays==null?7:s.ledgerKeepDays);}
+  {const r=$('#sRepOn');if(r){r.checked=!!s.reportEnabled;$('#sRepTime').value=s.reportTime||'09:00';$('#sKeep').value=s.logKeepDays;$('#sSrcKeep').value=(s.newSrcKeepDays==null?7:s.newSrcKeepDays);}}
   $('#sTrusted').value=(s.trustedIps||[]).join('\n');$('#chkTrustLAN').checked=!!s.trustLan;trustShown=10;renderTrustList();
   $('#sPanelBan').value=(s.panelBanThreshold==null?5:s.panelBanThreshold);
   $('#sServerName').value=s.serverName||'';
@@ -2258,14 +2240,15 @@ function applyProtSyncedCard(cardId,on){
 }
 function collectSettings(){
   const s=Object.assign({},setLoaded||{});
-  s.tgEnabled=$('#sTgOn').checked;s.tgBotToken=$('#sTgToken').value.trim();s.tgChatId=$('#sTgChat').value.trim();
+  /* 弹窗控件不存在时跳过, 保留 setLoaded 原值(后端 PUT 缺失键同样保留)。 */
+  {const t=$('#sTgOn');if(t){s.tgEnabled=t.checked;s.tgBotToken=$('#sTgToken').value.trim();s.tgChatId=$('#sTgChat').value.trim();}}
   // 报警键不在页内收集: 通知配置弹窗只 PUT 报警键, 其余保存走 setLoaded 原值(设置 PUT 缺失键保留)。
   s.autoBanEnabled=$('#sAbOn').checked;s.bruteWindowMin=+$('#sAbWin').value||10;s.bruteThreshold=+$('#sAbThr').value||5;
   s.floodEnabled=$('#sFldOn').checked;s.floodWindowMin=+$('#sFldWin').value||1;s.floodDistinctIps=+$('#sFldIPs').value||30;s.floodCloseMin=+$('#sFldClose').value||60;
   s.scanEnabled=$('#sScanOn').checked;s.alertScan=$('#sScanAlert').checked;s.scanAutoBan=$('#sScanAuto').checked;s.scanWindowMin=+$('#sScanWin').value||5;s.scanDistinctPorts=+$('#sScanThr').value||5;
-  s.trafficAcct=$('#sAcctOn').checked;
-  {const lk=$('#sLedgerKeep').value.trim();s.ledgerKeepDays=lk===''?7:Math.max(0,parseInt(lk,10)||0);}
-  s.reportEnabled=$('#sRepOn').checked;s.reportTime=$('#sRepTime').value.trim()||'09:00';s.logKeepDays=+$('#sKeep').value||30;s.newSrcKeepDays=Math.max(0,+$('#sSrcKeep').value||0);
+  {const a=$('#sAcctOn');if(a)s.trafficAcct=a.checked;}
+  {const lk=$('#sLedgerKeep');if(lk){const v=lk.value.trim();s.ledgerKeepDays=v===''?7:Math.max(0,parseInt(v,10)||0);}}
+  {const r=$('#sRepOn');if(r){s.reportEnabled=r.checked;s.reportTime=$('#sRepTime').value.trim()||'09:00';s.logKeepDays=+$('#sKeep').value||30;s.newSrcKeepDays=Math.max(0,+$('#sSrcKeep').value||0);}}
   s.trustedIps=$('#sTrusted').value.split('\n').map(x=>x.trim()).filter(Boolean);s.trustLan=$('#chkTrustLAN').checked;
   s.panelBanThreshold=+$('#sPanelBan').value||5;
   s.serverName=$('#sServerName').value.trim();
@@ -2592,17 +2575,8 @@ $$('[data-save]').forEach(b=>b.onclick=async()=>{
     toast('设置已保存');
   }catch(e){toast(e.message)}
 });
+/* TG 连通性测试冷却(弹窗内绑定, 见 openTgModal, 反馈写弹窗内不弹 toast)。 */
 let tgTestCool=0;
-$('#btnTgTest').onclick=async()=>{
-  const now=Date.now();if(now<tgTestCool)return;
-  const btn=$('#btnTgTest');
-  try{await api('POST','api/tg/test',{tgBotToken:$('#sTgToken').value.trim(),tgChatId:$('#sTgChat').value.trim()});
-    toast('测试消息已发送，去 Telegram 看一下');
-    tgTestCool=now+10000;let left=10;btn.disabled=true;
-    const iv=setInterval(()=>{left--;if(left<=0){clearInterval(iv);btn.disabled=false;btn.textContent='发送测试消息'}else btn.textContent='发送测试消息（'+left+'s）'},1000);
-    btn.textContent='发送测试消息（10s）';
-  }catch(e){if(/10 秒/.test(e.message)){tgTestCool=now+10000}toast(e.message)}
-};
 /* 信任全部内网 IP(第 6 项): 勾选框, 切换即时保存、即时生效; 勾选时把列表里已有的
    四段标准私网范围清掉(勾选期间行为不变), 取消只清标志、列表保持被清掉的状态;
    内网段由后端 trustLan 标志隐式信任, 绝不写进列表。反馈只在卡内, 不弹顶部提示。 */
@@ -2723,8 +2697,87 @@ async function openAlertModal(){
     catch(e){msg.className='sline fail';msg.style.display='';msg.textContent=e.message;}
   };
 }
-$('#btnAlertCfg').onclick=openAlertModal;
 $('#btnNodeAlertCfg').onclick=openAlertModal;
+/* ---------- Telegram 设置弹窗(原通知方式卡片已收进弹窗, 控件与流程原样) ---------- */
+let tgDraft=null;
+async function openTgModal(draft){
+  if(!setLoaded){try{await loadSettings()}catch(e){openCModal('<h3 class="mtitle">Telegram 设置</h3><div class="sline fail">读取失败：'+esc(e.message)+'</div>');return}}
+  const s=draft||setLoaded;
+  openCModal('<h3 class="mtitle">Telegram 设置</h3>'+
+    '<div class="cmrow"><div class="cml">启用 TG 报警<div class="d">报警消息带一键拉黑按钮</div></div><div class="cmv"><label class="sw"><input type="checkbox" id="sTgOn"'+(s.tgEnabled?' checked':'')+'><i></i></label></div></div>'+
+    '<div class="cmrow"><div class="cml">Bot Token</div><div class="cmv"><input id="sTgToken" type="password" placeholder="123456:ABC-..." value="'+esc(s.tgBotToken||'')+'"></div></div>'+
+    '<div class="cmrow"><div class="cml">Chat ID<div class="d">只认这个会话的拉黑回调</div></div><div class="cmv"><input id="sTgChat" placeholder="例如 123456789" value="'+esc(s.tgChatId||'')+'"></div></div>'+
+    '<div class="cmrow"><div class="cml">连通性测试<div class="d">用当前填写的值发送，无需先保存</div></div><div class="cmv"><button class="btn" id="btnTgTest">发送测试消息</button></div></div>'+
+    '<div class="cmrow"><div class="cml">通知配置<div class="d">报警项目开关</div></div><div class="cmv"><button class="btn" id="btnAlertCfg">通知配置</button></div></div>'+
+    '<div class="sline" id="cmTgMsg" style="display:none;margin-top:10px"></div>'+
+    '<div class="cfoot"><button class="btn" id="cmTgClose">关闭</button><button class="btn primary" id="cmTgSave">保存设置</button></div>');
+  $('#cmTgClose').onclick=()=>{tgDraft=null;closeCModal();};
+  $('#btnTgTest').onclick=async()=>{
+    const now=Date.now();if(now<tgTestCool)return;
+    const btn=$('#btnTgTest');const msg=$('#cmTgMsg');
+    try{await api('POST','api/tg/test',{tgBotToken:$('#sTgToken').value.trim(),tgChatId:$('#sTgChat').value.trim()});
+      msg.className='sline ok';msg.style.display='';msg.textContent='测试消息已发送，去 Telegram 看一下';
+      tgTestCool=now+10000;let left=10;btn.disabled=true;
+      const iv=setInterval(()=>{left--;if(left<=0){clearInterval(iv);btn.disabled=false;btn.textContent='发送测试消息'}else btn.textContent='发送测试消息（'+left+'s）'},1000);
+      btn.textContent='发送测试消息（10s）';
+    }catch(e){if(/10 秒/.test(e.message)){tgTestCool=now+10000}msg.className='sline fail';msg.style.display='';msg.textContent='测试失败：'+e.message;}
+  };
+  /* 通知配置弹窗关闭后回到本弹窗, 未保存的编辑用草稿恢复(不自动保存)。 */
+  $('#btnAlertCfg').onclick=()=>{
+    tgDraft={tgEnabled:$('#sTgOn').checked,tgBotToken:$('#sTgToken').value,tgChatId:$('#sTgChat').value};
+    cmodalOnClose=()=>openTgModal(tgDraft);
+    openAlertModal();
+  };
+  $('#cmTgSave').onclick=async()=>{
+    const body={tgEnabled:$('#sTgOn').checked,tgBotToken:$('#sTgToken').value.trim(),tgChatId:$('#sTgChat').value.trim()};
+    const msg=$('#cmTgMsg');
+    try{await api('PUT','api/settings',body);setLoaded=Object.assign({},setLoaded,body);tgDraft=null;
+      const st=$('#tgStatus');if(st)st.textContent=body.tgEnabled?'已启用':'未启用';
+      msg.className='sline ok';msg.style.display='';msg.textContent='已保存';}
+    catch(e){msg.className='sline fail';msg.style.display='';msg.textContent=e.message;}
+  };
+}
+$('#btnTgCfg').onclick=()=>{tgDraft=null;openTgModal();};
+/* ---------- 连接流量统计弹窗(原流量卡片已收进弹窗, 控件与保存流程原样) ---------- */
+async function openTrafficModal(){
+  if(!setLoaded){try{await loadSettings()}catch(e){openCModal('<h3 class="mtitle">连接流量统计</h3><div class="sline fail">读取失败：'+esc(e.message)+'</div>');return}}
+  const s=setLoaded;
+  const st=s.acctOn?(s.acctByApp?'内核计数已开启（由本应用自动打开）':'内核计数已开启'):'内核计数未开启';
+  openCModal('<h3 class="mtitle">连接流量统计</h3><div class="csub">流量来自内核连接字节计数；开启后应用启动时自动打开、退出时恢复原样，原本已开的不会动。</div>'+
+    '<div class="cmrow"><div class="cml">启用流量统计<div class="d">流量列、实时速率与流量排序的数据源</div></div><div class="cmv"><label class="sw"><input type="checkbox" id="sAcctOn"'+(s.trafficAcct!==false?' checked':'')+'><i></i></label><span class="mono" id="acctStatus">'+esc(st)+'</span></div></div>'+
+    '<div class="cmrow"><div class="cml">累计账本<div class="d">每个对端的历次连接总量：永久保留、只增不减，仅数据清理可手动清空</div></div><div class="cmv"><span class="mono">永久</span></div></div>'+
+    '<div class="cmrow"><div class="cml">每日明细保留<div class="d">每天一份各对端当天传了多少的明细文件</div></div><div class="cmv"><input type="number" id="sLedgerKeep" min="0" max="3650" value="'+(s.ledgerKeepDays==null?7:s.ledgerKeepDays)+'"><span class="mono">天；填 0 = 永久保留</span></div></div>'+
+    '<div class="sline" id="cmTrafficMsg" style="display:none;margin-top:10px"></div>'+
+    '<div class="cfoot"><button class="btn" id="cmTrafficClose">关闭</button><button class="btn primary" id="cmTrafficSave">保存设置</button></div>');
+  $('#cmTrafficClose').onclick=closeCModal;
+  $('#cmTrafficSave').onclick=async()=>{
+    const lk=$('#sLedgerKeep').value.trim();
+    const body={trafficAcct:$('#sAcctOn').checked,ledgerKeepDays:lk===''?7:Math.max(0,parseInt(lk,10)||0)};
+    const msg=$('#cmTrafficMsg');
+    try{await api('PUT','api/settings',body);setLoaded=Object.assign({},setLoaded,body);msg.className='sline ok';msg.style.display='';msg.textContent='已保存';}
+    catch(e){msg.className='sline fail';msg.style.display='';msg.textContent=e.message;}
+  };
+}
+$('#btnTrafficCfg').onclick=openTrafficModal;
+/* ---------- 日报与日志弹窗(原日报卡片已收进弹窗, 控件与保存流程原样) ---------- */
+async function openReportModal(){
+  if(!setLoaded){try{await loadSettings()}catch(e){openCModal('<h3 class="mtitle">日报与日志</h3><div class="sline fail">读取失败：'+esc(e.message)+'</div>');return}}
+  const s=setLoaded;
+  openCModal('<h3 class="mtitle">日报与日志</h3>'+
+    '<div class="cmrow"><div class="cml">TG 日报</div><div class="cmv"><label class="sw"><input type="checkbox" id="sRepOn"'+(s.reportEnabled?' checked':'')+'><i></i></label><span class="mono">每天</span><input id="sRepTime" class="short" placeholder="09:00" value="'+esc(s.reportTime||'09:00')+'"><span class="mono">推送当日摘要（时:分）</span></div></div>'+
+    '<div class="cmrow"><div class="cml">事件日志保留</div><div class="cmv"><input type="number" id="sKeep" min="1" max="365" value="'+(s.logKeepDays==null?'':s.logKeepDays)+'"><span class="mono">天，超期自动清理</span></div></div>'+
+    '<div class="cmrow"><div class="cml">新来源事件保留<div class="d">每个新 IP 当日首次出现留一条（量大价值低，单独保留期）</div></div><div class="cmv"><input type="number" id="sSrcKeep" min="0" max="365" value="'+(s.newSrcKeepDays==null?7:s.newSrcKeepDays)+'"><span class="mono">天；填 0 = 只计数、不记录</span></div></div>'+
+    '<div class="sline" id="cmReportMsg" style="display:none;margin-top:10px"></div>'+
+    '<div class="cfoot"><button class="btn" id="cmReportClose">关闭</button><button class="btn primary" id="cmReportSave">保存设置</button></div>');
+  $('#cmReportClose').onclick=closeCModal;
+  $('#cmReportSave').onclick=async()=>{
+    const body={reportEnabled:$('#sRepOn').checked,reportTime:$('#sRepTime').value.trim()||'09:00',logKeepDays:+$('#sKeep').value||30,newSrcKeepDays:Math.max(0,+$('#sSrcKeep').value||0)};
+    const msg=$('#cmReportMsg');
+    try{await api('PUT','api/settings',body);setLoaded=Object.assign({},setLoaded,body);msg.className='sline ok';msg.style.display='';msg.textContent='已保存';}
+    catch(e){msg.className='sline fail';msg.style.display='';msg.textContent=e.message;}
+  };
+}
+$('#btnReportCfg').onclick=openReportModal;
 /* ---------- 数据清理弹窗(原平铺内容已收进弹窗, 二次确认仍在弹窗内) ---------- */
 function openCleanupModal(status, statusOk){
   openCModal('<h3 class="mtitle">数据清理</h3><div class="csub">清空后不可恢复。</div>'+

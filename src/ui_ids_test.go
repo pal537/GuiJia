@@ -187,6 +187,9 @@ func TestModalNoToast(t *testing.T) {
 		{"改密码弹窗", "$('#btnPanelPwChange').onclick=()=>{", "$('#btnPanelPortSave').onclick"},
 		{"证书编辑弹窗", "function pxCertEditModal(c){", "$('#btnPxCertAdd').onclick"},
 		{"证书查看弹窗", "function pxCertViewModal(c){", "function bindPxRowEvents(){"},
+		{"Telegram 设置弹窗", "async function openTgModal(draft){", "async function openTrafficModal(){"},
+		{"连接流量统计弹窗", "async function openTrafficModal(){", "async function openReportModal(){"},
+		{"日报与日志弹窗", "async function openReportModal(){", "/* ---------- 数据清理弹窗"},
 	}
 	for _, c := range cases {
 		s := strings.Index(html, c.start)

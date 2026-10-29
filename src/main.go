@@ -477,9 +477,7 @@ func main() {
 	if !geoLoadV4File(geoV4Path) {
 		geoLoadV4Embedded() // 数据目录无下载文件时用内嵌库
 	}
-	if !geoLoadV6(geoV6Path) {
-		go downloadGeoV6(false) // 首次运行后台下载 IPv6 库
-	}
+	geoLoadV6(geoV6Path) // IPv6 库默认不下载, 已有文件则加载, 缺失由设置页手动下载
 	banInit()
 	intelInit()                        // 威胁情报: 开启则用缓存恢复集合并起定时循环, 关闭则清空集合
 	nginxHealTempEdits()               // 上次 nginx 临时改写未清理(崩溃): 启动先还原, 只记日志不卡启动
