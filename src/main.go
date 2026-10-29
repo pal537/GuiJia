@@ -600,6 +600,7 @@ func main() {
 	mux.HandleFunc("/api/nodes/proxy", handleNodeProxy)
 	mux.HandleFunc("/api/nodes/events", linkLimit(handleNodeEvents))
 	mux.HandleFunc("/api/certs/acme/apply", handleAcmeApply)
+	mux.HandleFunc("/api/certs/acme/renew", handleAcmeRenew)
 	mux.HandleFunc("/api/certs/acme/status", handleAcmeStatus)
 	mux.HandleFunc("/api/certs/cf-token", handleCFToken)
 	mux.HandleFunc("/api/intel", handleIntelStatus)
@@ -617,6 +618,7 @@ func main() {
 	mux.HandleFunc("/api/proxy/retry", handleProxyRetry)
 	mux.HandleFunc("/api/proxy/certs/upload", handleProxyCertUpload)
 	mux.HandleFunc("/api/proxy/certs/refresh", handleProxyCertRefresh)
+	mux.HandleFunc("/api/proxy/certs/refresh-all", handleProxyCertRefreshAll)
 	mux.HandleFunc("/api/proxy/certs/", handleProxyCertItem)
 
 	// 前置 80 服务(ACME HTTP-01 验证用; 绑定失败不致命, 申请时再报错)。

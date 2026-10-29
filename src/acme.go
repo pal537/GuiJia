@@ -62,9 +62,14 @@ func scanAcmeCerts(metas *[]ProxyCertMeta, serving map[string]*proxyCertEntry, s
 			continue
 		}
 		// 编辑弹窗与续期开关用：方式与自动续签取自 meta.json（无字段视为开）。
+		// 备注名也在此覆盖显示名（无备注则仍显示首域名）。
 		if m, ok := readAcmeMeta(e.Name()); ok {
 			meta.Method = m.Method
 			meta.AutoRenew = m.AutoRenew == nil || *m.AutoRenew
+			if strings.TrimSpace(m.Name) != "" {
+				meta.Name = strings.TrimSpace(m.Name)
+				meta.Remark = strings.TrimSpace(m.Name)
+			}
 			entry.meta = meta
 		} else {
 			meta.AutoRenew = true
@@ -568,18 +573,27 @@ func writeAcmeCert(domain string, fullchainPEM, privkeyPEM []byte) error {
 
 // acmeCertMeta: 证书目录里的 meta.json——申请时的域名组与验证方式，供续期原样沿用。
 // AutoRenew 为 nil（老证书无该字段）视为开；编辑弹窗可显式开关。
+// Name 为用户备注名，只影响列表显示；目录与证书 ID 仍用首域名，改名绝不影响反代引用。
 type acmeCertMeta struct {
 	Domains   []string `json:"domains"`
 	Method    string   `json:"method"`
 	AutoRenew *bool    `json:"autoRenew,omitempty"`
+	Name      string   `json:"name,omitempty"`
 }
 
 // acmeMetaForOrder: 续期/重新申请写 meta 时用——域名组与方式取本次值，
 // 自动续签开关沿用旧 meta（用户在编辑里关掉的，续期不能悄悄开回去；新证书默认开）。
 func acmeMetaForOrder(dir string, domains []string, method string) acmeCertMeta {
 	m := acmeCertMeta{Domains: append([]string{}, domains...), Method: method}
-	if old, ok := readAcmeMeta(dir); ok && old.AutoRenew != nil {
-		m.AutoRenew = old.AutoRenew
+	if old, ok := readAcmeMeta(dir); ok {
+		if old.AutoRenew != nil {
+			m.AutoRenew = old.AutoRenew
+		}
+		// 备注沿用旧 meta（续期/自动续期不丢用户备注）；本次申请带了新备注则覆盖。
+		m.Name = strings.TrimSpace(old.Name)
+	}
+	if jobName := acmeJobPendingName(); jobName != "" {
+		m.Name = jobName
 	}
 	return m
 }
@@ -732,6 +746,7 @@ type acmeJob struct {
 	Method  string   `json:"method"` // 本次/上次任务的验证方式：http-01、dns-01 或 nginx
 	LastOK  string   `json:"lastOk"`
 	LastErr string   `json:"lastError"`
+	Name    string   `json:"name,omitempty"` // 本次申请待写入的备注（续期/自动续期为空 = 沿用旧备注）
 }
 
 var (
@@ -745,27 +760,52 @@ func acmeJobSnapshot() acmeJob {
 	return acmeJobSt
 }
 
+// acmeClaimJob: 单飞行认领——调用方同步认领，杜绝“检查时空闲、起 goroutine 前又被抢”的竞态。
+// 认领成功才设 Name（申请备注）；失败不碰任何字段。
+func acmeClaimJob(domains []string, method, name string) bool {
+	if len(domains) == 0 {
+		return false
+	}
+	acmeJobMu.Lock()
+	defer acmeJobMu.Unlock()
+	if acmeJobSt.Running {
+		return false
+	}
+	acmeJobSt.Running = true
+	acmeJobSt.Domain = domains[0]
+	acmeJobSt.Domains = append([]string{}, domains...)
+	acmeJobSt.Method = method
+	acmeJobSt.LastErr = ""
+	acmeJobSt.Name = name
+	return true
+}
+
+// acmeJobPendingName: 当前任务待写入的备注（acmeMetaForOrder 消费；无任务/续期时为空）。
+func acmeJobPendingName() string {
+	acmeJobMu.Lock()
+	defer acmeJobMu.Unlock()
+	return acmeJobSt.Name
+}
+
 // runAcmeOrder: 申请/续期一张证书（域名组共一张 SAN 证书，目录取首域名），
 // 成功后写 meta、刷新证书表，并在面板用它时重建面板监听。
 func runAcmeOrder(domains []string, method, cfToken string) error {
 	if len(domains) == 0 {
 		return errors.New("域名为空")
 	}
-	dir := domains[0]
-	acmeJobMu.Lock()
-	if acmeJobSt.Running {
-		acmeJobMu.Unlock()
+	if !acmeClaimJob(domains, method, "") {
 		return errors.New("已有证书申请在进行中")
 	}
-	acmeJobSt.Running = true
-	acmeJobSt.Domain = dir
-	acmeJobSt.Domains = append([]string{}, domains...)
-	acmeJobSt.Method = method
-	acmeJobSt.LastErr = ""
-	acmeJobMu.Unlock()
+	return runAcmeOrderWork(domains, method, cfToken)
+}
+
+// runAcmeOrderWork: 订单实干（调用方须已认领且域名非空；结束时清 Running 与待写备注，防旧备注漏到下次续期）。
+func runAcmeOrderWork(domains []string, method, cfToken string) error {
+	dir := domains[0]
 	defer func() {
 		acmeJobMu.Lock()
 		acmeJobSt.Running = false
+		acmeJobSt.Name = ""
 		acmeJobMu.Unlock()
 	}()
 	fail := func(err error) error {
@@ -834,6 +874,9 @@ func runAcmeOrder(domains []string, method, cfToken string) error {
 // acmeOrderFunc: 续期循环调的下单函数（变量，单测可拦截；申请入口直接调 runAcmeOrder）。
 var acmeOrderFunc = runAcmeOrder
 
+// acmeOrderWorkFunc: 申请/续期入口调的订单实干（变量，单测可拦截；调用方须先认领）。
+var acmeOrderWorkFunc = runAcmeOrderWork
+
 // acmeRenewalCheck: 跑一轮续期检查——自动续签关掉的跳过；已过期证书本来就在
 // 续期范围内（acmeNeedsRenewal：到期前 30 天内或读不到到期时间即续），不用另加触发器。
 func acmeRenewalCheck() {
@@ -874,6 +917,7 @@ type acmeApplyInput struct {
 	Domains []string `json:"domains"` // 新多行域名
 	Method  string   `json:"method"`  // auto | http-01 | dns-01，空 = auto
 	CFToken string   `json:"cfToken"`
+	Name    string   `json:"name"` // 备注名，空 = 不指定
 }
 
 // resolveCFToken: 显式新 Token 优先（星号占位 = 未改动，用已存的），否则用已存 Token。
@@ -979,6 +1023,19 @@ func handleAcmeApply(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, 400, err.Error())
 		return
 	}
+	// 备注名：空 = 不指定（新证书默认显示首域名，重新申请沿用旧备注）；非空须合法且未被占用。
+	remark := strings.TrimSpace(in.Name)
+	if remark != "" {
+		if err := validateCertRemark(remark); err != nil {
+			errJSON(w, 400, err.Error())
+			return
+		}
+		rescanProxyCertsLocked()
+		if certDisplayNameTaken(remark, "acme:"+domains[0]) {
+			errJSON(w, 400, "证书名称已被使用")
+			return
+		}
+	}
 	acmeJobMu.Lock()
 	running := acmeJobSt.Running
 	acmeJobMu.Unlock()
@@ -1001,7 +1058,65 @@ func handleAcmeApply(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	acmeUnmarkDeleted(domains[0]) // 用户显式重新申请: 清除删除标记
-	go runAcmeOrder(domains, method, token)
+	// 同步认领后再起任务（认领失败 = 方才检查后又被抢，同样 409）。
+	if !acmeClaimJob(domains, method, remark) {
+		errJSON(w, 409, "已有证书申请在进行中")
+		return
+	}
+	go acmeOrderWorkFunc(domains, method, token)
+	writeJSON(w, 200, map[string]any{"started": true, "domains": domains, "method": method})
+}
+
+// handleAcmeRenew: 手动立即续期——不看到期时间（点了就是要现在换），不看自动续签开关
+// （手动一次与自动无关）；域名组与方式按 meta 原样沿用（无 meta 的老证书默认单域名 http-01）。
+// 单飞行，忙时 409；续期本身走与申请同一条订单路径（含面板重建）。
+func handleAcmeRenew(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	var in struct {
+		ID string `json:"id"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil || strings.TrimSpace(in.ID) == "" {
+		errJSON(w, 400, "请求无效")
+		return
+	}
+	if !strings.HasPrefix(in.ID, "acme:") {
+		errJSON(w, 400, "只有 ACME 证书可以立即续期")
+		return
+	}
+	domain := strings.TrimPrefix(in.ID, "acme:")
+	nd, nerr := normalizeDomain(domain)
+	if nerr != nil || nd == "" || nd != domain {
+		errJSON(w, 400, "域名无效")
+		return
+	}
+	rescanProxyCertsLocked()
+	if _, ok := findProxyCertMeta(in.ID); !ok {
+		errJSON(w, 400, "证书不存在")
+		return
+	}
+	domains, method := acmeRenewalPlan(domain)
+	tok := ""
+	if method == "dns-01" {
+		tok = cfLoadToken()
+		if tok == "" {
+			errJSON(w, 400, "DNS-01 续期需要 Cloudflare API Token：请先在编辑里填写 Token")
+			return
+		}
+	}
+	if method == "nginx" {
+		if _, err := nginxInstallDefaultAndProbe(); err != nil {
+			errJSON(w, 400, "nginx 代答配置失败: "+err.Error())
+			return
+		}
+	}
+	if !acmeClaimJob(domains, method, "") {
+		errJSON(w, 409, "已有证书申请在进行中")
+		return
+	}
+	go acmeOrderWorkFunc(domains, method, tok)
 	writeJSON(w, 200, map[string]any{"started": true, "domains": domains, "method": method})
 }
 

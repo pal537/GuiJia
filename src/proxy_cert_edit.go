@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 )
 
 // rescanProxyCertsLocked: 刷新证书表（调用方不持锁；与上传 handler 同一模式）。
@@ -39,6 +40,36 @@ func findProxyCertMeta(id string) (ProxyCertMeta, bool) {
 }
 
 // ---------- 刷新 ----------
+
+// handleProxyCertRefreshAll: 刷新全部证书——重读全部证书文件 + 逐张实时 OCSP 查吊销
+// （失败不阻断，只给备注），再重读一次返回最新表；前端据此刷新列表并把备注写进状态格。
+func handleProxyCertRefreshAll(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		errJSON(w, 405, "method")
+		return
+	}
+	rescanProxyCertsLocked()
+	proxyMu.Lock()
+	metas := append([]ProxyCertMeta{}, proxyCerts...)
+	proxyMu.Unlock()
+	notes := map[string]string{}
+	for _, meta := range metas {
+		st, note := ocspCheckForFile(meta.Path)
+		if note != "" {
+			notes[meta.ID] = note
+		}
+		if st == "good" || st == "revoked" {
+			if leaf, err := certLeafByPath(meta.Path); err == nil {
+				_ = writeOCSPCache(ocspCachePathFor(meta.Source, meta.Dir, meta.Name), leaf, st)
+			}
+		}
+	}
+	rescanProxyCertsLocked()
+	proxyMu.Lock()
+	out := append([]ProxyCertMeta{}, proxyCerts...)
+	proxyMu.Unlock()
+	writeJSON(w, 200, map[string]any{"ok": true, "certs": out, "notes": notes})
+}
 
 func handleProxyCertRefresh(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
@@ -86,6 +117,7 @@ func handleProxyCertEdit(w http.ResponseWriter, r *http.Request, id string) {
 		CFToken   *string `json:"cfToken"`
 		Crt       *string `json:"crt"`
 		Key       *string `json:"key"`
+		Name      *string `json:"name"` // ACME 备注名（上传证书忽略，名即文件名）
 	}
 	body, _ := io.ReadAll(r.Body)
 	if json.Unmarshal(body, &in) != nil {
@@ -104,7 +136,7 @@ func handleProxyCertEdit(w http.ResponseWriter, r *http.Request, id string) {
 			errJSON(w, 400, "ACME 证书不支持替换内容，请走续期或重新申请")
 			return
 		}
-		if err := editAcmeCertMeta(id, domain, in.AutoRenew); err != nil {
+		if err := editAcmeCertMeta(id, domain, in.AutoRenew, in.Name); err != nil {
 			errJSON(w, 400, err.Error())
 			return
 		}
@@ -155,11 +187,51 @@ func handleProxyCertEdit(w http.ResponseWriter, r *http.Request, id string) {
 	writeJSON(w, 200, map[string]any{"ok": true, "cert": meta})
 }
 
-// editAcmeCertMeta: 只改自动续签开关，其余字段原样保留；老证书无 meta 时
-// 用列表里的 SAN 与方式兜底建一个（方式未知则 http-01，与续期回落一致）。
-func editAcmeCertMeta(id, domain string, autoRenew *bool) error {
-	if autoRenew == nil {
-		return nil // 本次没改开关
+// validateCertRemark: 备注名只影响列表显示，不当目录/ID 用，故只禁控制字符与 / \，长度 1~64 字。
+func validateCertRemark(name string) error {
+	if utf8.RuneCountInString(name) > 64 {
+		return errors.New("证书名称过长（最多 64 字）")
+	}
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f || r == '/' || r == '\\' {
+			return errors.New("证书名称不能含控制字符或 / \\")
+		}
+	}
+	return nil
+}
+
+// certDisplayNameTaken: 备注名在全部证书显示名里是否已被占用（排除自身 id；调用方须已刷新列表）。
+func certDisplayNameTaken(name, excludeID string) bool {
+	proxyMu.Lock()
+	defer proxyMu.Unlock()
+	for _, c := range proxyCerts {
+		if c.ID != excludeID && c.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// editAcmeCertMeta: 改自动续签开关与备注名，其余字段原样保留，一次写盘（校验不过不写，防半截更新）。
+// name 为 nil = 不动备注；指向空串 = 清除备注（显示回首域名）；非空 = 设备注（须合法且未被占用）。
+// 老证书无 meta 时用列表里的 SAN 与方式兜底建一个（方式未知则 http-01，与续期回落一致）。
+func editAcmeCertMeta(id, domain string, autoRenew *bool, name *string) error {
+	if autoRenew == nil && name == nil {
+		return nil // 本次什么都没改
+	}
+	var remark string
+	remarkSet := false
+	if name != nil {
+		remark = strings.TrimSpace(*name)
+		if remark != "" {
+			if err := validateCertRemark(remark); err != nil {
+				return err
+			}
+			if certDisplayNameTaken(remark, id) {
+				return errors.New("证书名称已被使用")
+			}
+		}
+		remarkSet = true
 	}
 	m, ok := readAcmeMeta(domain)
 	if !ok {
@@ -176,7 +248,12 @@ func editAcmeCertMeta(id, domain string, autoRenew *bool) error {
 		}
 		m = acmeCertMeta{Domains: domains, Method: method}
 	}
-	m.AutoRenew = autoRenew
+	if autoRenew != nil {
+		m.AutoRenew = autoRenew
+	}
+	if remarkSet {
+		m.Name = remark
+	}
 	if err := writeAcmeMetaGuarded(domain, m); err != nil {
 		return err
 	}

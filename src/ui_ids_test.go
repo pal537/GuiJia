@@ -60,7 +60,7 @@ func TestUIIDs(t *testing.T) {
 		"msgbox",                // 申请状态彩色框（中性/绿/红）
 		"cmCertEditErr",         // 证书编辑弹窗内状态行
 		"pxCertEditModal",       // 证书编辑弹窗构建函数
-		"data-px-certrefresh",   // 证书行刷新按钮
+		"data-px-certrenew",     // 证书行更新证书按钮
 		"data-px-certedit",      // 证书行编辑按钮
 		`data-tab="cert"`,       // 导航证书项
 		`id="tab-cert"`,         // 证书页
@@ -118,7 +118,7 @@ func TestUIIDs(t *testing.T) {
 		"cmBackPort",             // 反代规则上游端口框
 		"pxCertViewModal",        // 证书查看弹窗构建函数
 		"data-px-certview",       // 证书行查看按钮
-		"data-px-certdl",         // 证书行下载按钮
+		"cmDl",                   // 证书查看弹窗下载按钮（下载已进查看弹窗）
 		"代理到内网已有应用端口",            // 反代规则上游新提示文案
 		`<th>名称</th><th>监听</th>`, // 反代规则表首列改显示名称
 		"http://127.0.0.1",       // 上游第一框可见预填 scheme+host（占位与预设）
@@ -183,7 +183,7 @@ func TestModalNoToast(t *testing.T) {
 		{"反代规则弹窗", "function pxRuleModal(rule){", "function pxDelModal("},
 		{"删除规则弹窗", "function pxDelModal(id,dom){", "$('#btnPxRetry').onclick"},
 		{"添加证书弹窗", "function pxCertModal(){", "$('#btnPxCertAdd').onclick"},
-		{"删除证书弹窗", "$$('#pxCertBody [data-px-certdel]')", "/* ---------- 总览 ---------- */"},
+		{"删除证书弹窗", "function pxCertDelConfirm(c){", "function bindPxRowEvents(){"},
 		{"改密码弹窗", "$('#btnPanelPwChange').onclick=()=>{", "$('#btnPanelPortSave').onclick"},
 		{"证书编辑弹窗", "function pxCertEditModal(c){", "$('#btnPxCertAdd').onclick"},
 		{"证书查看弹窗", "function pxCertViewModal(c){", "function bindPxRowEvents(){"},
@@ -242,5 +242,33 @@ func TestProtCardOrder(t *testing.T) {
 	}
 	if !strings.Contains(fw, `id="closedPortList"`) {
 		t.Errorf("防火墙菜单内应有洪峰临时关闭端口列表")
+	}
+}
+
+// TestCertRowButtons: 证书操作列新布局——行内只剩更新证书/查看/编辑（上传无更新），
+// 删除进了编辑弹窗、下载进了查看弹窗、刷新移到模块右上角；旧行内按钮不得复活。
+func TestCertRowButtons(t *testing.T) {
+	html := string(indexHTML)
+	for _, want := range []string{
+		`data-px-certrenew`,    // 行内：更新证书（ACME）
+		`id="btnPxCertRefreshAll"`, // 模块右上角：刷新全部
+		`id="pxAcmeName"`,      // 申请弹窗：证书名称
+		`id="cmCertEditName"`,  // 编辑弹窗：证书名称
+		`id="cmCertDel"`,       // 编辑弹窗：删除证书
+		`id="cmDl"`,            // 查看弹窗：下载
+		`function pxCertDelConfirm(c){`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("证书 UI 应有 %s", want)
+		}
+	}
+	for _, gone := range []string{
+		`data-px-certrefresh`, // 行内刷新已删
+		`data-px-certdl`,      // 行内下载已删
+		`data-px-certdel`,     // 行内删除已删
+	} {
+		if strings.Contains(html, gone) {
+			t.Errorf("证书 UI 不应再有 %s", gone)
+		}
 	}
 }

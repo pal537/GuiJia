@@ -577,9 +577,9 @@ body.auth #loginView{margin:auto}
   <section id="tab-cert" style="display:none">
     <div class="setgrid">
       <div class="scard">
-        <h3 class="mtitle">证书</h3>
+        <h3 class="mtitle">证书<button class="btn" id="btnPxCertRefreshAll" style="margin-left:auto">刷新全部</button></h3>
         <div class="hint">证书只有两个来源：在线申请（ACME）与手动上传，列表只显示元数据、不显示私钥。申请的证书按首域名分子目录存放，上传的证书存在数据目录的 certs 子目录；申请、上传、删除完成后列表自动刷新。下载为 zip（含证书与私钥，妥善保管）。</div>
-        <div class="tblwrap"><table class="fixed" style="width:100%"><colgroup><col style="width:150px"><col style="width:220px"><col style="width:80px"><col style="width:150px"><col style="width:70px"><col></colgroup><thead><tr><th>名称</th><th>域名</th><th>状态</th><th>到期</th><th>来源</th><th>操作</th></tr></thead><tbody id="pxCertBody"></tbody></table></div>
+        <div class="tblwrap"><table class="fixed" style="width:100%"><colgroup><col style="width:150px"><col style="width:220px"><col style="width:80px"><col style="width:150px"><col style="width:70px"><col></colgroup><thead><tr><th>名称</th><th>域名</th><th>状态</th><th>到期</th><th>来源</th><th style="text-align:center">操作</th></tr></thead><tbody id="pxCertBody"></tbody></table></div>
         <div class="empty" id="pxCertEmpty" style="display:none">暂无证书，可在线申请或手动上传。</div>
         <div class="frow"><div class="fl">添加证书<div class="d">手动上传已有证书（成对的 .crt + .key）</div></div><div class="fv"><button class="btn primary" id="btnPxCertAdd">添加证书</button></div></div>
         <div class="frow"><div class="fl">在线申请（ACME）<div class="d">到期前 30 天自动续期</div></div><div class="fv"><button class="btn primary" id="btnPxAcmeApplyOpen">在线申请</button></div></div>
@@ -1136,6 +1136,7 @@ async function loadPxAcmeCFToken(){
 function pxAcmeModal(){
   openCModal('<h3 class="mtitle">在线申请（ACME）</h3><div class="csub">到期前 30 天自动续期。自动：80 空闲走 HTTP-01，80 被占用走 DNS-01；nginx 代答：经 nginx 代答 HTTP-01，不占 80 也不用 Token；新域名走常驻代答块，已有 nginx 站点的域名申请时临时改写、用后还原；DNS-01 需要 Cloudflare API Token（需对应域名的 DNS 编辑权限），Token 只存服务器本地，续期继续用它。</div>'+
   '<div class="fld"><label>域名（一行一个，首域名决定证书存放目录）</label><textarea id="pxAcmeDomains" rows="3" placeholder="一行一个域名，如 example.com"></textarea></div>'+
+  '<div class="fld"><label>证书名称（备注）</label><input id="pxAcmeName" maxlength="64" placeholder="备注名，留空 = 用首域名"></div>'+
   '<div class="fld"><label>挑战方式</label><select id="pxAcmeMethod"><option value="auto">自动</option><option value="http-01">HTTP-01</option><option value="dns-01">DNS-01（Cloudflare）</option><option value="nginx">nginx 代答</option></select></div>'+
   '<div class="fld"><label>Cloudflare API Token（仅 DNS-01 需要）</label><input id="pxAcmeCFToken" type="password" placeholder="Cloudflare API Token"></div>'+
   '<div class="fld"><div class="msgbox" id="pxAcmeStatus">…</div></div>'+
@@ -1162,6 +1163,7 @@ function pxAcmeModal(){
     if(!domains.length){setAcmeMsg('请填写域名','err');return}
     const method=$('#pxAcmeMethod').value;
     const cfToken=$('#pxAcmeCFToken').value.trim();
+    const certName=$('#pxAcmeName').value.trim();
     // 快照上次结果，用于判断本次成败（后端 lastOk/lastError 是累计值）。
     let prevErr='',prevOk='';
     try{const st0=await api('GET','api/certs/acme/status');prevErr=st0.lastError||'';prevOk=st0.lastOk||''}catch(e){}
@@ -1182,7 +1184,7 @@ function pxAcmeModal(){
       }
     };
     try{
-      await api('POST','api/certs/acme/apply',{domains,method,cfToken});
+      await api('POST','api/certs/acme/apply',{domains,method,cfToken,name:certName});
       if(pxAcmePoll)clearInterval(pxAcmePoll);
       pxAcmePoll=setInterval(tick,3000);
       tick(); // 立即刷一次“申请进行中”，不等 3 秒
@@ -1251,8 +1253,10 @@ function renderProxy(){
     const sans=[...(c.dnsNames||[]),...(c.ips||[])].join('，');
     // 状态列在到期前面：有效绿 / 已过期红 / 已吊销红（吊销来自序列号匹配的 OCSP 缓存）。
     const stTxt=(c.status==='revoked'||c.status==='expired')?'<span style="color:var(--red);font-weight:600">'+(c.status==='revoked'?'已吊销':'已过期')+'</span>':'<span style="color:var(--green);font-weight:600">有效</span>';
-    const ops=(c.source==='upload'||c.source==='acme')?'<div class="ops"><button class="btn sm" data-px-certview="'+esc(c.id)+'">查看</button><button class="btn sm" data-px-certdl="'+esc(c.id)+'">下载</button><button class="btn sm" data-px-certrefresh="'+esc(c.id)+'">刷新</button><button class="btn sm" data-px-certedit="'+esc(c.id)+'">编辑</button><button class="btn sm danger" data-px-certdel="'+esc(c.id)+'">删除</button></div>':'<span class="mono">—</span>';
-    return '<tr><td class="ipcell">'+esc(c.name)+'</td><td style="word-break:break-all">'+esc(sans)+'</td><td>'+stTxt+'</td><td>'+esc(c.notAfter)+'</td><td>'+(c.source==='upload'?'上传':'ACME')+'</td><td>'+ops+'</td></tr>';
+    // 操作列：ACME 三个（更新证书、查看、编辑），上传两个（查看、编辑；上传证书无法续期，换内容走编辑）。
+    // 删除进了编辑弹窗，下载进了查看弹窗，刷新移到模块右上角的刷新全部。
+    const ops=c.source==='acme'?'<div class="ops" style="justify-content:center"><button class="btn sm" data-px-certrenew="'+esc(c.id)+'">更新证书</button><button class="btn sm" data-px-certview="'+esc(c.id)+'">查看</button><button class="btn sm" data-px-certedit="'+esc(c.id)+'">编辑</button></div>':c.source==='upload'?'<div class="ops" style="justify-content:center"><button class="btn sm" data-px-certview="'+esc(c.id)+'">查看</button><button class="btn sm" data-px-certedit="'+esc(c.id)+'">编辑</button></div>':'<span class="mono">—</span>';
+    return '<tr><td class="ipcell">'+esc(c.name)+'</td><td style="word-break:break-all">'+esc(sans)+'</td><td>'+stTxt+'</td><td>'+esc(c.notAfter)+'</td><td>'+(c.source==='upload'?'上传':'ACME')+'</td><td style="text-align:center">'+ops+'</td></tr>';
   }).join('');
   bindPxRowEvents();
 }
@@ -1454,6 +1458,7 @@ function pxCertEditModal(c){
   if(isAcme){
     body+='<div class="fld"><label>域名组（只读）</label><div>'+esc(domains)+'</div></div>'+
     '<div class="fld"><label>验证方式（只读）</label><div>'+methodTxt+'</div></div>'+
+    '<div class="fld"><label>证书名称（备注）</label><input id="cmCertEditName" maxlength="64" value="'+esc(c.remark||'')+'" placeholder="备注名，留空 = 用首域名"></div>'+
     '<div class="fld"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="cmCertEditRenew" style="flex:0 0 auto;width:auto;min-width:0"'+(c.autoRenew?' checked':'')+'> 自动续签</label><div class="hint">每 6 小时检查一次，到期前 30 天自动续期；面板启动时也检查一次。</div></div>';
     if(c.method==='dns-01'){
       body+='<div class="fld"><label>Cloudflare API Token</label><input id="cmCertEditToken" type="password" placeholder="留空 = 不改"><div class="hint">Token 由全部 DNS-01 证书共用，改一处全生效；Token 绝不明文回显。</div></div>';
@@ -1465,13 +1470,16 @@ function pxCertEditModal(c){
   }
   openCModal('<h3 class="mtitle">编辑证书</h3><div class="csub">'+esc(c.name)+'（'+(isAcme?'ACME':'上传')+'）</div>'+body+
   '<div class="fld"><div class="hint" id="cmCertEditErr" style="color:var(--red);min-height:18px"></div></div>'+
-  '<div class="cfoot"><button class="btn" id="cmCancel">取消</button><button class="btn primary" id="cmOk">保存</button></div>');
+  '<div class="cfoot"><button class="btn danger" id="cmCertDel" style="margin-right:auto">删除证书</button><button class="btn" id="cmCancel">取消</button><button class="btn primary" id="cmOk">保存</button></div>');
   $('#cmCancel').onclick=closeCModal;
+  // 删除在编辑弹窗里点：进删除确认（取消则回到列表，编辑中的未保存改动不保留，与原列表删除一致）。
+  $('#cmCertDel').onclick=()=>pxCertDelConfirm(c);
   $('#cmOk').onclick=async()=>{
     $('#cmCertEditErr').textContent='';
     const payload={};
     if(isAcme){
       payload.autoRenew=!!$('#cmCertEditRenew').checked;
+      payload.name=$('#cmCertEditName').value.trim();
       const tokEl=$('#cmCertEditToken');
       if(tokEl&&tokEl.value.trim())payload.cfToken=tokEl.value.trim();
     }else{
@@ -1484,6 +1492,26 @@ function pxCertEditModal(c){
   };
 }
 $('#btnPxCertAdd').onclick=()=>pxCertModal();
+// 刷新全部（证书模块右上角）：重读全部证书 + 逐张 OCSP 查吊销；按钮不在弹窗里，结果走顶部提示，
+// OCSP 备注写进各行状态格（与原单张刷新一致）。
+$('#btnPxCertRefreshAll').onclick=async()=>{
+  const btn=$('#btnPxCertRefreshAll');
+  if(btn.disabled)return;
+  btn.disabled=true;const oldTxt=btn.textContent;btn.textContent='刷新中…';
+  try{
+    const r=await api('POST','api/proxy/certs/refresh-all',{});
+    await loadProxy();
+    const notes=r.notes||{};
+    for(const id in notes){
+      if(!notes[id])continue;
+      const vb=document.querySelector('#pxCertBody [data-px-certview="'+CSS.escape(id)+'"]');
+      const row=vb?vb.closest('tr'):null;
+      if(row&&row.cells[2])row.cells[2].innerHTML+='<div class="mono" style="font-size:11px;color:var(--mut)">'+esc(notes[id])+'</div>';
+    }
+    toast('已刷新 '+(r.certs||[]).length+' 张证书');
+  }catch(e){toast(e.message)}
+  finally{btn.disabled=false;btn.textContent=oldTxt}
+};
 // 证书查看：只显示解析后的公开信息，绝不含私钥（下载为含私钥的 zip，不走查看）。
 function pxCertViewModal(c){
   const sans=[...(c.dnsNames||[]),...(c.ips||[])].map(esc).join('，')||'—';
@@ -1493,8 +1521,24 @@ function pxCertViewModal(c){
     row('名称',esc(c.name))+row('域名',sans)+row('签发者',esc(c.issuer||'—'))+row('主题',esc(c.subject||'—'))+
     row('有效期',esc(c.notBefore||'—')+' ~ '+esc(c.notAfter))+row('序列号',esc(c.serial||'—'))+
     row('SHA256 指纹',esc(c.fingerprint||'—'))+row('来源',c.source==='upload'?'上传':'ACME')+row('状态',stTxt)+
-    '<div class="cfoot"><button class="btn primary" id="cmCancel">关闭</button></div>');
+    '<div class="cfoot"><button class="btn" id="cmDl">下载</button><button class="btn primary" id="cmCancel">关闭</button></div>');
   $('#cmCancel').onclick=closeCModal;
+  $('#cmDl').onclick=()=>pxCertDownload(c.id);
+}
+// 证书下载：zip（含证书与私钥），与原列表下载同一地址。
+function pxCertDownload(id){
+  const a=document.createElement('a');
+  a.href='api/proxy/certs/'+encodeURIComponent(id)+'/download';
+  a.style.display='none';document.body.appendChild(a);a.click();a.remove();
+}
+// 删除确认（编辑弹窗里的删除按钮用）：面板回落 + 规则自动改回自动选择（deleteCertByID 的实际行为）。
+function pxCertDelConfirm(c){
+  const src=c.source==='upload'?'上传的证书 ':'证书 ';
+  openCModal('<h3 class="mtitle">删除证书</h3><div class="csub">确认删除'+src+esc(c.name)+'？面板若用了它会回退到 HTTP；引用它的反代规则会自动改回自动选择。</div>'+
+  '<div class="fld"><div class="hint" id="cmCertDelErr" style="color:var(--red);min-height:18px"></div></div>'+
+  '<div class="cfoot"><button class="btn" id="cmCancel">取消</button><button class="btn dangerfill" id="cmOk">确认删除</button></div>');
+  $('#cmCancel').onclick=closeCModal;
+  $('#cmOk').onclick=async()=>{try{await api('DELETE','api/proxy/certs/'+encodeURIComponent(c.id));closeCModal();loadProxy()}catch(e){$('#cmCertDelErr').textContent=e.message}};
 }
 function bindPxRowEvents(){
   $$('#pxRuleBody [data-px-toggle]').forEach(b=>b.onclick=async()=>{
@@ -1507,53 +1551,39 @@ function bindPxRowEvents(){
     if(r)pxRuleModal({...r});
   });
   $$('#pxRuleBody [data-px-del]').forEach(b=>b.onclick=()=>pxDelModal(b.dataset.pxDel,b.dataset.pxDom));
-  // 证书刷新：重读文件 + 实时 OCSP 查吊销；结果直接写回本行状态格（吊销未确认也留一行小字，
-  // 不靠顶部 toast，刷新完不等整页重载丢提示）。编辑：打开编辑弹窗。
-  $$('#pxCertBody [data-px-certrefresh]').forEach(b=>b.onclick=async()=>{
-    const id=b.dataset.pxCertrefresh;
-    b.disabled=true;
-    try{
-      const r=await api('POST','api/proxy/certs/refresh',{id});
-      const c=r.cert;
-      if(c){
-        const list=pxData.certs||[];
-        const ix=list.findIndex(x=>x.id===id);
-        if(ix>=0)list[ix]=c;
-        renderProxy();
-        // renderProxy 后按行内删除按钮定位本行，把刷新备注写进状态格（第 3 列）。
-        const delBtn=document.querySelector('#pxCertBody [data-px-certdel="'+CSS.escape(id)+'"]');
-        const row=delBtn?delBtn.closest('tr'):null;
-        if(row&&row.cells[2]){
-          const stTxt=c.status==='revoked'?'<span style="color:var(--red);font-weight:600">已吊销</span>':(c.status==='expired'?'<span style="color:var(--red);font-weight:600">已过期</span>':'<span style="color:var(--green);font-weight:600">有效</span>');
-          row.cells[2].innerHTML=stTxt+(r.note?'<div class="mono" style="font-size:11px;color:var(--mut)">'+esc(r.note)+'</div>':'');
-        }
+  // 证书更新：立即续期（不看到期时间、不看自动续签开关），轮询与申请同理（快照上次结果判本次成败）。
+  $$('#pxCertBody [data-px-certrenew]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.pxCertrenew;
+    if(b.disabled)return;
+    let prevErr='',prevOk='';
+    try{const st0=await api('GET','api/certs/acme/status');prevErr=st0.lastError||'';prevOk=st0.lastOk||''}catch(e){}
+    b.disabled=true;const oldTxt=b.textContent;b.textContent='更新中…';
+    let poll=null;
+    const tick=async()=>{
+      let st;try{st=await api('GET','api/certs/acme/status')}catch(e){return}
+      if(!st)return;
+      if(!st.running){
+        clearInterval(poll);poll=null;
+        b.disabled=false;b.textContent=oldTxt;
+        if(st.lastError&&st.lastError!==prevErr)toast('更新失败：'+st.lastError);
+        else if(st.lastOk&&st.lastOk!==prevOk){toast('证书已更新');loadProxy()}
+        else if(st.lastError)toast('更新失败：'+st.lastError);
+        else{toast('更新已结束，证书列表已刷新');loadProxy()}
       }
-    }catch(e){
-      const delBtn=document.querySelector('#pxCertBody [data-px-certdel="'+CSS.escape(id)+'"]');
-      const row=delBtn?delBtn.closest('tr'):null;
-      if(row&&row.cells[2])row.cells[2].innerHTML+='<div class="mono" style="font-size:11px;color:var(--red)">'+esc(e.message)+'</div>';
-    }finally{b.disabled=false}
+    };
+    try{
+      await api('POST','api/certs/acme/renew',{id});
+      poll=setInterval(tick,3000);
+      tick();
+    }catch(e){b.disabled=false;b.textContent=oldTxt;toast(e.message)}
   });
   $$('#pxCertBody [data-px-certview]').forEach(b=>b.onclick=()=>{
     const c=(pxData.certs||[]).find(x=>x.id===b.dataset.pxCertview);
     if(c)pxCertViewModal(c);
   });
-  $$('#pxCertBody [data-px-certdl]').forEach(b=>b.onclick=()=>{
-    const a=document.createElement('a');
-    a.href='api/proxy/certs/'+encodeURIComponent(b.dataset.pxCertdl)+'/download';
-    a.style.display='none';document.body.appendChild(a);a.click();a.remove();
-  });
   $$('#pxCertBody [data-px-certedit]').forEach(b=>b.onclick=()=>{
     const c=(pxData.certs||[]).find(x=>x.id===b.dataset.pxCertedit);
     if(c)pxCertEditModal(c);
-  });
-  $$('#pxCertBody [data-px-certdel]').forEach(b=>b.onclick=()=>{
-    const c=(pxData.certs||[]).find(x=>x.id===b.dataset.pxCertdel);
-    openCModal('<h3 class="mtitle">删除证书</h3><div class="csub">确认删除上传的证书 '+(c?esc(c.name):'')+'？删除后引用它的规则下次保存时会因证书不存在而报错，需先改规则。</div>'+
-    '<div class="fld"><div class="hint" id="cmCertDelErr" style="color:var(--red);min-height:18px"></div></div>'+
-    '<div class="cfoot"><button class="btn" id="cmCancel">取消</button><button class="btn dangerfill" id="cmOk">确认删除</button></div>');
-    $('#cmCancel').onclick=closeCModal;
-    $('#cmOk').onclick=async()=>{try{await api('DELETE','api/proxy/certs/'+encodeURIComponent(b.dataset.pxCertdel));closeCModal();loadProxy()}catch(e){$('#cmCertDelErr').textContent=e.message}};
   });
 }
 /* ---------- 总览 ---------- */

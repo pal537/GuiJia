@@ -112,7 +112,8 @@ func applyProxyRuleDefaults(r *ProxyRule) {
 // 证书元数据(API 只返回这些, 绝不返回私钥内容)
 type ProxyCertMeta struct {
 	ID       string   `json:"id"`       // 上传: "upload:"+名; 在线申请: "acme:"+首域名
-	Name     string   `json:"name"`     // 显示名(去掉 .crt 的文件名, ACME 则为域名)
+	Name     string   `json:"name"`     // 显示名(去掉 .crt 的文件名, ACME 则为域名或备注名)
+	Remark   string   `json:"remark,omitempty"` // ACME 备注原值（无备注为空）；编辑弹窗预填用，列表显示仍用 Name
 	Source   string   `json:"source"`   // "upload" | "acme"
 	Dir      string   `json:"dir"`      // 所在目录
 	Path     string   `json:"path"`     // crt 全路径
